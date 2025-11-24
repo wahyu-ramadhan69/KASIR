@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      Role
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  pengeluaran Pengeluaran[]
+}
+
+model Barang {
+  id              Int          @id @default(autoincrement())
+  namaBarang      String
+  hargaBeli       Int
+  hargaJual       Int
+  stok            Int          @default(0)
+  jumlahPerkardus Int
+  ukuran          Int
+  satuan          String
+  supplier        Supplier     @relation(fields: [supplierId], references: [id])
+  supplierId      Int
+  pembelianItems  PembelianItem[]
+  penjualanItems  PenjualanItem[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Supplier {
+  id              Int      @id @default(autoincrement())
+  namaSupplier    String
+  alamat          String
+  noHp            String
+  limitHutang     Int
+  hutang          Int      @default(0)
+  barang          Barang[]
+  pembelian       PembelianHeader[]
+}
+
+model Customer {
+  id            Int      @id @default(autoincrement())
+  nik           String   @unique
+  nama          String
+  alamat        String
+  namaToko      String
+  noHp          String
+  limit_piutang Int       @default(0)
+  piutang       Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  penjualan PenjualanHeader[]
+}
+
+model PembelianHeader {
+  id               Int              @id @default(autoincrement())
+  kodePembelian    String           @unique
+  supplier         Supplier         @relation(fields: [supplierId], references: [id])
+  supplierId       Int
+  subtotal         Int              @default(0)
+  diskonNota       Int              @default(0)
+  totalHarga       Int              @default(0)
+  jumlahDibayar    Int              @default(0)
+  kembalian        Int              @default(0)
+  statusPembayaran StatusPembayaran @default(HUTANG)
+  statusTransaksi  StatusTransaksi  @default(KERANJANG)
+  items            PembelianItem[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  tanggalJatuhTempo DateTime        @default(now())
+}
+
+model PembelianItem {
+  id              Int             @id @default(autoincrement())
+  pembelian       PembelianHeader @relation(fields: [pembelianId], references: [id])
+  pembelianId     Int
+  barang          Barang          @relation(fields: [barangId], references: [id])
+  barangId        Int
+  jumlahDus       Int             @default(0)
+  hargaPokok      Int
+  diskonPerItem   Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model PenjualanHeader {
+  id                Int              @id @default(autoincrement())
+  kodePenjualan     String           @unique
+  customer          Customer?        @relation(fields: [customerId], references: [id])
+  customerId        Int?
+  namaCustomer      String?         
+  subtotal          Int              @default(0)
+  diskonNota        Int              @default(0)
+  totalHarga        Int              @default(0)
+  jumlahDibayar     Int              @default(0)
+  kembalian         Int              @default(0)
+  metodePembayaran  MetodePembayaran @default(CASH)
+  statusPembayaran  StatusPembayaran @default(HUTANG)
+  statusTransaksi   StatusTransaksi  @default(KERANJANG)
+  tanggalTransaksi  DateTime         @default(now())
+  tanggalJatuhTempo DateTime?
+  userId            Int?             
+  items             PenjualanItem[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model PenjualanItem {
+  id             Int              @id @default(autoincrement())
+  penjualanId    Int
+  barangId       Int
+  jumlahDus      Int              @default(0)
+  jumlahPcs      Int              @default(0)
+  hargaJual      Int              // Harga jual per dus (dari barang atau custom)
+  hargaBeli      Int              @default(0) // BARU: Harga beli per dus untuk hitung laba
+  diskonPerItem  Int              @default(0) // Diskon per dus
+  laba           Int              @default(0) // BARU: Total laba dari item ini (otomatis dihitung)
+  
+  penjualan      PenjualanHeader  @relation(fields: [penjualanId], references: [id], onDelete: Cascade)
+  barang         Barang           @relation(fields: [barangId], references: [id])
+  
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([penjualanId])
+  @@index([barangId])
+}
+
+model Pengeluaran {
+  id            Int               @id @default(autoincrement())
+  jenis         JenisPengeluaran
+  jumlah        Int              
+  keterangan    String?        
+
+  tanggalInput  DateTime          @default(now()) 
+  updatedAt     DateTime          @updatedAt
+
+  user          User              @relation(fields: [userId], references: [id])
+  userId        Int
+}
+
+enum MetodePembayaran {
+  CASH
+  TRANSFER
+}
+
+enum StatusPembayaran {
+  LUNAS
+  HUTANG
+}
+
+enum StatusTransaksi {
+  KERANJANG
+  SELESAI
+  DIBATALKAN
+}
+
+enum Role{
+  ADMIN
+  KASIR
+}
+
+enum JenisPengeluaran {
+  BAHAN_BAKAR
+  UPAH_KULI
+  LAINNYA
+}

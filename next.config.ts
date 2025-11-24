@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {
+    root: __dirname, // <-- WAJIB: supaya Next.js pakai folder "kasir" sebagai root
+  },
 };
 
 export default nextConfig;

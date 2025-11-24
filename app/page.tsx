@@ -1,65 +1,145 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { FormEvent } from "react";
+import toast from "react-hot-toast";
 import Image from "next/image";
 
-export default function Home() {
+export default function LoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  async function handleLogin(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (res.ok) {
+      router.push("/dashboard/admin/barang");
+      setUsername("");
+      setUsername("");
+      setLoading(false);
+    } else {
+      const data = await res.json();
+      toast.error(data?.error || "Terjadi kesalahan login");
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="lg:flex bg-white">
+      <div className="lg:w-1/2 xl:max-w-screen-sm">
+        <div className="py-12 bg-white lg:bg-white flex justify-center lg:justify-start lg:px-12">
+          <div className="cursor-pointer flex items-center">
+            <div>
+              <Image
+                src="/gun.png"
+                alt="logo"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="text-lg text-indigo-800 tracking-wide ml-2 font-semibold">
+              MFP INJECTOR
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="mt-10 px-12 sm:px-24 md:px-48 lg:px-12 lg:mt-16 xl:px-24 xl:max-w-2xl">
+          <h2 className="text-center text-4xl text-indigo-900 font-display font-semibold lg:text-left xl:text-5xl xl:text-bold">
+            Log in
+          </h2>
+
+          <div className="mt-12">
+            <form onSubmit={handleLogin}>
+              <div className="mt-8">
+                <div className="text-sm font-bold text-gray-700 tracking-wide">
+                  Username
+                </div>
+                <input
+                  className="w-full text-lg py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mt-8">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm font-bold text-gray-700 tracking-wide">
+                    Password
+                  </div>
+                </div>
+                <input
+                  className="w-full text-lg py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mt-10">
+                {loading ? (
+                  <div className="bg-indigo-500 text-gray-100 p-4 w-full rounded-full tracking-wide font-semibold font-display focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg flex justify-center items-center">
+                    <svg
+                      className="animate-spin h-7 w-7 text-purple-100"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      ></path>
+                    </svg>
+                  </div>
+                ) : (
+                  <button
+                    className="bg-indigo-500 text-gray-100 p-4 w-full rounded-full tracking-wide font-semibold font-display focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg"
+                    type="submit"
+                  >
+                    Log In
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
         </div>
-      </main>
+      </div>
+
+      {/* Bagian kanan untuk gambar ilustrasi */}
+      <div className="hidden lg:flex items-center justify-center bg-indigo-100 flex-1 h-screen">
+        <div className="max-w-xs transform duration-200 hover:scale-150 cursor-pointer">
+          <Image
+            src="/gun.png"
+            className="w-full h-full object-cover"
+            alt="logo"
+            width={200}
+            height={200}
+          />
+        </div>
+      </div>
     </div>
   );
 }

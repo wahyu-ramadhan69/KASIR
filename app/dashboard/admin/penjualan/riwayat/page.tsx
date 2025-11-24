@@ -1,0 +1,1381 @@
+"use client";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Search,
+  Receipt,
+  RefreshCw,
+  X,
+  Check,
+  CreditCard,
+  AlertCircle,
+  ArrowLeft,
+  Eye,
+  Banknote,
+  Calendar,
+  Loader2,
+  Clock,
+  AlertTriangle,
+  User,
+  Building2,
+  Package,
+} from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
+import Link from "next/link";
+
+interface Customer {
+  id: number;
+  nik: string;
+  nama: string;
+  alamat: string;
+  namaToko: string;
+  noHp: string;
+  limit_piutang: number;
+  piutang: number;
+}
+
+interface Barang {
+  id: number;
+  namaBarang: string;
+  hargaBeli: number;
+  hargaJual: number;
+  stok: number;
+  jumlahPerkardus: number;
+  ukuran: number;
+  satuan: string;
+}
+
+interface PenjualanItem {
+  id: number;
+  barangId: number;
+  jumlahDus: number;
+  jumlahPcs: number;
+  hargaJual: number;
+  diskonPerItem: number;
+  barang: Barang;
+}
+
+interface PenjualanHeader {
+  id: number;
+  kodePenjualan: string;
+  customerId: number | null;
+  namaCustomer: string | null;
+  subtotal: number;
+  diskonNota: number;
+  totalHarga: number;
+  jumlahDibayar: number;
+  kembalian: number;
+  metodePembayaran: "CASH" | "TRANSFER";
+  statusPembayaran: "LUNAS" | "HUTANG";
+  statusTransaksi: "KERANJANG" | "SELESAI" | "DIBATALKAN";
+  tanggalTransaksi: string;
+  tanggalJatuhTempo: string;
+  customer: Customer | null;
+  items: PenjualanItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+// Helper function untuk menghitung status jatuh tempo
+const getJatuhTempoStatus = (tanggalJatuhTempo: string) => {
+  const now = new Date();
+  const jatuhTempo = new Date(tanggalJatuhTempo);
+  const diffTime = jatuhTempo.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return {
+      status: "overdue",
+      label: `Terlambat ${Math.abs(diffDays)} hari`,
+      color: "bg-red-100 text-red-700 border-red-200",
+      bgColor: "bg-red-50",
+      textColor: "text-red-600",
+      icon: AlertTriangle,
+    };
+  } else if (diffDays <= 7) {
+    return {
+      status: "critical",
+      label: diffDays === 0 ? "Hari ini" : `${diffDays} hari lagi`,
+      color: "bg-red-100 text-red-700 border-red-200",
+      bgColor: "bg-red-50",
+      textColor: "text-red-600",
+      icon: AlertTriangle,
+    };
+  } else if (diffDays <= 30) {
+    return {
+      status: "warning",
+      label: `${diffDays} hari lagi`,
+      color: "bg-yellow-100 text-yellow-700 border-yellow-200",
+      bgColor: "bg-yellow-50",
+      textColor: "text-yellow-600",
+      icon: Clock,
+    };
+  } else {
+    return {
+      status: "safe",
+      label: `${diffDays} hari lagi`,
+      color: "bg-green-100 text-green-700 border-green-200",
+      bgColor: "bg-green-50",
+      textColor: "text-green-600",
+      icon: Check,
+    };
+  }
+};
+
+const RiwayatPenjualanPage = () => {
+  // Data state
+  const [penjualanList, setPenjualanList] = useState<PenjualanHeader[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+
+  // Filter state
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("SELESAI");
+  const [filterPembayaran, setFilterPembayaran] = useState<string>("all");
+  const [filterMetode, setFilterMetode] = useState<string>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
+  // Debounce search
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Infinite scroll observer
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  // Detail modal
+  const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
+  const [selectedPenjualan, setSelectedPenjualan] =
+    useState<PenjualanHeader | null>(null);
+
+  // Pelunasan modal
+  const [showPelunasanModal, setShowPelunasanModal] = useState<boolean>(false);
+  const [pelunasanPenjualan, setPelunasanPenjualan] =
+    useState<PenjualanHeader | null>(null);
+  const [jumlahBayar, setJumlahBayar] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Statistik
+  const [stats, setStats] = useState({
+    totalTransaksi: 0,
+    totalPendapatan: 0,
+    totalHutang: 0,
+    totalLunas: 0,
+    totalDibatalkan: 0,
+    hutangJatuhTempo: 0,
+  });
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Fetch data when filters change
+  useEffect(() => {
+    fetchPenjualan(1, true);
+  }, [
+    filterStatus,
+    filterPembayaran,
+    filterMetode,
+    startDate,
+    endDate,
+    debouncedSearch,
+  ]);
+
+  // Fetch stats on mount
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  // Setup intersection observer for infinite scroll
+  useEffect(() => {
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          pagination?.hasMore &&
+          !loadingMore &&
+          !loading
+        ) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [pagination, loadingMore, loading]);
+
+  const buildQueryParams = (page: number) => {
+    const params = new URLSearchParams();
+    params.append("page", page.toString());
+    params.append("limit", "20");
+
+    if (filterStatus !== "all") {
+      params.append("status", filterStatus);
+    }
+
+    if (filterPembayaran !== "all") {
+      params.append("pembayaran", filterPembayaran);
+    }
+
+    if (debouncedSearch) {
+      params.append("search", debouncedSearch);
+    }
+
+    if (startDate) {
+      params.append("startDate", startDate);
+    }
+
+    if (endDate) {
+      params.append("endDate", endDate);
+    }
+
+    return params.toString();
+  };
+
+  const fetchPenjualan = async (page: number = 1, reset: boolean = false) => {
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      const queryParams = buildQueryParams(page);
+      const res = await fetch(`/api/penjualan?${queryParams}`);
+      const data = await res.json();
+
+      if (data.success) {
+        let filtered = data.data;
+
+        // Filter out KERANJANG since this is riwayat page
+        if (filterStatus === "all") {
+          filtered = data.data.filter(
+            (p: PenjualanHeader) =>
+              p.statusTransaksi === "SELESAI" ||
+              p.statusTransaksi === "DIBATALKAN"
+          );
+        }
+
+        // Filter by metode pembayaran (client side karena tidak ada di API)
+        if (filterMetode !== "all") {
+          filtered = filtered.filter(
+            (p: PenjualanHeader) => p.metodePembayaran === filterMetode
+          );
+        }
+
+        if (reset) {
+          setPenjualanList(filtered);
+        } else {
+          setPenjualanList((prev) => [...prev, ...filtered]);
+        }
+        setPagination(data.pagination);
+      }
+    } catch (error) {
+      console.error("Error fetching penjualan:", error);
+      toast.error("Gagal mengambil data penjualan");
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const selesaiRes = await fetch(
+        "/api/penjualan?status=SELESAI&limit=1000"
+      );
+      const selesaiData = await selesaiRes.json();
+
+      const dibatalkanRes = await fetch(
+        "/api/penjualan?status=DIBATALKAN&limit=1000"
+      );
+      const dibatalkanData = await dibatalkanRes.json();
+
+      if (selesaiData.success && dibatalkanData.success) {
+        const selesaiList = selesaiData.data as PenjualanHeader[];
+        const dibatalkanList = dibatalkanData.data as PenjualanHeader[];
+
+        const hutangList = selesaiList.filter(
+          (p) => p.statusPembayaran === "HUTANG"
+        );
+
+        const totalHutang = hutangList.reduce(
+          (sum, p) => sum + (p.totalHarga - p.jumlahDibayar),
+          0
+        );
+
+        const totalPendapatan = selesaiList.reduce(
+          (sum, p) => sum + p.jumlahDibayar,
+          0
+        );
+
+        // Hitung hutang yang akan jatuh tempo dalam 7 hari
+        const now = new Date();
+        const hutangJatuhTempo = hutangList.filter((p) => {
+          if (!p.tanggalJatuhTempo) return false;
+          const jatuhTempo = new Date(p.tanggalJatuhTempo);
+          const diffTime = jatuhTempo.getTime() - now.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          return diffDays <= 7;
+        }).length;
+
+        const totalLunas = selesaiList.filter(
+          (p) => p.statusPembayaran === "LUNAS"
+        ).length;
+
+        setStats({
+          totalTransaksi: selesaiList.length,
+          totalPendapatan,
+          totalHutang,
+          totalLunas,
+          totalDibatalkan: dibatalkanList.length,
+          hutangJatuhTempo,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
+
+  const loadMore = () => {
+    if (pagination && pagination.hasMore && !loadingMore) {
+      fetchPenjualan(pagination.page + 1, false);
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchPenjualan(1, true);
+    fetchStats();
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    setFilterStatus("SELESAI");
+    setFilterPembayaran("all");
+    setFilterMetode("all");
+    setStartDate("");
+    setEndDate("");
+  };
+
+  const handleViewDetail = (penjualan: PenjualanHeader) => {
+    setSelectedPenjualan(penjualan);
+    setShowDetailModal(true);
+  };
+
+  const handleOpenPelunasan = (penjualan: PenjualanHeader) => {
+    setPelunasanPenjualan(penjualan);
+    const sisaHutang = penjualan.totalHarga - penjualan.jumlahDibayar;
+    setJumlahBayar(sisaHutang.toString());
+    setShowPelunasanModal(true);
+  };
+
+  const handlePelunasan = async () => {
+    if (!pelunasanPenjualan || !jumlahBayar) return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(
+        `/api/penjualan/${pelunasanPenjualan.id}/bayar-hutang`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jumlahBayar: parseInt(jumlahBayar) }),
+        }
+      );
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        setShowPelunasanModal(false);
+        setPelunasanPenjualan(null);
+        setJumlahBayar("");
+        handleRefresh();
+      } else {
+        toast.error(data.error || "Gagal melakukan pembayaran");
+      }
+    } catch (error) {
+      console.error("Error paying debt:", error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatRupiah = (number: number): string => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(number);
+  };
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getSisaHutang = (penjualan: PenjualanHeader): number => {
+    return penjualan.totalHarga - penjualan.jumlahDibayar;
+  };
+
+  const getCustomerName = (penjualan: PenjualanHeader): string => {
+    if (penjualan.customer) {
+      return penjualan.customer.nama;
+    }
+    return penjualan.namaCustomer || "-";
+  };
+
+  const hasActiveFilters =
+    filterStatus !== "SELESAI" ||
+    filterPembayaran !== "all" ||
+    filterMetode !== "all" ||
+    startDate ||
+    endDate ||
+    debouncedSearch;
+
+  return (
+    <div className="w-full max-w-7xl mx-auto">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: { background: "#333", color: "#fff" },
+          success: { style: { background: "#22c55e" } },
+          error: { style: { background: "#ef4444" } },
+        }}
+      />
+
+      {/* Header */}
+      <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl p-6 mb-6 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard/admin/penjualan"
+              className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-all"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">
+                Riwayat Penjualan
+              </h1>
+              <p className="text-blue-100">
+                Lihat riwayat dan kelola pembayaran hutang customer
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="bg-white hover:bg-blue-50 text-blue-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Statistik */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-500 text-xs font-medium">
+                Total Transaksi
+              </p>
+              <p className="text-xl font-bold text-gray-900 mt-1">
+                {stats.totalTransaksi}
+              </p>
+            </div>
+            <div className="bg-blue-100 p-2 rounded-lg">
+              <Receipt className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-500 text-xs font-medium">
+                Total Pendapatan
+              </p>
+              <p className="text-lg font-bold text-green-600 mt-1">
+                {formatRupiah(stats.totalPendapatan)}
+              </p>
+            </div>
+            <div className="bg-green-100 p-2 rounded-lg">
+              <Banknote className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-500 text-xs font-medium">Total Piutang</p>
+              <p className="text-lg font-bold text-red-600 mt-1">
+                {formatRupiah(stats.totalHutang)}
+              </p>
+            </div>
+            <div className="bg-red-100 p-2 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-500 text-xs font-medium">
+                Jatuh Tempo ≤7 Hari
+              </p>
+              <p className="text-xl font-bold text-orange-600 mt-1">
+                {stats.hutangJatuhTempo}
+              </p>
+            </div>
+            <div className="bg-orange-100 p-2 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-orange-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-500 text-xs font-medium">Lunas</p>
+              <p className="text-xl font-bold text-green-600 mt-1">
+                {stats.totalLunas}
+              </p>
+            </div>
+            <div className="bg-green-100 p-2 rounded-lg">
+              <Check className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-500 text-xs font-medium">Dibatalkan</p>
+              <p className="text-xl font-bold text-gray-600 mt-1">
+                {stats.totalDibatalkan}
+              </p>
+            </div>
+            <div className="bg-gray-100 p-2 rounded-lg">
+              <X className="w-5 h-5 text-gray-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter & Search - Compact Single Row */}
+      <div className="bg-white rounded-lg p-4 mb-6 shadow-md border border-gray-100">
+        <div className="flex flex-col lg:flex-row gap-3">
+          {/* Search */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Cari kode penjualan, nama customer, atau toko..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+            />
+          </div>
+
+          {/* Filters in one row */}
+          <div className="flex gap-2 flex-wrap lg:flex-nowrap">
+            {/* Status Transaksi */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm min-w-[140px]"
+            >
+              <option value="all">Selesai</option>
+              <option value="SELESAI">Selesai</option>
+              <option value="DIBATALKAN">Dibatalkan</option>
+            </select>
+
+            {/* Status Pembayaran */}
+            <select
+              value={filterPembayaran}
+              onChange={(e) => setFilterPembayaran(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm min-w-[160px]"
+            >
+              <option value="all">Semua Pembayaran</option>
+              <option value="LUNAS">Lunas</option>
+              <option value="HUTANG">Piutang</option>
+            </select>
+
+            {/* Metode Pembayaran */}
+            <select
+              value={filterMetode}
+              onChange={(e) => setFilterMetode(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm min-w-[130px]"
+            >
+              <option value="all">Semua Metode</option>
+              <option value="CASH">Cash</option>
+              <option value="TRANSFER">Transfer</option>
+            </select>
+
+            {/* Tanggal Mulai */}
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                placeholder="Tanggal Mulai"
+                className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm min-w-[150px]"
+              />
+            </div>
+
+            {/* Tanggal Akhir */}
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                placeholder="Tanggal Akhir"
+                className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm min-w-[150px]"
+              />
+            </div>
+
+            {/* Reset Button */}
+            {hasActiveFilters && (
+              <button
+                onClick={handleClearFilters}
+                className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-all flex items-center gap-2 whitespace-nowrap"
+                title="Reset semua filter"
+              >
+                <X className="w-4 h-4" />
+                <span className="hidden xl:inline">Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Info sorting - sekarang di luar flex container */}
+        {filterPembayaran === "HUTANG" && (
+          <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-yellow-600" />
+            <span className="text-sm text-yellow-700">
+              Data diurutkan berdasarkan tanggal jatuh tempo terdekat
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden">
+        {loading && penjualanList.length === 0 ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Kode
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Tanggal
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Total
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Piutang
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Jatuh Tempo
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Aksi
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {penjualanList.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-6 py-12 text-center text-gray-500"
+                    >
+                      <Receipt className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                      <p>Tidak ada data penjualan ditemukan</p>
+                    </td>
+                  </tr>
+                ) : (
+                  penjualanList.map((pj) => {
+                    const sisaHutang = getSisaHutang(pj);
+                    const jatuhTempoStatus =
+                      pj.statusPembayaran === "HUTANG" && pj.tanggalJatuhTempo
+                        ? getJatuhTempoStatus(pj.tanggalJatuhTempo)
+                        : null;
+
+                    return (
+                      <tr
+                        key={pj.id}
+                        className={`hover:bg-gray-50 transition-colors ${
+                          jatuhTempoStatus?.status === "overdue" ||
+                          jatuhTempoStatus?.status === "critical"
+                            ? "bg-red-50/50"
+                            : ""
+                        }`}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <p className="font-medium text-gray-900 text-sm">
+                            {pj.kodePenjualan}
+                          </p>
+                          <span
+                            className={`text-xs px-1.5 py-0.5 rounded ${
+                              pj.metodePembayaran === "CASH"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-purple-100 text-purple-700"
+                            }`}
+                          >
+                            {pj.metodePembayaran}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <p className="text-sm font-medium text-gray-900">
+                            {getCustomerName(pj)}
+                          </p>
+                          {pj.customer?.namaToko && (
+                            <p className="text-xs text-gray-500">
+                              {pj.customer.namaToko}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(pj.tanggalTransaksi)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {formatRupiah(pj.totalHarga)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {pj.statusTransaksi === "SELESAI" &&
+                          sisaHutang > 0 ? (
+                            <span className="text-sm font-medium text-red-600">
+                              {formatRupiah(sisaHutang)}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {pj.statusTransaksi === "SELESAI" &&
+                          pj.statusPembayaran === "HUTANG" &&
+                          pj.tanggalJatuhTempo ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs text-gray-600">
+                                {formatDate(pj.tanggalJatuhTempo)}
+                              </span>
+                              {jatuhTempoStatus && (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${jatuhTempoStatus.color}`}
+                                >
+                                  <jatuhTempoStatus.icon className="w-3 h-3" />
+                                  {jatuhTempoStatus.label}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex flex-col gap-1">
+                            <span
+                              className={`px-2 py-0.5 rounded text-xs font-medium inline-block w-fit ${
+                                pj.statusTransaksi === "SELESAI"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {pj.statusTransaksi}
+                            </span>
+                            {pj.statusTransaksi === "SELESAI" && (
+                              <span
+                                className={`px-2 py-0.5 rounded text-xs font-medium inline-block w-fit ${
+                                  pj.statusPembayaran === "LUNAS"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-yellow-100 text-yellow-700"
+                                }`}
+                              >
+                                {pj.statusPembayaran === "HUTANG"
+                                  ? "PIUTANG"
+                                  : pj.statusPembayaran}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleViewDetail(pj)}
+                              className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
+                              title="Lihat Detail"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            {pj.statusTransaksi === "SELESAI" &&
+                              pj.statusPembayaran === "HUTANG" && (
+                                <button
+                                  onClick={() => handleOpenPelunasan(pj)}
+                                  className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all"
+                                  title="Terima Pembayaran"
+                                >
+                                  <Banknote className="w-4 h-4" />
+                                </button>
+                              )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Infinite Scroll Loader */}
+        <div ref={loadMoreRef} className="py-4">
+          {loadingMore && (
+            <div className="flex justify-center items-center gap-2 text-gray-500">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Memuat lebih banyak...</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Pagination Info */}
+      <div className="mt-4 text-center text-sm text-gray-500">
+        {pagination && (
+          <span>
+            Menampilkan {penjualanList.length} dari {pagination.totalCount}{" "}
+            transaksi
+            {pagination.hasMore &&
+              " • Scroll ke bawah untuk memuat lebih banyak"}
+          </span>
+        )}
+      </div>
+
+      {/* Modal Detail */}
+      {showDetailModal && selectedPenjualan && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowDetailModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Detail Penjualan</h2>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+              {/* Info Header */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Kode Penjualan</p>
+                    <p className="font-semibold">
+                      {selectedPenjualan.kodePenjualan}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Tanggal</p>
+                    <p className="font-semibold">
+                      {new Date(
+                        selectedPenjualan.tanggalTransaksi
+                      ).toLocaleString("id-ID")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Customer</p>
+                    <p className="font-semibold">
+                      {getCustomerName(selectedPenjualan)}
+                    </p>
+                    {selectedPenjualan.customer?.namaToko && (
+                      <p className="text-sm text-gray-500">
+                        <Building2 className="w-3 h-3 inline mr-1" />
+                        {selectedPenjualan.customer.namaToko}
+                      </p>
+                    )}
+                    {selectedPenjualan.customer && (
+                      <div className="mt-1 text-xs">
+                        <span className="text-gray-500">Piutang: </span>
+                        <span
+                          className={
+                            selectedPenjualan.customer.piutang > 0
+                              ? "text-red-600 font-medium"
+                              : "text-green-600"
+                          }
+                        >
+                          {formatRupiah(selectedPenjualan.customer.piutang)}
+                        </span>
+                        <span className="text-gray-400">
+                          {" "}
+                          /{" "}
+                          {formatRupiah(
+                            selectedPenjualan.customer.limit_piutang
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Status</p>
+                    <div className="flex gap-2 mt-1 flex-wrap">
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          selectedPenjualan.statusTransaksi === "SELESAI"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {selectedPenjualan.statusTransaksi}
+                      </span>
+                      {selectedPenjualan.statusTransaksi === "SELESAI" && (
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            selectedPenjualan.statusPembayaran === "LUNAS"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {selectedPenjualan.statusPembayaran === "HUTANG"
+                            ? "PIUTANG"
+                            : selectedPenjualan.statusPembayaran}
+                        </span>
+                      )}
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          selectedPenjualan.metodePembayaran === "CASH"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-purple-100 text-purple-700"
+                        }`}
+                      >
+                        {selectedPenjualan.metodePembayaran}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Tanggal Jatuh Tempo */}
+                  {selectedPenjualan.statusPembayaran === "HUTANG" &&
+                    selectedPenjualan.tanggalJatuhTempo && (
+                      <div className="col-span-2">
+                        <p className="text-sm text-gray-500">
+                          Tanggal Jatuh Tempo
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="font-semibold">
+                            {formatDate(selectedPenjualan.tanggalJatuhTempo)}
+                          </p>
+                          {(() => {
+                            const status = getJatuhTempoStatus(
+                              selectedPenjualan.tanggalJatuhTempo
+                            );
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${status.color}`}
+                              >
+                                <status.icon className="w-3 h-3" />
+                                {status.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
+
+              {/* Items */}
+              <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Daftar Barang
+              </h3>
+              <div className="border rounded-lg overflow-hidden mb-4">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Barang</th>
+                      <th className="px-3 py-2 text-center">Qty</th>
+                      <th className="px-3 py-2 text-right">Harga</th>
+                      <th className="px-3 py-2 text-right">Diskon</th>
+                      <th className="px-3 py-2 text-right">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {selectedPenjualan.items?.map((item) => {
+                      const hargaPcs =
+                        item.jumlahPcs > 0
+                          ? Math.round(
+                              (item.hargaJual / item.barang.jumlahPerkardus) *
+                                item.jumlahPcs
+                            )
+                          : 0;
+                      const subtotal =
+                        item.hargaJual * item.jumlahDus +
+                        hargaPcs -
+                        item.diskonPerItem * item.jumlahDus;
+
+                      return (
+                        <tr key={item.id}>
+                          <td className="px-3 py-2">
+                            <p className="font-medium">
+                              {item.barang?.namaBarang}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {item.barang?.jumlahPerkardus} pcs/dus
+                            </p>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {item.jumlahDus > 0 && (
+                              <span className="block">
+                                {item.jumlahDus} dus
+                              </span>
+                            )}
+                            {item.jumlahPcs > 0 && (
+                              <span className="block text-gray-500">
+                                +{item.jumlahPcs} pcs
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {formatRupiah(item.hargaJual)}/dus
+                          </td>
+                          <td className="px-3 py-2 text-right text-red-500">
+                            {item.diskonPerItem > 0
+                              ? `-${formatRupiah(
+                                  item.diskonPerItem * item.jumlahDus
+                                )}`
+                              : "-"}
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium">
+                            {formatRupiah(subtotal)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Subtotal</span>
+                  <span>{formatRupiah(selectedPenjualan.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Diskon Nota</span>
+                  <span className="text-red-500">
+                    -{formatRupiah(selectedPenjualan.diskonNota)}
+                  </span>
+                </div>
+                <div className="flex justify-between font-bold text-lg border-t pt-2">
+                  <span>Total</span>
+                  <span>{formatRupiah(selectedPenjualan.totalHarga)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Dibayar</span>
+                  <span>{formatRupiah(selectedPenjualan.jumlahDibayar)}</span>
+                </div>
+                {selectedPenjualan.kembalian > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Kembalian</span>
+                    <span>{formatRupiah(selectedPenjualan.kembalian)}</span>
+                  </div>
+                )}
+                {getSisaHutang(selectedPenjualan) > 0 && (
+                  <div className="flex justify-between text-sm text-red-600 font-medium">
+                    <span>Sisa Piutang</span>
+                    <span>
+                      {formatRupiah(getSisaHutang(selectedPenjualan))}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              {selectedPenjualan.statusTransaksi === "SELESAI" &&
+                selectedPenjualan.statusPembayaran === "HUTANG" && (
+                  <button
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      handleOpenPelunasan(selectedPenjualan);
+                    }}
+                    className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                  >
+                    <Banknote className="w-5 h-5" />
+                    Terima Pembayaran
+                  </button>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pelunasan */}
+      {showPelunasanModal && pelunasanPenjualan && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowPelunasanModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 rounded-t-xl flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">
+                Terima Pembayaran
+              </h2>
+              <button
+                onClick={() => setShowPelunasanModal(false)}
+                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Info */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Kode</span>
+                    <span className="font-medium">
+                      {pelunasanPenjualan.kodePenjualan}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Customer</span>
+                    <span>{getCustomerName(pelunasanPenjualan)}</span>
+                  </div>
+                  {pelunasanPenjualan.customer && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Piutang Customer</span>
+                      <span className="text-red-600 font-medium">
+                        {formatRupiah(pelunasanPenjualan.customer.piutang)} /{" "}
+                        {formatRupiah(
+                          pelunasanPenjualan.customer.limit_piutang
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Total</span>
+                    <span>{formatRupiah(pelunasanPenjualan.totalHarga)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Sudah Dibayar</span>
+                    <span>
+                      {formatRupiah(pelunasanPenjualan.jumlahDibayar)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold text-red-600 border-t pt-2">
+                    <span>Sisa Piutang</span>
+                    <span>
+                      {formatRupiah(getSisaHutang(pelunasanPenjualan))}
+                    </span>
+                  </div>
+                  {/* Tanggal Jatuh Tempo di modal */}
+                  {pelunasanPenjualan.tanggalJatuhTempo && (
+                    <div className="flex justify-between items-center text-sm border-t pt-2">
+                      <span className="text-gray-500">Jatuh Tempo</span>
+                      <div className="flex items-center gap-2">
+                        <span>
+                          {formatDate(pelunasanPenjualan.tanggalJatuhTempo)}
+                        </span>
+                        {(() => {
+                          const status = getJatuhTempoStatus(
+                            pelunasanPenjualan.tanggalJatuhTempo
+                          );
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${status.color}`}
+                            >
+                              <status.icon className="w-3 h-3" />
+                              {status.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Input */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Jumlah Pembayaran <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={jumlahBayar}
+                  onChange={(e) => setJumlahBayar(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-lg"
+                  placeholder="Masukkan jumlah pembayaran"
+                />
+              </div>
+
+              {/* Quick Amount */}
+              <div className="flex gap-2 flex-wrap mb-4">
+                <button
+                  onClick={() =>
+                    setJumlahBayar(getSisaHutang(pelunasanPenjualan).toString())
+                  }
+                  className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded text-sm hover:bg-emerald-200"
+                >
+                  Lunasi Semua
+                </button>
+                {[50000, 100000, 200000, 500000].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setJumlahBayar(amount.toString())}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+                  >
+                    {formatRupiah(amount)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Preview */}
+              {jumlahBayar && parseInt(jumlahBayar) > 0 && (
+                <div
+                  className={`rounded-lg p-4 mb-4 ${
+                    parseInt(jumlahBayar) >= getSisaHutang(pelunasanPenjualan)
+                      ? "bg-green-50 border border-green-200"
+                      : "bg-yellow-50 border border-yellow-200"
+                  }`}
+                >
+                  {parseInt(jumlahBayar) >=
+                  getSisaHutang(pelunasanPenjualan) ? (
+                    <>
+                      <div className="flex items-center gap-2 text-green-700 font-medium">
+                        <Check className="w-5 h-5" />
+                        Piutang akan LUNAS
+                      </div>
+                      {parseInt(jumlahBayar) >
+                        getSisaHutang(pelunasanPenjualan) && (
+                        <p className="text-green-600 mt-1">
+                          Kembalian:{" "}
+                          {formatRupiah(
+                            parseInt(jumlahBayar) -
+                              getSisaHutang(pelunasanPenjualan)
+                          )}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 text-yellow-700 font-medium">
+                        <AlertCircle className="w-5 h-5" />
+                        Pembayaran Sebagian
+                      </div>
+                      <p className="text-yellow-600 mt-1">
+                        Sisa Piutang:{" "}
+                        {formatRupiah(
+                          getSisaHutang(pelunasanPenjualan) -
+                            parseInt(jumlahBayar)
+                        )}
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPelunasanModal(false)}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handlePelunasan}
+                  disabled={
+                    isSubmitting || !jumlahBayar || parseInt(jumlahBayar) <= 0
+                  }
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    "Memproses..."
+                  ) : (
+                    <>
+                      <CreditCard className="w-5 h-5" />
+                      Terima
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RiwayatPenjualanPage;
