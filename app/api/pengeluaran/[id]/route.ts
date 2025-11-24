@@ -6,9 +6,10 @@ const prisma = new PrismaClient();
 // PUT - Update pengeluaran
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // ← Ubah jadi Promise
 ) {
   try {
+    const { id } = await params; // ← Await params
     const body = await request.json();
     const { jenis, jumlah, keterangan } = body;
 
@@ -22,7 +23,7 @@ export async function PUT(
     }
 
     const pengeluaran = await prisma.pengeluaran.update({
-      where: { id: parseInt(params.id) },
+      where: { id: parseInt(id) }, // ← Gunakan id yang sudah di-await
       data: {
         jenis,
         jumlah: parseInt(jumlah),
@@ -51,11 +52,13 @@ export async function PUT(
 // DELETE - Hapus pengeluaran
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // ← Ubah jadi Promise
 ) {
   try {
+    const { id } = await params; // ← Await params
+
     await prisma.pengeluaran.delete({
-      where: { id: parseInt(params.id) },
+      where: { id: parseInt(id) }, // ← Gunakan id yang sudah di-await
     });
 
     return NextResponse.json(

@@ -39,7 +39,7 @@ async function exportMonthly(
   startDate: string | null,
   endDate: string | null,
   search: string | null
-) {
+): Promise<NextResponse> {
   const whereHeader: any = {
     statusTransaksi: "SELESAI",
   };
@@ -149,7 +149,7 @@ async function createExcelMonthly(
   data: any[],
   startDate: string | null,
   endDate: string | null
-) {
+): Promise<NextResponse> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Laporan Per Item");
 
@@ -305,7 +305,7 @@ async function createExcelMonthly(
 }
 
 // Export Yearly (Per Bulan Jan-Des)
-async function exportYearly(year: number) {
+async function exportYearly(year: number): Promise<NextResponse> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet(`Laporan Tahunan ${year}`);
 

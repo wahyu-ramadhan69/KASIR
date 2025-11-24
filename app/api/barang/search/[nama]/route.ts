@@ -25,9 +25,6 @@ export async function GET(
           mode: "insensitive",
         },
       },
-      include: {
-        jenisBarang: true,
-      },
       orderBy: {
         id: "desc",
       },

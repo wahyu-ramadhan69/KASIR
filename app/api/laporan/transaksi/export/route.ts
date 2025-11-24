@@ -10,37 +10,6 @@ import PDFDocument from "pdfkit";
 
 const prisma = new PrismaClient();
 
-// GET: Export laporan transaksi
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const format = searchParams.get("format") || "excel";
-    const period = searchParams.get("period") || "current";
-    const detail = searchParams.get("detail") !== "false"; // default true
-    const year = searchParams.get("year");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-    const search = searchParams.get("search");
-
-    // Route berdasarkan period
-    if (period === "yearly" && year) {
-      return await exportYearly(parseInt(year));
-    } else if (detail) {
-      return await exportDetail(format, startDate, endDate, search);
-    } else {
-      return await exportSummary(format, startDate, endDate, search);
-    }
-  } catch (error) {
-    console.error("Error exporting:", error);
-    return NextResponse.json(
-      { success: false, error: "Gagal export data" },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
-  }
-}
-
 // =====================================================
 // EXPORT DETAIL (Per Transaksi + Breakdown Items)
 // =====================================================
@@ -49,7 +18,7 @@ async function exportDetail(
   startDate: string | null,
   endDate: string | null,
   search: string | null
-) {
+): Promise<NextResponse> {
   const penjualanList = await fetchPenjualan(startDate, endDate, search);
 
   if (format === "excel") {
@@ -63,7 +32,7 @@ async function exportToExcelDetail(
   data: any[],
   startDate: string | null,
   endDate: string | null
-) {
+): Promise<NextResponse> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Laporan Detail Transaksi");
 
@@ -368,7 +337,7 @@ async function exportSummary(
   startDate: string | null,
   endDate: string | null,
   search: string | null
-) {
+): Promise<NextResponse> {
   const penjualanList = await fetchPenjualan(startDate, endDate, search);
 
   const workbook = new ExcelJS.Workbook();
@@ -536,7 +505,7 @@ async function exportSummary(
 // =====================================================
 // EXPORT YEARLY (Per Bulan Jan-Des)
 // =====================================================
-async function exportYearly(year: number) {
+async function exportYearly(year: number): Promise<NextResponse> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet(`Laporan Tahunan ${year}`);
 
@@ -734,7 +703,7 @@ async function fetchPenjualan(
   startDate: string | null,
   endDate: string | null,
   search: string | null
-) {
+): Promise<any[]> {
   const where: any = {
     statusTransaksi: "SELESAI",
   };
@@ -787,7 +756,7 @@ async function exportToPDF(
   data: any[],
   startDate: string | null,
   endDate: string | null
-) {
+): Promise<NextResponse> {
   return new Promise((resolve) => {
     const doc = new PDFDocument({ margin: 50, size: "A4" });
     const chunks: any[] = [];
@@ -831,4 +800,36 @@ function formatRupiah(num: number): string {
     currency: "IDR",
     minimumFractionDigits: 0,
   }).format(num);
+}
+
+// =====================================================
+// MAIN HANDLER (Harus di paling bawah)
+// =====================================================
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const format = searchParams.get("format") || "excel";
+    const period = searchParams.get("period") || "current";
+    const detail = searchParams.get("detail") !== "false";
+    const year = searchParams.get("year");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    const search = searchParams.get("search");
+
+    if (period === "yearly" && year) {
+      return await exportYearly(parseInt(year));
+    } else if (detail) {
+      return await exportDetail(format, startDate, endDate, search);
+    } else {
+      return await exportSummary(format, startDate, endDate, search);
+    }
+  } catch (error) {
+    console.error("Error exporting:", error);
+    return NextResponse.json(
+      { success: false, error: "Gagal export data" },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
 }
