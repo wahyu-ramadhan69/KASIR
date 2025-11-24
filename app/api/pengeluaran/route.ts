@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 // GET - Mengambil semua pengeluaran
 export async function GET() {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const pengeluaran = await prisma.pengeluaran.findMany({
       orderBy: { id: "desc" },

@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 // GET: Ambil pembelian dengan filter, pagination, dan date range
 export async function GET(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
 
     // Pagination
@@ -124,6 +129,10 @@ export async function GET(request: NextRequest) {
 // POST: Buat pembelian baru (keranjang) - Step 1: Pilih Supplier
 export async function POST(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const body = await request.json();
     const { supplierId } = body;
 

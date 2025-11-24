@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 // POST: Recalculate hutang untuk semua supplier berdasarkan transaksi
 export async function POST(request: NextRequest) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     // Ambil semua supplier
     const suppliers = await prisma.supplier.findMany();
@@ -68,6 +73,10 @@ export async function POST(request: NextRequest) {
 
 // GET: Lihat summary hutang per supplier
 export async function GET(request: NextRequest) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const suppliers = await prisma.supplier.findMany({
       select: {

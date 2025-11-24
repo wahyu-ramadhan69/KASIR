@@ -22,7 +22,7 @@ export default function LoginPage() {
     });
 
     if (res.ok) {
-      router.push("/dashboard/admin/barang");
+      router.push("/dashboard/admin");
       setUsername("");
       setUsername("");
       setLoading(false);
@@ -40,15 +40,15 @@ export default function LoginPage() {
           <div className="cursor-pointer flex items-center">
             <div>
               <Image
-                src="/gun.png"
+                src="/ara2.png"
                 alt="logo"
                 width={40}
                 height={40}
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="text-lg text-indigo-800 tracking-wide ml-2 font-semibold">
-              MFP INJECTOR
+            <div className="text-3xl text-indigo-800 tracking-wide ml-2 font-semibold">
+              AW SEMBAKO
             </div>
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex items-center justify-center bg-indigo-100 flex-1 h-screen">
         <div className="max-w-xs transform duration-200 hover:scale-150 cursor-pointer">
           <Image
-            src="/gun.png"
+            src="/ara2.png"
             className="w-full h-full object-cover"
             alt="logo"
             width={200}

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 // Helper: Hitung ulang total hutang supplier dari semua transaksi
 async function recalculateSupplierHutang(tx: any, supplierId: number) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const pembelianHutang = await tx.pembelianHeader.findMany({
     where: {
       supplierId: supplierId,
@@ -34,6 +39,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const { id } = await params;
     const pembelianId = parseInt(id);

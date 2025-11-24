@@ -69,10 +69,32 @@ const DataBarangPage = () => {
   const [showEditSupplierDropdown, setShowEditSupplierDropdown] =
     useState<boolean>(false);
 
+  // State untuk form add (dengan format Rupiah)
+  const [addFormHargaBeli, setAddFormHargaBeli] = useState<string>("");
+  const [addFormHargaJual, setAddFormHargaJual] = useState<string>("");
+
   useEffect(() => {
     fetchBarang();
     fetchSuppliers();
   }, []);
+
+  // Format input as Rupiah while typing
+  const formatInputRupiah = (value: string): string => {
+    // Remove all non-digit characters
+    const numbers = value.replace(/\D/g, "");
+
+    // Format as Rupiah
+    if (numbers === "") return "";
+
+    const formatted = new Intl.NumberFormat("id-ID").format(parseInt(numbers));
+    return `Rp ${formatted}`;
+  };
+
+  // Parse Rupiah string to number
+  const parseRupiahToNumber = (value: string): number => {
+    const numbers = value.replace(/\D/g, "");
+    return numbers === "" ? 0 : parseInt(numbers);
+  };
 
   const fetchSuppliers = async () => {
     try {
@@ -107,8 +129,8 @@ const DataBarangPage = () => {
       id: barang.id,
       data: {
         namaBarang: barang.namaBarang,
-        hargaBeli: barang.hargaBeli.toString(),
-        hargaJual: barang.hargaJual.toString(),
+        hargaBeli: formatInputRupiah(barang.hargaBeli.toString()),
+        hargaJual: formatInputRupiah(barang.hargaJual.toString()),
         jumlahPerkardus: barang.jumlahPerkardus.toString(),
         ukuran: barang.ukuran.toString(),
         satuan: barang.satuan,
@@ -148,13 +170,25 @@ const DataBarangPage = () => {
   ) => {
     const { name, value } = e.target;
     if (editingBarang) {
-      setEditingBarang({
-        ...editingBarang,
-        data: {
-          ...editingBarang.data,
-          [name]: value,
-        },
-      });
+      // Format harga beli dan harga jual
+      if (name === "hargaBeli" || name === "hargaJual") {
+        const formattedValue = formatInputRupiah(value);
+        setEditingBarang({
+          ...editingBarang,
+          data: {
+            ...editingBarang.data,
+            [name]: formattedValue,
+          },
+        });
+      } else {
+        setEditingBarang({
+          ...editingBarang,
+          data: {
+            ...editingBarang.data,
+            [name]: value,
+          },
+        });
+      }
     }
   };
 
@@ -178,8 +212,8 @@ const DataBarangPage = () => {
         },
         body: JSON.stringify({
           namaBarang: formData.get("namaBarang"),
-          hargaBeli: parseInt(formData.get("hargaBeli") as string),
-          hargaJual: parseInt(formData.get("hargaJual") as string),
+          hargaBeli: parseRupiahToNumber(addFormHargaBeli),
+          hargaJual: parseRupiahToNumber(addFormHargaJual),
           jumlahPerkardus: parseInt(formData.get("jumlahPerkardus") as string),
           ukuran: parseInt(formData.get("ukuran") as string),
           satuan: formData.get("satuan"),
@@ -195,6 +229,8 @@ const DataBarangPage = () => {
         setSupplierSearch("");
         setSelectedSupplierId("");
         setSelectedSupplierName("");
+        setAddFormHargaBeli("");
+        setAddFormHargaJual("");
         fetchBarang();
       } else {
         toast.error(data.error || "Gagal menambahkan barang");
@@ -221,8 +257,8 @@ const DataBarangPage = () => {
         },
         body: JSON.stringify({
           namaBarang: editingBarang.data.namaBarang,
-          hargaBeli: parseInt(editingBarang.data.hargaBeli),
-          hargaJual: parseInt(editingBarang.data.hargaJual),
+          hargaBeli: parseRupiahToNumber(editingBarang.data.hargaBeli),
+          hargaJual: parseRupiahToNumber(editingBarang.data.hargaJual),
           jumlahPerkardus: parseInt(editingBarang.data.jumlahPerkardus),
           ukuran: parseInt(editingBarang.data.ukuran),
           satuan: editingBarang.data.satuan,
@@ -634,6 +670,8 @@ const DataBarangPage = () => {
                   setSupplierSearch("");
                   setSelectedSupplierId("");
                   setSelectedSupplierName("");
+                  setAddFormHargaBeli("");
+                  setAddFormHargaJual("");
                 }}
                 className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
               >
@@ -716,10 +754,14 @@ const DataBarangPage = () => {
                       Harga Beli <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       name="hargaBeli"
+                      value={addFormHargaBeli}
+                      onChange={(e) =>
+                        setAddFormHargaBeli(formatInputRupiah(e.target.value))
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                      placeholder="12000"
+                      placeholder="Rp 12.000"
                       required
                     />
                   </div>
@@ -729,10 +771,14 @@ const DataBarangPage = () => {
                       Harga Jual <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       name="hargaJual"
+                      value={addFormHargaJual}
+                      onChange={(e) =>
+                        setAddFormHargaJual(formatInputRupiah(e.target.value))
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                      placeholder="15000"
+                      placeholder="Rp 15.000"
                       required
                     />
                   </div>
@@ -793,6 +839,8 @@ const DataBarangPage = () => {
                     setSupplierSearch("");
                     setSelectedSupplierId("");
                     setSelectedSupplierName("");
+                    setAddFormHargaBeli("");
+                    setAddFormHargaJual("");
                   }}
                   className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
                 >
@@ -915,7 +963,7 @@ const DataBarangPage = () => {
                       Harga Beli <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       name="hargaBeli"
                       value={editingBarang.data.hargaBeli}
                       onChange={handleInputChange}
@@ -929,7 +977,7 @@ const DataBarangPage = () => {
                       Harga Jual <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       name="hargaJual"
                       value={editingBarang.data.hargaJual}
                       onChange={handleInputChange}

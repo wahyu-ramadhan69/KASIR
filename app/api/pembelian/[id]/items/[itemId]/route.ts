@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -33,6 +34,10 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; itemId: string }> }
 ) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const { id, itemId } = await params;
     const pembelianId = parseInt(id);
@@ -118,6 +123,10 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; itemId: string }> }
 ) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const { id, itemId } = await params;
     const pembelianId = parseInt(id);

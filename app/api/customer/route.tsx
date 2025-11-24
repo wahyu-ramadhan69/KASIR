@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { nik, nama, alamat, namaToko, noHp, limit_piutang, piutang } = body;
@@ -60,6 +65,10 @@ export async function POST(request: NextRequest) {
 
 // GET all customers
 export async function GET() {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const customers = await prisma.customer.findMany({
       orderBy: { id: "desc" },

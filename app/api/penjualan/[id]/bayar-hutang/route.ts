@@ -1,9 +1,6 @@
-// =====================================================
-// PATH: app/api/penjualan/[id]/bayar-hutang/route.ts
-// =====================================================
-
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -12,6 +9,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     // PENTING: await params dulu sebelum digunakan
     const { id } = await params;

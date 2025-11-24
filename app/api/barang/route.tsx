@@ -1,11 +1,16 @@
 // app/api/barang/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 // CREATE Barang
 export async function POST(request: NextRequest) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const {
@@ -67,6 +72,10 @@ export async function POST(request: NextRequest) {
 
 // GET semua barang (opsional, sekalian dibuat)
 export async function GET() {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const barang = await prisma.barang.findMany({
       orderBy: { id: "desc" },

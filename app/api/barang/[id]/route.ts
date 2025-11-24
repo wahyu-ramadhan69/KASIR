@@ -1,6 +1,7 @@
 // app/api/barang/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -16,6 +17,10 @@ function parseId(id: string | undefined) {
 
 // (opsional) GET detail barang per ID
 export async function GET(_req: NextRequest, { params }: RouteCtx) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
   const idNum = parseId(id);
 
@@ -53,6 +58,10 @@ export async function GET(_req: NextRequest, { params }: RouteCtx) {
 
 // UPDATE / EDIT Barang
 export async function PUT(request: NextRequest, { params }: RouteCtx) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
   const idNum = parseId(id);
 

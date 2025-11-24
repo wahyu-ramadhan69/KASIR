@@ -87,14 +87,42 @@ const DataSupplierPage = () => {
     }
   };
 
+  // Format input as Rupiah while typing
+  const formatInputRupiah = (value: string): string => {
+    // Remove all non-digit characters
+    const numbers = value.replace(/\D/g, "");
+
+    // Format as Rupiah
+    if (numbers === "") return "";
+
+    const formatted = new Intl.NumberFormat("id-ID").format(parseInt(numbers));
+    return `Rp ${formatted}`;
+  };
+
+  // Parse Rupiah string to number
+  const parseRupiahToNumber = (value: string): number => {
+    const numbers = value.replace(/\D/g, "");
+    return numbers === "" ? 0 : parseInt(numbers);
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+
+    // Format currency fields
+    if (name === "limitHutang" || name === "hutang") {
+      const formattedValue = formatInputRupiah(value);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: formattedValue,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -111,8 +139,8 @@ const DataSupplierPage = () => {
           namaSupplier: formData.namaSupplier,
           alamat: formData.alamat,
           noHp: formData.noHp,
-          limitHutang: parseInt(formData.limitHutang),
-          hutang: parseInt(formData.hutang),
+          limitHutang: parseRupiahToNumber(formData.limitHutang),
+          hutang: parseRupiahToNumber(formData.hutang),
         }),
       });
 
@@ -174,8 +202,8 @@ const DataSupplierPage = () => {
       namaSupplier: supplier.namaSupplier,
       alamat: supplier.alamat,
       noHp: supplier.noHp,
-      limitHutang: supplier.limitHutang.toString(),
-      hutang: supplier.hutang.toString(),
+      limitHutang: formatInputRupiah(supplier.limitHutang.toString()),
+      hutang: formatInputRupiah(supplier.hutang.toString()),
     });
     setShowEditModal(true);
   };
@@ -196,8 +224,8 @@ const DataSupplierPage = () => {
           namaSupplier: formData.namaSupplier,
           alamat: formData.alamat,
           noHp: formData.noHp,
-          limitHutang: parseInt(formData.limitHutang),
-          hutang: parseInt(formData.hutang),
+          limitHutang: parseRupiahToNumber(formData.limitHutang),
+          hutang: parseRupiahToNumber(formData.hutang),
         }),
       });
 
@@ -432,7 +460,7 @@ const DataSupplierPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-500 text-sm font-medium">
-                Limit Pembelian
+                Total Hutang Awal
               </p>
               <p className="text-lg font-bold text-gray-900 mt-1">
                 {formatRupiah(totalhutang)}
@@ -531,7 +559,7 @@ const DataSupplierPage = () => {
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-500">Hutang</span>
+                      <span className="text-sm text-gray-500">Hutang Awal</span>
                       <span className="text-sm font-bold text-green-600">
                         {formatRupiah(supplier.hutang)}
                       </span>
@@ -656,7 +684,7 @@ const DataSupplierPage = () => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Limit Pembelian</p>
+                  <p className="text-sm text-gray-500 mb-1">Hutang Awal</p>
                   <p className="text-gray-900 font-bold">
                     {formatRupiah(selectedSupplier.hutang)}
                   </p>
@@ -768,28 +796,28 @@ const DataSupplierPage = () => {
                     Limit Hutang <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="limitHutang"
                     value={formData.limitHutang}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                    placeholder="Contoh: 50000000"
+                    placeholder="Contoh: Rp 50.000.000"
                     required
                   />
                 </div>
 
-                {/* Limit Pembelian */}
+                {/* Hutang Awal */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Limit Pembelian <span className="text-red-500">*</span>
+                    Hutang Awal <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="hutang"
                     value={formData.hutang}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                    placeholder="Contoh: 100000000"
+                    placeholder="Contoh: Rp 100.000.000"
                     required
                   />
                 </div>
@@ -892,28 +920,28 @@ const DataSupplierPage = () => {
                     Limit Hutang <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="limitHutang"
                     value={formData.limitHutang}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                    placeholder="Contoh: 50000000"
+                    placeholder="Contoh: Rp 50.000.000"
                     required
                   />
                 </div>
 
-                {/* Limit Pembelian */}
+                {/* Hutang Awal */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Limit Pembelian <span className="text-red-500">*</span>
+                    Hutang Awal <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="hutang"
                     value={formData.hutang}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                    placeholder="Contoh: 100000000"
+                    placeholder="Contoh: Rp 100.000.000"
                     required
                   />
                 </div>

@@ -1,10 +1,15 @@
 // app/api/supplier/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { namaSupplier, alamat, noHp, limitHutang, hutang } = body;
@@ -66,6 +71,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const suppliers = await prisma.supplier.findMany({
       orderBy: { id: "desc" },
