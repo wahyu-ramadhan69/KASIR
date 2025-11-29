@@ -4,6 +4,49 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize pembelian data with BigInt conversion
+function serializePembelian(pembelian: any) {
+  return {
+    ...pembelian,
+    subtotal: bigIntToNumber(pembelian.subtotal),
+    diskonNota: bigIntToNumber(pembelian.diskonNota),
+    totalHarga: bigIntToNumber(pembelian.totalHarga),
+    jumlahDibayar: bigIntToNumber(pembelian.jumlahDibayar),
+    kembalian: bigIntToNumber(pembelian.kembalian),
+    supplier: pembelian.supplier
+      ? {
+          ...pembelian.supplier,
+          limitHutang: bigIntToNumber(pembelian.supplier.limitHutang),
+          hutang: bigIntToNumber(pembelian.supplier.hutang),
+        }
+      : undefined,
+    items: pembelian.items?.map((item: any) => ({
+      ...item,
+      hargaPokok: bigIntToNumber(item.hargaPokok),
+      diskonPerItem: bigIntToNumber(item.diskonPerItem),
+      jumlahDus: bigIntToNumber(item.jumlahDus),
+      barang: item.barang
+        ? {
+            ...item.barang,
+            hargaBeli: bigIntToNumber(item.barang.hargaBeli),
+            hargaJual: bigIntToNumber(item.barang.hargaJual),
+            stok: bigIntToNumber(item.barang.stok),
+            jumlahPerkardus: bigIntToNumber(item.barang.jumlahPerkardus),
+            ukuran: bigIntToNumber(item.barang.ukuran),
+          }
+        : undefined,
+    })),
+  };
+}
+
 // GET: Ambil pembelian dengan filter, pagination, dan date range
 export async function GET(request: NextRequest) {
   try {
@@ -100,13 +143,16 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
+    // Serialize data
+    const serializedPembelian = pembelian.map(serializePembelian);
+
     // Calculate pagination info
     const totalPages = Math.ceil(totalCount / limit);
     const hasMore = page < totalPages;
 
     return NextResponse.json({
       success: true,
-      data: pembelian,
+      data: serializedPembelian,
       pagination: {
         page,
         limit,
@@ -195,6 +241,11 @@ export async function POST(request: NextRequest) {
         statusTransaksi: "KERANJANG",
         statusPembayaran: "HUTANG",
         tanggalJatuhTempo,
+        subtotal: BigInt(0),
+        diskonNota: BigInt(0),
+        totalHarga: BigInt(0),
+        jumlahDibayar: BigInt(0),
+        kembalian: BigInt(0),
       },
       include: {
         supplier: true,
@@ -206,7 +257,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         message: "Keranjang pembelian berhasil dibuat",
-        data: pembelian,
+        data: serializePembelian(pembelian),
       },
       { status: 201 }
     );

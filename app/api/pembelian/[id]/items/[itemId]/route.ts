@@ -4,6 +4,53 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize data
+function serializeItem(item: any) {
+  return {
+    ...item,
+    hargaPokok: bigIntToNumber(item.hargaPokok),
+    diskonPerItem: bigIntToNumber(item.diskonPerItem),
+    jumlahDus: bigIntToNumber(item.jumlahDus),
+    barang: item.barang
+      ? {
+          ...item.barang,
+          hargaBeli: bigIntToNumber(item.barang.hargaBeli),
+          hargaJual: bigIntToNumber(item.barang.hargaJual),
+          stok: bigIntToNumber(item.barang.stok),
+          jumlahPerkardus: bigIntToNumber(item.barang.jumlahPerkardus),
+          ukuran: bigIntToNumber(item.barang.ukuran),
+        }
+      : undefined,
+  };
+}
+
+function serializePembelian(pembelian: any) {
+  return {
+    ...pembelian,
+    subtotal: bigIntToNumber(pembelian.subtotal),
+    diskonNota: bigIntToNumber(pembelian.diskonNota),
+    totalHarga: bigIntToNumber(pembelian.totalHarga),
+    jumlahDibayar: bigIntToNumber(pembelian.jumlahDibayar),
+    kembalian: bigIntToNumber(pembelian.kembalian),
+    supplier: pembelian.supplier
+      ? {
+          ...pembelian.supplier,
+          limitHutang: bigIntToNumber(pembelian.supplier.limitHutang),
+          hutang: bigIntToNumber(pembelian.supplier.hutang),
+        }
+      : undefined,
+    items: pembelian.items?.map(serializeItem),
+  };
+}
+
 // Helper: Update totals di header
 async function updatePembelianTotals(pembelianId: number) {
   const items = await prisma.pembelianItem.findMany({
@@ -11,8 +58,11 @@ async function updatePembelianTotals(pembelianId: number) {
   });
 
   const subtotal = items.reduce((total, item) => {
-    const totalHarga = item.hargaPokok * item.jumlahDus;
-    const totalDiskon = item.diskonPerItem * item.jumlahDus;
+    const hargaPokok = bigIntToNumber(item.hargaPokok);
+    const jumlahDus = bigIntToNumber(item.jumlahDus);
+    const diskonPerItem = bigIntToNumber(item.diskonPerItem);
+    const totalHarga = hargaPokok * jumlahDus;
+    const totalDiskon = diskonPerItem * jumlahDus;
     return total + (totalHarga - totalDiskon);
   }, 0);
 
@@ -20,12 +70,15 @@ async function updatePembelianTotals(pembelianId: number) {
     where: { id: pembelianId },
   });
 
-  const diskonNota = pembelian?.diskonNota || 0;
+  const diskonNota = bigIntToNumber(pembelian?.diskonNota || BigInt(0));
   const totalHarga = subtotal - diskonNota;
 
   await prisma.pembelianHeader.update({
     where: { id: pembelianId },
-    data: { subtotal, totalHarga },
+    data: {
+      subtotal: BigInt(subtotal),
+      totalHarga: BigInt(totalHarga),
+    },
   });
 }
 
@@ -79,11 +132,12 @@ export async function PUT(
       );
     }
 
-    // Update item
+    // Update item dengan BigInt conversion
     const updateData: any = {};
-    if (jumlahDus !== undefined) updateData.jumlahDus = jumlahDus;
-    if (hargaPokok !== undefined) updateData.hargaPokok = hargaPokok;
-    if (diskonPerItem !== undefined) updateData.diskonPerItem = diskonPerItem;
+    if (jumlahDus !== undefined) updateData.jumlahDus = BigInt(jumlahDus);
+    if (hargaPokok !== undefined) updateData.hargaPokok = BigInt(hargaPokok);
+    if (diskonPerItem !== undefined)
+      updateData.diskonPerItem = BigInt(diskonPerItem);
 
     const item = await prisma.pembelianItem.update({
       where: { id: pembelianItemId },
@@ -99,16 +153,22 @@ export async function PUT(
       where: { id: pembelianId },
       include: {
         supplier: true,
-        items: { include: { barang: true } },
+        items: { include: { barang: true }, orderBy: { id: "asc" } },
       },
     });
 
     return NextResponse.json({
       success: true,
       message: "Item berhasil diupdate",
-      data: { item, pembelian: updatedPembelian },
+      data: {
+        item: serializeItem(item),
+        pembelian: updatedPembelian
+          ? serializePembelian(updatedPembelian)
+          : null,
+      },
     });
   } catch (err) {
+    console.error("Error updating item:", err);
     return NextResponse.json(
       { success: false, error: "Gagal mengupdate item" },
       { status: 500 }
@@ -179,16 +239,21 @@ export async function DELETE(
       where: { id: pembelianId },
       include: {
         supplier: true,
-        items: { include: { barang: true } },
+        items: { include: { barang: true }, orderBy: { id: "asc" } },
       },
     });
 
     return NextResponse.json({
       success: true,
       message: "Item berhasil dihapus dari keranjang",
-      data: { pembelian: updatedPembelian },
+      data: {
+        pembelian: updatedPembelian
+          ? serializePembelian(updatedPembelian)
+          : null,
+      },
     });
   } catch (err) {
+    console.error("Error deleting item:", err);
     return NextResponse.json(
       { success: false, error: "Gagal menghapus item" },
       { status: 500 }

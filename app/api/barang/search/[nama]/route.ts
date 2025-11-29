@@ -5,6 +5,33 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize barang data with BigInt conversion
+function serializeBarang(barang: any) {
+  return {
+    ...barang,
+    hargaBeli: bigIntToNumber(barang.hargaBeli),
+    hargaJual: bigIntToNumber(barang.hargaJual),
+    stok: bigIntToNumber(barang.stok),
+    jumlahPerkardus: bigIntToNumber(barang.jumlahPerkardus),
+    ukuran: bigIntToNumber(barang.ukuran),
+    supplier: barang.supplier
+      ? {
+          ...barang.supplier,
+          limitHutang: bigIntToNumber(barang.supplier.limitHutang),
+          hutang: bigIntToNumber(barang.supplier.hutang),
+        }
+      : undefined,
+  };
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ nama: string }> }
@@ -13,7 +40,7 @@ export async function GET(
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { nama } = await params; // <- WAJIB await
+  const { nama } = await params;
 
   if (!nama || nama.trim() === "") {
     return NextResponse.json(
@@ -29,18 +56,25 @@ export async function GET(
           contains: nama,
           mode: "insensitive",
         },
+        isActive: true,
+      },
+      include: {
+        supplier: true,
       },
       orderBy: {
         id: "desc",
       },
     });
 
+    // Serialize all barang to convert BigInt to number
+    const serializedBarang = barang.map(serializeBarang);
+
     return NextResponse.json(
       {
         success: true,
         keyword: nama,
         count: barang.length,
-        data: barang,
+        data: serializedBarang,
       },
       { status: 200 }
     );

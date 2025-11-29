@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -12,6 +12,8 @@ import {
   Legend,
   Area,
   AreaChart,
+  BarChart,
+  Bar,
 } from "recharts";
 import {
   DollarSign,
@@ -27,15 +29,24 @@ import {
   Clock,
   Wallet,
   ShoppingCart,
+  CalendarDays,
+  CalendarRange,
+  CalendarClock,
+  Package,
+  BadgeDollarSign,
 } from "lucide-react";
 
 interface DailySales {
   date: string;
   penjualan: number;
+  pembelian: number;
   pengeluaran: number;
+  labaKotor: number;
   laba: number;
   label?: string;
 }
+
+type Period = "daily" | "monthly" | "yearly";
 
 const formatRupiah = (number: number): string => {
   return new Intl.NumberFormat("id-ID", {
@@ -46,40 +57,57 @@ const formatRupiah = (number: number): string => {
 };
 
 const formatNumber = (num: number): string => {
+  if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)}M`;
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}jt`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}rb`;
   return num.toString();
 };
 
-// Custom Tooltip dengan 3 metrics
-// Di dalam CustomTooltip component, ganti bagian margin calculation:
-
-const CustomTooltip = ({ active, payload }: any) => {
+// Custom Tooltip dengan 5 metrics
+const CustomTooltip = ({ active, payload, period }: any) => {
   if (!active || !payload || !payload.length) return null;
 
   const d = payload[0].payload;
-  const date = new Date(d.date + "T00:00:00").toLocaleDateString("id-ID", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-  });
 
-  // FIX: Pastikan margin selalu string
-  const marginValue =
+  let dateLabel = "";
+  if (period === "daily") {
+    dateLabel = new Date(d.date + "T00:00:00").toLocaleDateString("id-ID", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  } else if (period === "monthly") {
+    const [year, month] = d.date.split("-");
+    dateLabel = new Date(
+      parseInt(year),
+      parseInt(month) - 1
+    ).toLocaleDateString("id-ID", {
+      month: "long",
+      year: "numeric",
+    });
+  } else {
+    dateLabel = `Tahun ${d.date}`;
+  }
+
+  const marginLabaBersih =
     d.penjualan > 0 ? ((d.laba / d.penjualan) * 100).toFixed(1) : "0";
+  const marginLabaKotor =
+    d.penjualan > 0 ? ((d.labaKotor / d.penjualan) * 100).toFixed(1) : "0";
+  const totalKeluar = d.pembelian + d.pengeluaran;
 
   return (
     <div className="bg-white/95 backdrop-blur-xl p-5 rounded-2xl shadow-2xl border border-purple-100 transform transition-all">
       <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-100">
         <Calendar className="w-4 h-4 text-purple-600" />
-        <p className="font-bold text-gray-800">{date}</p>
+        <p className="font-bold text-gray-800">{dateLabel}</p>
       </div>
 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500" />
-            <span className="text-sm text-gray-600">Penjualan Kotor</span>
+            <span className="text-sm text-gray-600">Penjualan</span>
           </div>
           <span className="font-bold text-purple-600">
             {formatRupiah(d.penjualan)}
@@ -88,11 +116,35 @@ const CustomTooltip = ({ active, payload }: any) => {
 
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-red-500 to-orange-500" />
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500" />
+            <span className="text-sm text-gray-600">Pembelian</span>
+          </div>
+          <span className="font-bold text-orange-600">
+            {formatRupiah(d.pembelian)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-8">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-red-500 to-pink-500" />
             <span className="text-sm text-gray-600">Pengeluaran</span>
           </div>
           <span className="font-bold text-red-500">
             {formatRupiah(d.pengeluaran)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-8">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+            <span className="text-sm text-gray-600">Laba Kotor</span>
+          </div>
+          <span
+            className={`font-bold ${
+              d.labaKotor >= 0 ? "text-blue-600" : "text-red-600"
+            }`}
+          >
+            {formatRupiah(d.labaKotor)}
           </span>
         </div>
 
@@ -110,15 +162,35 @@ const CustomTooltip = ({ active, payload }: any) => {
           </span>
         </div>
 
-        <div className="pt-3 border-t border-gray-100">
+        <div className="pt-3 border-t border-gray-100 space-y-2">
           <div className="flex items-center justify-between gap-8">
-            <span className="text-xs text-gray-500">Margin Laba</span>
+            <span className="text-xs text-gray-500">Total Keluar</span>
+            <span className="text-sm font-bold text-gray-700">
+              {formatRupiah(totalKeluar)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-8">
+            <span className="text-xs text-gray-500">Margin Laba Kotor</span>
             <span
               className={`text-sm font-bold ${
-                parseFloat(marginValue) >= 0 ? "text-green-600" : "text-red-600"
+                parseFloat(marginLabaKotor) >= 0
+                  ? "text-blue-600"
+                  : "text-red-600"
               }`}
             >
-              {marginValue}%
+              {marginLabaKotor}%
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-8">
+            <span className="text-xs text-gray-500">Margin Laba Bersih</span>
+            <span
+              className={`text-sm font-bold ${
+                parseFloat(marginLabaBersih) >= 0
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}
+            >
+              {marginLabaBersih}%
             </span>
           </div>
         </div>
@@ -127,7 +199,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   );
 };
 
-// Komponen Stat Card dengan animasi
+// Stat Card Component
 const StatCard = ({
   title,
   value,
@@ -149,7 +221,6 @@ const StatCard = ({
         isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
       }`}
     >
-      {/* Background decorative elements */}
       <div
         className={`absolute -right-8 -top-8 w-32 h-32 ${gradient} rounded-full opacity-10 group-hover:scale-150 transition-transform duration-700`}
       />
@@ -178,7 +249,7 @@ const StatCard = ({
                 ) : trend < 0 ? (
                   <ArrowDownRight className="w-3 h-3" />
                 ) : null}
-                {Math.abs(trend)}%
+                {Math.abs(trend).toFixed(1)}%
               </span>
             )}
           </div>
@@ -202,19 +273,35 @@ const Penjualan30HariPage = () => {
   const [data, setData] = useState<DailySales[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [chartType, setChartType] = useState<"line" | "area">("area");
+  const [chartType, setChartType] = useState<"bar" | "area">("area");
+  const [period, setPeriod] = useState<Period>("daily");
+  const [range, setRange] = useState<number>(30);
   const [visibleLines, setVisibleLines] = useState({
     penjualan: true,
+    pembelian: true,
     pengeluaran: true,
+    labaKotor: true,
     laba: true,
   });
 
-  const fetchData = async () => {
+  const [debouncedRange, setDebouncedRange] = useState<number>(range);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedRange(range);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [range]);
+
+  const fetchData = useCallback(async () => {
     try {
       if (!data.length) setLoading(true);
       else setRefreshing(true);
 
-      const res = await fetch("/api/penjualan/grafik");
+      const res = await fetch(
+        `/api/penjualan/grafik?period=${period}&range=${debouncedRange}`
+      );
       const json = await res.json();
 
       if (json.success) {
@@ -223,46 +310,63 @@ const Penjualan30HariPage = () => {
         console.error(json.error);
       }
     } catch (error) {
-      console.error("Error fetch penjualan 30 hari:", error);
+      console.error("Error fetch penjualan:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [period, debouncedRange]);
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchData]);
 
   // Calculations
   const totalPenjualan = data.reduce((sum, item) => sum + item.penjualan, 0);
+  const totalPembelian = data.reduce((sum, item) => sum + item.pembelian, 0);
   const totalPengeluaran = data.reduce(
     (sum, item) => sum + item.pengeluaran,
     0
   );
+  const totalLabaKotor = data.reduce((sum, item) => sum + item.labaKotor, 0);
   const totalLaba = data.reduce((sum, item) => sum + item.laba, 0);
-  const rataRataPerHari = data.length ? totalPenjualan / data.length : 0;
 
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const todayData = data.find((item) => item.date === todayKey);
-  const totalHariIni = todayData?.penjualan ?? 0;
-
-  // Trend calculation (compare last 7 days vs previous 7 days)
-  const last7Days = data.slice(-7);
-  const prev7Days = data.slice(-14, -7);
-  const last7Total = last7Days.reduce((sum, item) => sum + item.penjualan, 0);
-  const prev7Total = prev7Days.reduce((sum, item) => sum + item.penjualan, 0);
+  // Trend calculation
+  const halfPoint = Math.floor(data.length / 2);
+  const firstHalf = data.slice(0, halfPoint);
+  const secondHalf = data.slice(halfPoint);
+  const firstHalfTotal = firstHalf.reduce(
+    (sum, item) => sum + item.penjualan,
+    0
+  );
+  const secondHalfTotal = secondHalf.reduce(
+    (sum, item) => sum + item.penjualan,
+    0
+  );
   const trendPercentage =
-    prev7Total > 0 ? ((last7Total - prev7Total) / prev7Total) * 100 : 0;
+    firstHalfTotal > 0
+      ? ((secondHalfTotal - firstHalfTotal) / firstHalfTotal) * 100
+      : 0;
 
-  // Chart data
+  // Format label berdasarkan period
   const chartData = data.map((item) => {
-    const dateObj = new Date(item.date + "T00:00:00");
-    const label = dateObj.toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "short",
-    });
+    let label = "";
+    if (period === "daily") {
+      const dateObj = new Date(item.date + "T00:00:00");
+      label = dateObj.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+      });
+    } else if (period === "monthly") {
+      const [year, month] = item.date.split("-");
+      const dateObj = new Date(parseInt(year), parseInt(month) - 1);
+      label = dateObj.toLocaleDateString("id-ID", {
+        month: "short",
+        year: "2-digit",
+      });
+    } else {
+      label = item.date;
+    }
     return { ...item, label };
   });
 
@@ -279,6 +383,14 @@ const Penjualan30HariPage = () => {
       ? data.reduce((max, cur) => (cur.laba > max.laba ? cur : max), data[0])
       : null;
 
+  const maxLabaKotor =
+    data.length > 0
+      ? data.reduce(
+          (max, cur) => (cur.labaKotor > max.labaKotor ? cur : max),
+          data[0]
+        )
+      : null;
+
   const tanggalHariIni = new Date().toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "long",
@@ -289,12 +401,24 @@ const Penjualan30HariPage = () => {
     setVisibleLines((prev) => ({ ...prev, [line]: !prev[line] }));
   };
 
+  const handlePeriodChange = (newPeriod: Period) => {
+    setPeriod(newPeriod);
+    if (newPeriod === "daily") setRange(30);
+    else if (newPeriod === "monthly") setRange(12);
+    else setRange(5);
+  };
+
+  const getPeriodLabel = () => {
+    if (period === "daily") return `${range} Hari Terakhir`;
+    if (period === "monthly") return `${range} Bulan Terakhir`;
+    return `${range} Tahun Terakhir`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 p-4 md:p-8">
       <div className="w-full max-w-7xl mx-auto">
         {/* HEADER */}
         <div className="relative bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 rounded-3xl p-8 mb-8 shadow-2xl overflow-hidden">
-          {/* Decorative elements */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32 blur-3xl" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-900/20 rounded-full translate-y-48 -translate-x-48 blur-3xl" />
 
@@ -305,11 +429,11 @@ const Penjualan30HariPage = () => {
                 <span className="font-semibold">Real-time Monitoring</span>
               </div>
               <h1 className="text-4xl md:text-5xl font-black text-white mb-3 tracking-tight">
-                Dashboard Penjualan
+                Dashboard Keuangan
               </h1>
               <p className="text-purple-100 text-base max-w-2xl">
-                Analisis komprehensif penjualan, pengeluaran, dan laba bersih 30
-                hari terakhir
+                Analisis lengkap penjualan, pembelian, pengeluaran, laba kotor,
+                dan laba bersih
               </p>
             </div>
 
@@ -334,10 +458,160 @@ const Penjualan30HariPage = () => {
           </div>
         </div>
 
-        {/* STATS CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* FILTER SECTION */}
+        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-8">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            {/* Period Filter */}
+            <div className="flex-1 w-full lg:w-auto">
+              <label className="text-sm font-bold text-gray-700 mb-3 block">
+                Periode Waktu
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => handlePeriodChange("daily")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
+                    period === "daily"
+                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <CalendarDays className="w-6 h-6" />
+                  <span className="text-xs">Harian</span>
+                </button>
+                <button
+                  onClick={() => handlePeriodChange("monthly")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
+                    period === "monthly"
+                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <CalendarRange className="w-6 h-6" />
+                  <span className="text-xs">Bulanan</span>
+                </button>
+                <button
+                  onClick={() => handlePeriodChange("yearly")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
+                    period === "yearly"
+                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <CalendarClock className="w-6 h-6" />
+                  <span className="text-xs">Tahunan</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Range Filter */}
+            <div className="flex-1 w-full lg:w-auto">
+              <label className="text-sm font-bold text-gray-700 mb-3 block">
+                Rentang{" "}
+                {period === "daily"
+                  ? "Hari"
+                  : period === "monthly"
+                  ? "Bulan"
+                  : "Tahun"}
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={1}
+                  max={period === "daily" ? 90 : period === "monthly" ? 24 : 10}
+                  value={range}
+                  onChange={(e) => setRange(parseInt(e.target.value))}
+                  className="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                />
+                <div className="min-w-[120px] px-4 py-2 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl">
+                  <p className="text-2xl font-black text-purple-700 text-center">
+                    {range}
+                  </p>
+                  <p className="text-xs text-purple-600 text-center">
+                    {period === "daily"
+                      ? "Hari"
+                      : period === "monthly"
+                      ? "Bulan"
+                      : "Tahun"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Filters */}
+            <div className="w-full lg:w-auto">
+              <label className="text-sm font-bold text-gray-700 mb-3 block">
+                Quick Filter
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {period === "daily" && (
+                  <>
+                    <button
+                      onClick={() => setRange(1)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      1 Hari
+                    </button>
+                    <button
+                      onClick={() => setRange(7)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      7 Hari
+                    </button>
+                    <button
+                      onClick={() => setRange(30)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      30 Hari
+                    </button>
+                    <button
+                      onClick={() => setRange(90)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      90 Hari
+                    </button>
+                  </>
+                )}
+                {period === "monthly" && (
+                  <>
+                    <button
+                      onClick={() => setRange(6)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      6 Bulan
+                    </button>
+                    <button
+                      onClick={() => setRange(12)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      12 Bulan
+                    </button>
+                  </>
+                )}
+                {period === "yearly" && (
+                  <>
+                    <button
+                      onClick={() => setRange(3)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      3 Tahun
+                    </button>
+                    <button
+                      onClick={() => setRange(5)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      5 Tahun
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ✅ UPDATED: STATS CARDS - Now 5 cards (removed Rata-rata) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <StatCard
-            title="Penjualan Kotor"
+            title="Penjualan"
             value={formatNumber(totalPenjualan)}
             subtitle={formatRupiah(totalPenjualan)}
             icon={ShoppingCart}
@@ -347,12 +621,30 @@ const Penjualan30HariPage = () => {
           />
 
           <StatCard
-            title="Total Pengeluaran"
+            title="Pembelian"
+            value={formatNumber(totalPembelian)}
+            subtitle={formatRupiah(totalPembelian)}
+            icon={Package}
+            gradient="bg-gradient-to-br from-orange-500 to-amber-600"
+            delay={50}
+          />
+
+          <StatCard
+            title="Pengeluaran"
             value={formatNumber(totalPengeluaran)}
             subtitle={formatRupiah(totalPengeluaran)}
             icon={Wallet}
-            gradient="bg-gradient-to-br from-red-500 to-orange-600"
+            gradient="bg-gradient-to-br from-red-500 to-pink-600"
             delay={100}
+          />
+
+          <StatCard
+            title="Laba Kotor"
+            value={formatNumber(totalLabaKotor)}
+            subtitle={formatRupiah(totalLabaKotor)}
+            icon={BadgeDollarSign}
+            gradient="bg-gradient-to-br from-blue-500 to-cyan-600"
+            delay={150}
           />
 
           <StatCard
@@ -362,15 +654,6 @@ const Penjualan30HariPage = () => {
             icon={Sparkles}
             gradient="bg-gradient-to-br from-green-500 to-emerald-600"
             delay={200}
-          />
-
-          <StatCard
-            title="Rata-rata/Hari"
-            value={formatNumber(Math.round(rataRataPerHari))}
-            subtitle={formatRupiah(Math.round(rataRataPerHari))}
-            icon={TrendingUp}
-            gradient="bg-gradient-to-br from-blue-500 to-cyan-600"
-            delay={300}
           />
         </div>
 
@@ -382,12 +665,11 @@ const Penjualan30HariPage = () => {
                 Analisis Tren Keuangan
               </h2>
               <p className="text-sm text-gray-500">
-                Visualisasi penjualan kotor, pengeluaran, dan laba bersih harian
+                Visualisasi {getPeriodLabel().toLowerCase()}
               </p>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
-              {/* Chart Type Toggle */}
               <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-2xl">
                 <button
                   onClick={() => setChartType("area")}
@@ -400,14 +682,14 @@ const Penjualan30HariPage = () => {
                   Area
                 </button>
                 <button
-                  onClick={() => setChartType("line")}
+                  onClick={() => setChartType("bar")}
                   className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    chartType === "line"
+                    chartType === "bar"
                       ? "bg-white text-purple-600 shadow-md"
                       : "text-gray-600 hover:text-gray-800"
                   }`}
                 >
-                  Line
+                  Bar
                 </button>
               </div>
             </div>
@@ -430,6 +712,17 @@ const Penjualan30HariPage = () => {
               Penjualan
             </button>
             <button
+              onClick={() => toggleLine("pembelian")}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                visibleLines.pembelian
+                  ? "bg-orange-100 text-orange-700 border-2 border-orange-300"
+                  : "bg-gray-100 text-gray-400 border-2 border-gray-200"
+              }`}
+            >
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500" />
+              Pembelian
+            </button>
+            <button
               onClick={() => toggleLine("pengeluaran")}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                 visibleLines.pengeluaran
@@ -437,8 +730,19 @@ const Penjualan30HariPage = () => {
                   : "bg-gray-100 text-gray-400 border-2 border-gray-200"
               }`}
             >
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-red-500 to-orange-500" />
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-red-500 to-pink-500" />
               Pengeluaran
+            </button>
+            <button
+              onClick={() => toggleLine("labaKotor")}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                visibleLines.labaKotor
+                  ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
+                  : "bg-gray-100 text-gray-400 border-2 border-gray-200"
+              }`}
+            >
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+              Laba Kotor
             </button>
             <button
               onClick={() => toggleLine("laba")}
@@ -449,7 +753,7 @@ const Penjualan30HariPage = () => {
               }`}
             >
               <div className="w-3 h-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-500" />
-              Laba
+              Laba Bersih
             </button>
           </div>
 
@@ -467,7 +771,7 @@ const Penjualan30HariPage = () => {
                 <BarChart3 className="w-10 h-10 text-gray-400" />
               </div>
               <p className="text-gray-500 text-lg font-semibold">
-                Belum ada data penjualan
+                Belum ada data
               </p>
               <p className="text-gray-400 text-sm mt-2">
                 Data akan muncul setelah transaksi pertama dibuat
@@ -498,6 +802,24 @@ const Penjualan30HariPage = () => {
                         />
                       </linearGradient>
                       <linearGradient
+                        id="colorPembelian"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#f97316"
+                          stopOpacity={0.8}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#f97316"
+                          stopOpacity={0.1}
+                        />
+                      </linearGradient>
+                      <linearGradient
                         id="colorPengeluaran"
                         x1="0"
                         y1="0"
@@ -512,6 +834,24 @@ const Penjualan30HariPage = () => {
                         <stop
                           offset="95%"
                           stopColor="#ef4444"
+                          stopOpacity={0.1}
+                        />
+                      </linearGradient>
+                      <linearGradient
+                        id="colorLabaKotor"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#3b82f6"
+                          stopOpacity={0.8}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#3b82f6"
                           stopOpacity={0.1}
                         />
                       </linearGradient>
@@ -549,7 +889,7 @@ const Penjualan30HariPage = () => {
                       tickLine={false}
                       tickFormatter={(value) => formatNumber(value)}
                     />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip period={period} />} />
                     <Legend
                       wrapperStyle={{ paddingTop: "20px" }}
                       iconType="circle"
@@ -568,6 +908,19 @@ const Penjualan30HariPage = () => {
                       />
                     )}
 
+                    {visibleLines.pembelian && (
+                      <Area
+                        type="monotone"
+                        dataKey="pembelian"
+                        name="Pembelian"
+                        stroke="#f97316"
+                        strokeWidth={3}
+                        fill="url(#colorPembelian)"
+                        dot={{ r: 4, fill: "#f97316", strokeWidth: 2 }}
+                        activeDot={{ r: 7 }}
+                      />
+                    )}
+
                     {visibleLines.pengeluaran && (
                       <Area
                         type="monotone"
@@ -581,11 +934,24 @@ const Penjualan30HariPage = () => {
                       />
                     )}
 
+                    {visibleLines.labaKotor && (
+                      <Area
+                        type="monotone"
+                        dataKey="labaKotor"
+                        name="Laba Kotor"
+                        stroke="#3b82f6"
+                        strokeWidth={3}
+                        fill="url(#colorLabaKotor)"
+                        dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2 }}
+                        activeDot={{ r: 7 }}
+                      />
+                    )}
+
                     {visibleLines.laba && (
                       <Area
                         type="monotone"
                         dataKey="laba"
-                        name="Laba"
+                        name="Laba Bersih"
                         stroke="#10b981"
                         strokeWidth={3}
                         fill="url(#colorLaba)"
@@ -595,7 +961,7 @@ const Penjualan30HariPage = () => {
                     )}
                   </AreaChart>
                 ) : (
-                  <LineChart data={chartData} margin={{ left: 0, right: 20 }}>
+                  <BarChart data={chartData} margin={{ left: 0, right: 20 }}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       stroke="#e5e7eb"
@@ -611,63 +977,57 @@ const Penjualan30HariPage = () => {
                       tickLine={false}
                       tickFormatter={(value) => formatNumber(value)}
                     />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip period={period} />} />
                     <Legend
                       wrapperStyle={{ paddingTop: "20px" }}
-                      iconType="circle"
+                      iconType="rect"
                     />
 
                     {visibleLines.penjualan && (
-                      <Line
-                        type="monotone"
+                      <Bar
                         dataKey="penjualan"
                         name="Penjualan"
-                        stroke="#8b5cf6"
-                        strokeWidth={3}
-                        dot={{
-                          r: 5,
-                          fill: "#8b5cf6",
-                          stroke: "#fff",
-                          strokeWidth: 2,
-                        }}
-                        activeDot={{ r: 7 }}
+                        fill="#8b5cf6"
+                        radius={[8, 8, 0, 0]}
+                      />
+                    )}
+
+                    {visibleLines.pembelian && (
+                      <Bar
+                        dataKey="pembelian"
+                        name="Pembelian"
+                        fill="#f97316"
+                        radius={[8, 8, 0, 0]}
                       />
                     )}
 
                     {visibleLines.pengeluaran && (
-                      <Line
-                        type="monotone"
+                      <Bar
                         dataKey="pengeluaran"
                         name="Pengeluaran"
-                        stroke="#ef4444"
-                        strokeWidth={3}
-                        dot={{
-                          r: 5,
-                          fill: "#ef4444",
-                          stroke: "#fff",
-                          strokeWidth: 2,
-                        }}
-                        activeDot={{ r: 7 }}
+                        fill="#ef4444"
+                        radius={[8, 8, 0, 0]}
+                      />
+                    )}
+
+                    {visibleLines.labaKotor && (
+                      <Bar
+                        dataKey="labaKotor"
+                        name="Laba Kotor"
+                        fill="#3b82f6"
+                        radius={[8, 8, 0, 0]}
                       />
                     )}
 
                     {visibleLines.laba && (
-                      <Line
-                        type="monotone"
+                      <Bar
                         dataKey="laba"
-                        name="Laba"
-                        stroke="#10b981"
-                        strokeWidth={3}
-                        dot={{
-                          r: 5,
-                          fill: "#10b981",
-                          stroke: "#fff",
-                          strokeWidth: 2,
-                        }}
-                        activeDot={{ r: 7 }}
+                        name="Laba Bersih"
+                        fill="#10b981"
+                        radius={[8, 8, 0, 0]}
                       />
                     )}
-                  </LineChart>
+                  </BarChart>
                 )}
               </ResponsiveContainer>
             </div>
@@ -675,18 +1035,17 @@ const Penjualan30HariPage = () => {
 
           <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl border border-purple-100">
             <p className="text-xs text-gray-600 leading-relaxed">
-              <span className="font-bold text-purple-700">💡 Info:</span> Grafik
-              menampilkan 3 metrik utama:
-              <strong> Penjualan Kotor</strong> (total dari PenjualanHeader),
-              <strong> Pengeluaran</strong> (dari tabel Pengeluaran), dan
-              <strong> Laba Bersih</strong> (dari PenjualanItem.laba). Klik
-              tombol di atas untuk show/hide line yang diinginkan.
+              <span className="font-bold text-purple-700">💡 Info:</span>{" "}
+              Menampilkan data <strong>{getPeriodLabel().toLowerCase()}</strong>
+              . Grafik menampilkan 5 metrik: Penjualan, Pembelian, Pengeluaran,
+              Laba Kotor (Harga Jual - Harga Beli), dan Laba Bersih (Laba Kotor
+              - Pengeluaran).
             </p>
           </div>
         </div>
 
         {/* QUICK INSIGHTS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-200">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-purple-500 rounded-xl">
@@ -700,13 +1059,62 @@ const Penjualan30HariPage = () => {
                   {formatRupiah(maxPenjualan.penjualan)}
                 </p>
                 <p className="text-sm text-purple-600">
-                  {new Date(maxPenjualan.date + "T00:00:00").toLocaleDateString(
-                    "id-ID",
-                    {
+                  {period === "daily" &&
+                    new Date(
+                      maxPenjualan.date + "T00:00:00"
+                    ).toLocaleDateString("id-ID", {
                       day: "numeric",
                       month: "long",
-                    }
-                  )}
+                    })}
+                  {period === "monthly" &&
+                    (() => {
+                      const [year, month] = maxPenjualan.date.split("-");
+                      return new Date(
+                        parseInt(year),
+                        parseInt(month) - 1
+                      ).toLocaleDateString("id-ID", {
+                        month: "long",
+                        year: "numeric",
+                      });
+                    })()}
+                  {period === "yearly" && `Tahun ${maxPenjualan.date}`}
+                </p>
+              </>
+            )}
+          </div>
+
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-blue-500 rounded-xl">
+                <BadgeDollarSign className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="font-bold text-blue-900">Laba Kotor Tertinggi</h3>
+            </div>
+            {maxLabaKotor && (
+              <>
+                <p className="text-2xl font-black text-blue-700 mb-1">
+                  {formatRupiah(maxLabaKotor.labaKotor)}
+                </p>
+                <p className="text-sm text-blue-600">
+                  {period === "daily" &&
+                    new Date(
+                      maxLabaKotor.date + "T00:00:00"
+                    ).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "long",
+                    })}
+                  {period === "monthly" &&
+                    (() => {
+                      const [year, month] = maxLabaKotor.date.split("-");
+                      return new Date(
+                        parseInt(year),
+                        parseInt(month) - 1
+                      ).toLocaleDateString("id-ID", {
+                        month: "long",
+                        year: "numeric",
+                      });
+                    })()}
+                  {period === "yearly" && `Tahun ${maxLabaKotor.date}`}
                 </p>
               </>
             )}
@@ -717,7 +1125,9 @@ const Penjualan30HariPage = () => {
               <div className="p-2 bg-green-500 rounded-xl">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <h3 className="font-bold text-green-900">Laba Tertinggi</h3>
+              <h3 className="font-bold text-green-900">
+                Laba Bersih Tertinggi
+              </h3>
             </div>
             {maxLaba && (
               <>
@@ -725,33 +1135,48 @@ const Penjualan30HariPage = () => {
                   {formatRupiah(maxLaba.laba)}
                 </p>
                 <p className="text-sm text-green-600">
-                  {new Date(maxLaba.date + "T00:00:00").toLocaleDateString(
-                    "id-ID",
-                    {
-                      day: "numeric",
-                      month: "long",
-                    }
-                  )}
+                  {period === "daily" &&
+                    new Date(maxLaba.date + "T00:00:00").toLocaleDateString(
+                      "id-ID",
+                      {
+                        day: "numeric",
+                        month: "long",
+                      }
+                    )}
+                  {period === "monthly" &&
+                    (() => {
+                      const [year, month] = maxLaba.date.split("-");
+                      return new Date(
+                        parseInt(year),
+                        parseInt(month) - 1
+                      ).toLocaleDateString("id-ID", {
+                        month: "long",
+                        year: "numeric",
+                      });
+                    })()}
+                  {period === "yearly" && `Tahun ${maxLaba.date}`}
                 </p>
               </>
             )}
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200">
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200">
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-blue-500 rounded-xl">
+              <div className="p-2 bg-indigo-500 rounded-xl">
                 <Activity className="w-5 h-5 text-white" />
               </div>
-              <h3 className="font-bold text-blue-900">Margin Profit</h3>
+              <h3 className="font-bold text-indigo-900">
+                Margin Profit Bersih
+              </h3>
             </div>
-            <p className="text-2xl font-black text-blue-700 mb-1">
+            <p className="text-2xl font-black text-indigo-700 mb-1">
               {totalPenjualan > 0
                 ? ((totalLaba / totalPenjualan) * 100).toFixed(1)
                 : 0}
               %
             </p>
-            <p className="text-sm text-blue-600">
-              Dari total penjualan 30 hari
+            <p className="text-sm text-indigo-600">
+              Dari total penjualan {getPeriodLabel().toLowerCase()}
             </p>
           </div>
         </div>

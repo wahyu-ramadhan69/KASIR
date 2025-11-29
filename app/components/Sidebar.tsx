@@ -84,16 +84,6 @@ const transactionLinks = [
         href: "/dashboard/admin/penjualan/riwayat",
         icon: <History className="w-4 h-4" />,
       },
-      {
-        label: "Laporan Transaksi",
-        href: "/dashboard/admin/laporan/transaksi",
-        icon: <FileText className="w-4 h-4" />,
-      },
-      {
-        label: "Laporan Per Item",
-        href: "/dashboard/admin/laporan/per-item",
-        icon: <FileText className="w-4 h-4" />,
-      },
     ],
   },
   {
@@ -105,6 +95,33 @@ const transactionLinks = [
         label: "Catat Pengeluaran",
         href: "/dashboard/admin/pengeluaran",
         icon: <DollarSign className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Laporan Transaksi",
+    href: "/dashboard/admin/laporan/pembelian",
+    icon: <FileText className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Laporan Pembelian",
+        href: "/dashboard/admin/laporan/pembelian",
+        icon: <FileText className="w-4 h-4" />,
+      },
+      {
+        label: "Laporan Penjualan",
+        href: "/dashboard/admin/laporan/penjualan",
+        icon: <FileText className="w-4 h-4" />,
+      },
+      {
+        label: "Laporan Pengeluaran",
+        href: "/dashboard/admin/laporan/pengeluaran",
+        icon: <FileText className="w-4 h-4" />,
+      },
+      {
+        label: "Semua Pengeluaran",
+        href: "/dashboard/admin/laporan/all",
+        icon: <FileText className="w-4 h-4" />,
       },
     ],
   },

@@ -8,25 +8,70 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "bigint") {
+    return Number(obj);
+  }
+
+  if (obj instanceof Date) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(deepSerialize);
+  }
+
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+
+  return obj;
+}
+
 // Helper function untuk menghitung total penjualan
 const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let subtotal = 0;
   let totalDiskonItem = 0;
 
   const calculatedItems = items.map((item) => {
-    const totalPcs =
-      item.jumlahDus * (item.barang?.jumlahPerkardus || 1) +
-      (item.jumlahPcs || 0);
-    const hargaTotal = item.hargaJual * item.jumlahDus;
+    const jumlahDus =
+      typeof item.jumlahDus === "bigint"
+        ? Number(item.jumlahDus)
+        : item.jumlahDus;
+    const jumlahPcs =
+      typeof item.jumlahPcs === "bigint"
+        ? Number(item.jumlahPcs)
+        : item.jumlahPcs;
+    const hargaJual =
+      typeof item.hargaJual === "bigint"
+        ? Number(item.hargaJual)
+        : item.hargaJual;
+    const diskonPerItem =
+      typeof item.diskonPerItem === "bigint"
+        ? Number(item.diskonPerItem)
+        : item.diskonPerItem;
+    const jumlahPerkardus =
+      typeof item.barang?.jumlahPerkardus === "bigint"
+        ? Number(item.barang.jumlahPerkardus)
+        : item.barang?.jumlahPerkardus || 1;
+
+    const totalPcs = jumlahDus * jumlahPerkardus + (jumlahPcs || 0);
+    const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      item.jumlahPcs > 0
-        ? Math.round(
-            (item.hargaJual / (item.barang?.jumlahPerkardus || 1)) *
-              item.jumlahPcs
-          )
-        : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
-    const diskon = item.diskonPerItem * item.jumlahDus;
+    const diskon = diskonPerItem * jumlahDus;
 
     subtotal += totalHargaSebelumDiskon;
     totalDiskonItem += diskon;
@@ -135,23 +180,25 @@ export async function GET(request: NextRequest) {
 
     const penjualanWithCalculation = penjualan.map((p) => ({
       ...p,
-      calculation: calculatePenjualan(p.items, p.diskonNota),
+      calculation: calculatePenjualan(p.items, Number(p.diskonNota)),
     }));
 
     const totalPages = Math.ceil(totalCount / limit);
     const hasMore = page < totalPages;
 
-    return NextResponse.json({
-      success: true,
-      data: penjualanWithCalculation,
-      pagination: {
-        page,
-        limit,
-        totalCount,
-        totalPages,
-        hasMore,
-      },
-    });
+    return NextResponse.json(
+      deepSerialize({
+        success: true,
+        data: penjualanWithCalculation,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages,
+          hasMore,
+        },
+      })
+    );
   } catch (err) {
     console.error("Error fetching penjualan:", err);
     return NextResponse.json(
@@ -216,11 +263,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      {
+      deepSerialize({
         success: true,
         message: "Keranjang penjualan berhasil dibuat",
         data: penjualan,
-      },
+      }),
       { status: 201 }
     );
   } catch (err) {

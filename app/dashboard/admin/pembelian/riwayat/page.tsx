@@ -15,6 +15,7 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
+  CalendarClock,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -131,6 +132,9 @@ const RiwayatPembelianPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
 
+  // User role state
+  const [userRole, setUserRole] = useState<string>("");
+
   // Filter state
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("SELESAI");
@@ -158,6 +162,14 @@ const RiwayatPembelianPage = () => {
   const [jumlahBayar, setJumlahBayar] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // Ubah Jatuh Tempo modal
+  const [showUbahJatuhTempoModal, setShowUbahJatuhTempoModal] =
+    useState<boolean>(false);
+  const [jatuhTempoPembelian, setJatuhTempoPembelian] =
+    useState<PembelianHeader | null>(null);
+  const [tanggalJatuhTempoBaru, setTanggalJatuhTempoBaru] =
+    useState<string>("");
+
   // Statistik
   const [stats, setStats] = useState({
     totalTransaksi: 0,
@@ -166,6 +178,23 @@ const RiwayatPembelianPage = () => {
     totalDibatalkan: 0,
     hutangJatuhTempo: 0, // Hutang yang akan jatuh tempo dalam 7 hari
   });
+
+  // Check user role on mount
+  useEffect(() => {
+    checkUserRole();
+  }, []);
+
+  const checkUserRole = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (data.success) {
+        setUserRole(data.data.role);
+      }
+    } catch (error) {
+      console.error("Error checking user role:", error);
+    }
+  };
 
   // Debounce search input
   useEffect(() => {
@@ -408,6 +437,49 @@ const RiwayatPembelianPage = () => {
     }
   };
 
+  const handleOpenUbahJatuhTempo = (pembelian: PembelianHeader) => {
+    setJatuhTempoPembelian(pembelian);
+    // Format tanggal untuk input date (YYYY-MM-DD)
+    const currentDate = new Date(pembelian.tanggalJatuhTempo);
+    const formattedDate = currentDate.toISOString().split("T")[0];
+    setTanggalJatuhTempoBaru(formattedDate);
+    setShowUbahJatuhTempoModal(true);
+  };
+
+  const handleUbahJatuhTempo = async () => {
+    if (!jatuhTempoPembelian || !tanggalJatuhTempoBaru) return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(
+        `/api/pembelian/${jatuhTempoPembelian.id}/ubah-jatuh-tempo`, // ← Ubah URL ini
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tanggalJatuhTempo: tanggalJatuhTempoBaru,
+          }),
+        }
+      );
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        setShowUbahJatuhTempoModal(false);
+        setJatuhTempoPembelian(null);
+        setTanggalJatuhTempoBaru("");
+        handleRefresh();
+      } else {
+        toast.error(data.error || "Gagal mengubah tanggal jatuh tempo");
+      }
+    } catch (error) {
+      console.error("Error updating jatuh tempo:", error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const formatRupiah = (number: number): string => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -434,6 +506,8 @@ const RiwayatPembelianPage = () => {
     startDate ||
     endDate ||
     debouncedSearch;
+
+  const isAdmin = userRole === "ADMIN";
 
   return (
     <div className="w-full max-w-7xl mx-auto">
@@ -795,13 +869,27 @@ const RiwayatPembelianPage = () => {
                             </button>
                             {pb.statusTransaksi === "SELESAI" &&
                               pb.statusPembayaran === "HUTANG" && (
-                                <button
-                                  onClick={() => handleOpenPelunasan(pb)}
-                                  className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all"
-                                  title="Bayar Hutang"
-                                >
-                                  <Banknote className="w-4 h-4" />
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleOpenPelunasan(pb)}
+                                    className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all"
+                                    title="Bayar Hutang"
+                                  >
+                                    <Banknote className="w-4 h-4" />
+                                  </button>
+                                  {/* Tombol Ubah Jatuh Tempo - hanya untuk ADMIN */}
+                                  {isAdmin && (
+                                    <button
+                                      onClick={() =>
+                                        handleOpenUbahJatuhTempo(pb)
+                                      }
+                                      className="p-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all"
+                                      title="Ubah Jatuh Tempo"
+                                    >
+                                      <CalendarClock className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </>
                               )}
                           </div>
                         </td>
@@ -1016,19 +1104,33 @@ const RiwayatPembelianPage = () => {
                 )}
               </div>
 
-              {/* Action Button */}
+              {/* Action Buttons */}
               {selectedPembelian.statusTransaksi === "SELESAI" &&
                 selectedPembelian.statusPembayaran === "HUTANG" && (
-                  <button
-                    onClick={() => {
-                      setShowDetailModal(false);
-                      handleOpenPelunasan(selectedPembelian);
-                    }}
-                    className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-                  >
-                    <Banknote className="w-5 h-5" />
-                    Bayar Hutang
-                  </button>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => {
+                        setShowDetailModal(false);
+                        handleOpenPelunasan(selectedPembelian);
+                      }}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                    >
+                      <Banknote className="w-5 h-5" />
+                      Bayar Hutang
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          handleOpenUbahJatuhTempo(selectedPembelian);
+                        }}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                      >
+                        <CalendarClock className="w-5 h-5" />
+                        Ubah Jatuh Tempo
+                      </button>
+                    )}
+                  </div>
                 )}
             </div>
           </div>
@@ -1215,6 +1317,152 @@ const RiwayatPembelianPage = () => {
                     <>
                       <CreditCard className="w-5 h-5" />
                       Bayar
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ubah Jatuh Tempo */}
+      {showUbahJatuhTempoModal && jatuhTempoPembelian && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowUbahJatuhTempoModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 rounded-t-xl flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">
+                Ubah Tanggal Jatuh Tempo
+              </h2>
+              <button
+                onClick={() => setShowUbahJatuhTempoModal(false)}
+                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Info */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Kode</span>
+                    <span className="font-medium">
+                      {jatuhTempoPembelian.kodePembelian}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Supplier</span>
+                    <span>{jatuhTempoPembelian.supplier?.namaSupplier}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Sisa Hutang</span>
+                    <span className="font-bold text-red-600">
+                      {formatRupiah(getSisaHutang(jatuhTempoPembelian))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-t pt-2">
+                    <span className="text-gray-500">Jatuh Tempo Saat Ini</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {formatDate(jatuhTempoPembelian.tanggalJatuhTempo)}
+                      </span>
+                      {(() => {
+                        const status = getJatuhTempoStatus(
+                          jatuhTempoPembelian.tanggalJatuhTempo
+                        );
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${status.color}`}
+                          >
+                            <status.icon className="w-3 h-3" />
+                            {status.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Input Tanggal Baru */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Tanggal Jatuh Tempo Baru{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={tanggalJatuhTempoBaru}
+                  onChange={(e) => setTanggalJatuhTempoBaru(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none text-lg"
+                />
+              </div>
+
+              {/* Preview Tanggal Baru */}
+              {tanggalJatuhTempoBaru && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 text-purple-700 font-medium mb-2">
+                    <CalendarClock className="w-5 h-5" />
+                    Preview Jatuh Tempo Baru
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-700">
+                      {formatDate(tanggalJatuhTempoBaru)}
+                    </span>
+                    {(() => {
+                      const status = getJatuhTempoStatus(tanggalJatuhTempoBaru);
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${status.color}`}
+                        >
+                          <status.icon className="w-3 h-3" />
+                          {status.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* Warning */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-yellow-700">
+                  Perubahan tanggal jatuh tempo akan langsung disimpan dan tidak
+                  dapat dibatalkan.
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowUbahJatuhTempoModal(false)}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleUbahJatuhTempo}
+                  disabled={isSubmitting || !tanggalJatuhTempoBaru}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <CalendarClock className="w-5 h-5" />
+                      Simpan Perubahan
                     </>
                   )}
                 </button>

@@ -1,69 +1,81 @@
+// app/api/supplier/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
-// POST: Recalculate hutang untuk semua supplier berdasarkan transaksi
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize supplier data with BigInt conversion
+function serializeSupplier(supplier: any) {
+  return {
+    ...supplier,
+    limitHutang: bigIntToNumber(supplier.limitHutang),
+    hutang: bigIntToNumber(supplier.hutang),
+    barang: supplier.barang?.map((b: any) => ({
+      ...b,
+      hargaBeli: bigIntToNumber(b.hargaBeli),
+      hargaJual: bigIntToNumber(b.hargaJual),
+      stok: bigIntToNumber(b.stok),
+    })),
+  };
+}
+
 export async function POST(request: NextRequest) {
   const auth = await isAuthenticated();
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    // Ambil semua supplier
-    const suppliers = await prisma.supplier.findMany();
+    const body = await request.json();
+    const { namaSupplier, alamat, noHp, limitHutang, hutang } = body;
 
-    const results = [];
-
-    for (const supplier of suppliers) {
-      // Hitung total hutang dari pembelian yang status HUTANG dan SELESAI
-      const pembelianHutang = await prisma.pembelianHeader.findMany({
-        where: {
-          supplierId: supplier.id,
-          statusPembayaran: "HUTANG",
-          statusTransaksi: "SELESAI",
-        },
-        select: {
-          id: true,
-          kodePembelian: true,
-          totalHarga: true,
-          jumlahDibayar: true,
-        },
-      });
-
-      // Hitung total sisa hutang
-      const totalHutang = pembelianHutang.reduce((sum, pb) => {
-        return sum + (pb.totalHarga - pb.jumlahDibayar);
-      }, 0);
-
-      // Pastikan tidak minus
-      const hutangFinal = Math.max(0, totalHutang);
-
-      // Update hutang di supplier
-      await prisma.supplier.update({
-        where: { id: supplier.id },
-        data: { hutang: hutangFinal },
-      });
-
-      results.push({
-        supplierId: supplier.id,
-        namaSupplier: supplier.namaSupplier,
-        hutangSebelum: supplier.hutang,
-        hutangSesudah: hutangFinal,
-        jumlahTransaksiHutang: pembelianHutang.length,
-      });
+    if (
+      !namaSupplier ||
+      !alamat ||
+      !noHp ||
+      limitHutang == null ||
+      hutang == null
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Semua field harus diisi" },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Recalculate hutang supplier berhasil",
-      data: results,
+    // ✅ Parse ke BigInt
+    const supplier = await prisma.supplier.create({
+      data: {
+        namaSupplier: namaSupplier.trim(),
+        alamat: alamat.trim(),
+        noHp: noHp.trim(),
+        limitHutang: BigInt(limitHutang),
+        hutang: BigInt(hutang),
+      },
     });
-  } catch (err) {
-    console.error("Error recalculating hutang:", err);
+
     return NextResponse.json(
-      { success: false, error: "Gagal recalculate hutang" },
+      {
+        success: true,
+        message: "Supplier berhasil ditambahkan",
+        data: serializeSupplier(supplier),
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Error creating supplier:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Terjadi kesalahan saat menambahkan supplier",
+      },
       { status: 500 }
     );
   } finally {
@@ -71,66 +83,37 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET: Lihat summary hutang per supplier
-export async function GET(request: NextRequest) {
+export async function GET() {
   const auth = await isAuthenticated();
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
     const suppliers = await prisma.supplier.findMany({
-      select: {
-        id: true,
-        namaSupplier: true,
-        hutang: true,
-        limitHutang: true,
+      where: { isActive: true },
+      orderBy: { id: "desc" },
+      include: {
+        barang: { where: { isActive: true } },
       },
     });
 
-    const summary = [];
+    // ✅ Convert BigInt ke number untuk JSON response
+    const serializedSuppliers = suppliers.map(serializeSupplier);
 
-    for (const supplier of suppliers) {
-      // Hitung hutang dari transaksi
-      const pembelianHutang = await prisma.pembelianHeader.findMany({
-        where: {
-          supplierId: supplier.id,
-          statusPembayaran: "HUTANG",
-          statusTransaksi: "SELESAI",
-        },
-        select: {
-          kodePembelian: true,
-          totalHarga: true,
-          jumlahDibayar: true,
-          createdAt: true,
-        },
-      });
-
-      const totalHutangDariTransaksi = pembelianHutang.reduce((sum, pb) => {
-        return sum + (pb.totalHarga - pb.jumlahDibayar);
-      }, 0);
-
-      summary.push({
-        supplier: {
-          id: supplier.id,
-          nama: supplier.namaSupplier,
-          limitHutang: supplier.limitHutang,
-        },
-        hutangDiDatabase: supplier.hutang,
-        hutangDariTransaksi: totalHutangDariTransaksi,
-        selisih: supplier.hutang - totalHutangDariTransaksi,
-        perluFix: supplier.hutang !== totalHutangDariTransaksi,
-        transaksiHutang: pembelianHutang,
-      });
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: summary,
-    });
-  } catch (err) {
-    console.error("Error getting hutang summary:", err);
     return NextResponse.json(
-      { success: false, error: "Gagal mengambil summary hutang" },
+      {
+        success: true,
+        data: serializedSuppliers,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error fetching supplier:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Terjadi kesalahan saat mengambil data supplier",
+      },
       { status: 500 }
     );
   } finally {

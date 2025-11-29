@@ -1,25 +1,77 @@
-// app/api/penjualan/summary-30-hari/route.ts
+// app/api/penjualan/summary/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
-export async function GET() {
-  try {
-    const today = new Date();
-    const startDate = new Date();
-    // 30 hari terakhir (hari ini + 29 ke belakang)
-    startDate.setDate(startDate.getDate() - 29);
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
 
-    // 1) Penjualan per hari (PenjualanHeader)
+  if (typeof obj === "bigint") {
+    return Number(obj);
+  }
+
+  if (obj instanceof Date) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(deepSerialize);
+  }
+
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+
+  return obj;
+}
+
+export async function GET(request: Request) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    const { searchParams } = new URL(request.url);
+    const period = searchParams.get("period") || "daily";
+    const range = parseInt(searchParams.get("range") || "30");
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const startDate = new Date();
+
+    if (period === "daily") {
+      startDate.setDate(startDate.getDate() - (range - 1));
+      startDate.setHours(0, 0, 0, 0);
+    } else if (period === "monthly") {
+      startDate.setMonth(startDate.getMonth() - (range - 1));
+      startDate.setDate(1);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (period === "yearly") {
+      startDate.setFullYear(startDate.getFullYear() - (range - 1));
+      startDate.setMonth(0, 1);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    // Fetch data penjualan
     const penjualanHeaders = await prisma.penjualanHeader.findMany({
       where: {
         tanggalTransaksi: {
           gte: startDate,
           lte: today,
         },
-        // kalau mau filter statusTransaksi SELESAI bisa pakai:
-        // statusTransaksi: "SELESAI",
+        statusTransaksi: "SELESAI",
       },
       select: {
         id: true,
@@ -28,7 +80,23 @@ export async function GET() {
       },
     });
 
-    // 2) Pengeluaran per hari (Pengeluaran)
+    // Fetch data pembelian
+    const pembelianHeaders = await prisma.pembelianHeader.findMany({
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: today,
+        },
+        statusTransaksi: "SELESAI",
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        totalHarga: true,
+      },
+    });
+
+    // Fetch data pengeluaran
     const pengeluaran = await prisma.pengeluaran.findMany({
       where: {
         tanggalInput: {
@@ -42,8 +110,7 @@ export async function GET() {
       },
     });
 
-    // 3) Laba per hari dari PenjualanItem.laba
-    //    Filter berdasarkan tanggalTransaksi PenjualanHeader
+    // Fetch data untuk hitung laba kotor
     const labaItems = await prisma.penjualanItem.findMany({
       where: {
         penjualan: {
@@ -51,76 +118,162 @@ export async function GET() {
             gte: startDate,
             lte: today,
           },
+          statusTransaksi: "SELESAI",
         },
       },
       select: {
-        laba: true,
+        hargaJual: true,
+        hargaBeli: true,
+        jumlahDus: true,
+        jumlahPcs: true,
         penjualan: {
           select: { tanggalTransaksi: true },
         },
       },
     });
 
-    // Map tanggal → { penjualan, pengeluaran, laba }
     type DailyValue = {
       penjualan: number;
+      pembelian: number;
       pengeluaran: number;
-      laba: number;
+      labaKotor: number;
+      laba: number; // ✅ Ini akan dihitung = labaKotor - pengeluaran
     };
 
     const dataMap: Record<string, DailyValue> = {};
 
-    // Inisialisasi semua hari dalam range dengan 0
+    // Helper function untuk generate key berdasarkan period
+    const getKey = (date: Date): string => {
+      if (period === "daily") {
+        return date.toISOString().slice(0, 10); // YYYY-MM-DD
+      } else if (period === "monthly") {
+        return date.toISOString().slice(0, 7); // YYYY-MM
+      } else {
+        return date.toISOString().slice(0, 4); // YYYY
+      }
+    };
+
+    // Inisialisasi semua periode dengan 0
     const cursor = new Date(startDate);
     while (cursor <= today) {
-      const key = cursor.toISOString().slice(0, 10); // YYYY-MM-DD
-      dataMap[key] = { penjualan: 0, pengeluaran: 0, laba: 0 };
-      cursor.setDate(cursor.getDate() + 1);
+      const key = getKey(cursor);
+      if (!dataMap[key]) {
+        dataMap[key] = {
+          penjualan: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          laba: 0,
+        };
+      }
+
+      if (period === "daily") {
+        cursor.setDate(cursor.getDate() + 1);
+      } else if (period === "monthly") {
+        cursor.setMonth(cursor.getMonth() + 1);
+      } else {
+        cursor.setFullYear(cursor.getFullYear() + 1);
+      }
     }
 
-    // Isi penjualan (totalHarga) per hari
+    // Isi data penjualan
     for (const h of penjualanHeaders) {
-      const key = h.tanggalTransaksi.toISOString().slice(0, 10);
+      const key = getKey(h.tanggalTransaksi);
       if (!dataMap[key]) {
-        dataMap[key] = { penjualan: 0, pengeluaran: 0, laba: 0 };
+        dataMap[key] = {
+          penjualan: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          laba: 0,
+        };
       }
-      dataMap[key].penjualan += h.totalHarga;
+      dataMap[key].penjualan += Number(h.totalHarga);
     }
 
-    // Isi pengeluaran per hari
+    // Isi data pembelian
+    for (const p of pembelianHeaders) {
+      const key = getKey(p.createdAt);
+      if (!dataMap[key]) {
+        dataMap[key] = {
+          penjualan: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          laba: 0,
+        };
+      }
+      dataMap[key].pembelian += Number(p.totalHarga);
+    }
+
+    // Isi data pengeluaran
     for (const e of pengeluaran) {
-      const key = e.tanggalInput.toISOString().slice(0, 10);
+      const key = getKey(e.tanggalInput);
       if (!dataMap[key]) {
-        dataMap[key] = { penjualan: 0, pengeluaran: 0, laba: 0 };
+        dataMap[key] = {
+          penjualan: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          laba: 0,
+        };
       }
-      dataMap[key].pengeluaran += e.jumlah;
+      dataMap[key].pengeluaran += Number(e.jumlah);
     }
 
-    // Isi laba per hari dari PenjualanItem.laba
+    // ✅ Isi data laba kotor
     for (const item of labaItems) {
-      const key = item.penjualan.tanggalTransaksi.toISOString().slice(0, 10);
+      const key = getKey(item.penjualan.tanggalTransaksi);
       if (!dataMap[key]) {
-        dataMap[key] = { penjualan: 0, pengeluaran: 0, laba: 0 };
+        dataMap[key] = {
+          penjualan: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          laba: 0,
+        };
       }
-      dataMap[key].laba += item.laba;
+
+      // Laba Kotor = (hargaJual - hargaBeli) * total quantity
+      const totalQty = Number(item.jumlahDus) + Number(item.jumlahPcs);
+      const labaKotorPerItem =
+        (Number(item.hargaJual) - Number(item.hargaBeli)) * totalQty;
+      dataMap[key].labaKotor += labaKotorPerItem;
     }
 
-    // Convert ke array & sort berdasarkan tanggal
+    // ✅ HITUNG LABA BERSIH = Laba Kotor - Pengeluaran
+    // (setelah semua data terkumpul)
+    for (const key in dataMap) {
+      dataMap[key].laba = dataMap[key].labaKotor - dataMap[key].pengeluaran;
+    }
+
+    // Convert ke array & sort
     const data = Object.entries(dataMap)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([date, value]) => ({
         date,
         penjualan: value.penjualan,
+        pembelian: value.pembelian,
         pengeluaran: value.pengeluaran,
-        laba: value.laba,
+        labaKotor: value.labaKotor,
+        laba: value.laba, // ✅ Sudah dikurangi pengeluaran
       }));
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json(
+      deepSerialize({
+        success: true,
+        data,
+        period,
+        range,
+      })
+    );
   } catch (error) {
-    console.error("Error summary 30 hari:", error);
+    console.error("Error summary:", error);
     return NextResponse.json(
       { success: false, error: "Gagal mengambil data" },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }

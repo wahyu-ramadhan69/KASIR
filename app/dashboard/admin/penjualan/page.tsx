@@ -898,13 +898,15 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
               <Receipt className="w-4 h-4" />
               Riwayat
             </Link>
-            <button
-              onClick={resetAll}
-              className="bg-white hover:bg-blue-50 text-blue-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              Transaksi Baru
-            </button>
+            {step === 2 && (
+              <button
+                onClick={resetAll}
+                className="bg-white hover:bg-blue-50 text-blue-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                Transaksi Baru
+              </button>
+            )}
           </div>
         </div>
       </div>

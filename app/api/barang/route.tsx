@@ -5,6 +5,33 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize barang data with BigInt conversion
+function serializeBarang(barang: any) {
+  return {
+    ...barang,
+    hargaBeli: bigIntToNumber(barang.hargaBeli),
+    hargaJual: bigIntToNumber(barang.hargaJual),
+    stok: bigIntToNumber(barang.stok),
+    jumlahPerkardus: bigIntToNumber(barang.jumlahPerkardus),
+    ukuran: bigIntToNumber(barang.ukuran),
+    supplier: barang.supplier
+      ? {
+          ...barang.supplier,
+          limitHutang: bigIntToNumber(barang.supplier.limitHutang),
+          hutang: bigIntToNumber(barang.supplier.hutang),
+        }
+      : undefined,
+  };
+}
+
 // CREATE Barang
 export async function POST(request: NextRequest) {
   const auth = await isAuthenticated();
@@ -39,15 +66,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Convert to BigInt for database
     const barang = await prisma.barang.create({
       data: {
         namaBarang: String(namaBarang).trim(),
-        hargaBeli: Number(hargaBeli),
-        hargaJual: Number(hargaJual),
-        jumlahPerkardus: Number(jumlahPerkardus),
-        ukuran: Number(ukuran),
+        hargaBeli: BigInt(hargaBeli),
+        hargaJual: BigInt(hargaJual),
+        stok: stok != null ? BigInt(stok) : BigInt(0),
+        jumlahPerkardus: BigInt(jumlahPerkardus),
+        ukuran: BigInt(ukuran),
         satuan: String(satuan).trim(),
         supplierId: Number(supplierId),
+      },
+      include: {
+        supplier: true,
       },
     });
 
@@ -55,7 +87,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         message: "Barang berhasil ditambahkan",
-        data: barang,
+        data: serializeBarang(barang),
       },
       { status: 201 }
     );
@@ -70,7 +102,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET semua barang (opsional, sekalian dibuat)
+// GET semua barang
 export async function GET() {
   const auth = await isAuthenticated();
   if (!auth) {
@@ -82,9 +114,16 @@ export async function GET() {
       include: {
         supplier: true,
       },
+      where: { isActive: true },
     });
 
-    return NextResponse.json({ success: true, data: barang }, { status: 200 });
+    // Serialize all barang to convert BigInt to number
+    const serializedBarang = barang.map(serializeBarang);
+
+    return NextResponse.json(
+      { success: true, data: serializedBarang },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error fetching barang:", error);
     return NextResponse.json(

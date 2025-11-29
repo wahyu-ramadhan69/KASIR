@@ -1,0 +1,23 @@
+-- DropForeignKey
+ALTER TABLE "PembelianItem" DROP CONSTRAINT "PembelianItem_pembelianId_fkey";
+
+-- AlterTable
+ALTER TABLE "Pengeluaran" ALTER COLUMN "jumlah" SET DATA TYPE BIGINT;
+
+-- AlterTable
+ALTER TABLE "PenjualanHeader" ALTER COLUMN "subtotal" SET DATA TYPE BIGINT,
+ALTER COLUMN "diskonNota" SET DATA TYPE BIGINT,
+ALTER COLUMN "totalHarga" SET DATA TYPE BIGINT,
+ALTER COLUMN "jumlahDibayar" SET DATA TYPE BIGINT,
+ALTER COLUMN "kembalian" SET DATA TYPE BIGINT;
+
+-- AlterTable
+ALTER TABLE "PenjualanItem" ALTER COLUMN "jumlahDus" SET DATA TYPE BIGINT,
+ALTER COLUMN "jumlahPcs" SET DATA TYPE BIGINT,
+ALTER COLUMN "hargaJual" SET DATA TYPE BIGINT,
+ALTER COLUMN "diskonPerItem" SET DATA TYPE BIGINT,
+ALTER COLUMN "hargaBeli" SET DATA TYPE BIGINT,
+ALTER COLUMN "laba" SET DATA TYPE BIGINT;
+
+-- AddForeignKey
+ALTER TABLE "PembelianItem" ADD CONSTRAINT "PembelianItem_pembelianId_fkey" FOREIGN KEY ("pembelianId") REFERENCES "PembelianHeader"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -8,6 +8,23 @@ type RouteCtx = {
   params: Promise<{ id: string }>;
 };
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize customer data with BigInt conversion
+function serializeCustomer(customer: any) {
+  return {
+    ...customer,
+    limit_piutang: bigIntToNumber(customer.limit_piutang),
+    piutang: bigIntToNumber(customer.piutang),
+  };
+}
+
 function parseId(id: string | undefined) {
   const num = Number(id);
   if (!id || Number.isNaN(num)) return null;
@@ -42,7 +59,10 @@ export async function GET(_request: NextRequest, { params }: RouteCtx) {
       );
     }
 
-    return NextResponse.json({ success: true, data: customer });
+    return NextResponse.json({
+      success: true,
+      data: serializeCustomer(customer),
+    });
   } catch (err) {
     console.error("Error fetching customer:", err);
     return NextResponse.json(
@@ -55,6 +75,11 @@ export async function GET(_request: NextRequest, { params }: RouteCtx) {
 }
 
 export async function PUT(request: NextRequest, { params }: RouteCtx) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const idNum = parseId(id);
 
@@ -95,15 +120,15 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       }
     }
 
-    // Build update data object
+    // Build update data object with BigInt conversion
     const updateData: {
       nik?: string;
       nama?: string;
       alamat?: string;
       namaToko?: string;
       noHp?: string;
-      limit_piutang?: number;
-      piutang?: number;
+      limit_piutang?: bigint;
+      piutang?: bigint;
     } = {};
 
     if (nik !== undefined) updateData.nik = nik;
@@ -111,8 +136,9 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
     if (alamat !== undefined) updateData.alamat = alamat;
     if (namaToko !== undefined) updateData.namaToko = namaToko;
     if (noHp !== undefined) updateData.noHp = noHp;
-    if (limit_piutang !== undefined) updateData.limit_piutang = limit_piutang;
-    if (piutang !== undefined) updateData.piutang = piutang;
+    if (limit_piutang !== undefined)
+      updateData.limit_piutang = BigInt(limit_piutang);
+    if (piutang !== undefined) updateData.piutang = BigInt(piutang);
 
     const updated = await prisma.customer.update({
       where: { id: idNum },
@@ -122,7 +148,7 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
     return NextResponse.json({
       success: true,
       message: "Customer berhasil diperbarui",
-      data: updated,
+      data: serializeCustomer(updated),
     });
   } catch (err) {
     console.error("Error updating customer:", err);

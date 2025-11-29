@@ -808,11 +808,11 @@ const DataBarangPage = () => {
                       required
                     >
                       <option value="">Pilih Satuan</option>
-                      <option value="kg">Kilogram (kg)</option>
+                      <option value="kg">KG</option>
                       <option value="liter">Liter</option>
-                      <option value="pcs">Pieces (pcs)</option>
-                      <option value="box">Box</option>
+                      <option value="pcs">PCS</option>
                       <option value="pack">Pack</option>
+                      <option value="sak">Sak</option>
                     </select>
                   </div>
                 </div>
@@ -1014,11 +1014,11 @@ const DataBarangPage = () => {
                       required
                     >
                       <option value="">Pilih Satuan</option>
-                      <option value="kg">Kilogram (kg)</option>
+                      <option value="kg">KG</option>
                       <option value="liter">Liter</option>
-                      <option value="pcs">Pieces (pcs)</option>
-                      <option value="box">Box</option>
+                      <option value="pcs">PCS</option>
                       <option value="pack">Pack</option>
+                      <option value="sak">Sak</option>
                     </select>
                   </div>
                 </div>

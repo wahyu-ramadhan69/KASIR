@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Customer" ALTER COLUMN "limit_piutang" SET DATA TYPE BIGINT,
+ALTER COLUMN "piutang" SET DATA TYPE BIGINT;

@@ -1,18 +1,19 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search,
   Calendar,
   TrendingUp,
-  TrendingDown,
   DollarSign,
   Package,
   Eye,
   X,
   Download,
   RefreshCw,
-  Filter,
-  ArrowLeft,
+  Filter as FilterIcon,
+  FileSpreadsheet,
+  FileText,
+  Loader2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -20,8 +21,6 @@ import Link from "next/link";
 interface Barang {
   id: number;
   namaBarang: string;
-  hargaBeli: number;
-  hargaJual: number;
   ukuran: number;
   satuan: string;
   jumlahPerkardus: number;
@@ -61,19 +60,22 @@ interface PenjualanHeader {
   items: PenjualanItem[];
 }
 
-interface LabaRugiStats {
+interface Stats {
   totalPenjualan: number;
   totalModal: number;
   totalLaba: number;
   marginPersen: number;
   jumlahTransaksi: number;
   jumlahItem: number;
+  totalDus?: number;
+  totalPcs?: number;
 }
 
-const LaporanLabaRugiPage = () => {
+const LaporanPenjualanPage = () => {
   const [penjualanList, setPenjualanList] = useState<PenjualanHeader[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [stats, setStats] = useState<LabaRugiStats>({
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [stats, setStats] = useState<Stats>({
     totalPenjualan: 0,
     totalModal: 0,
     totalLaba: 0,
@@ -82,86 +84,122 @@ const LaporanLabaRugiPage = () => {
     jumlahItem: 0,
   });
 
+  // Pagination
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+
   // Filter state
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Detail modal
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [selectedPenjualan, setSelectedPenjualan] =
     useState<PenjualanHeader | null>(null);
 
+  // Export loading
+  const [exportingSummary, setExportingSummary] = useState<boolean>(false);
+  const [exportingDetail, setExportingDetail] = useState<boolean>(false);
+  const [exportingYearly, setExportingYearly] = useState<boolean>(false);
+
+  // Ref untuk infinite scroll
+  const observerTarget = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    fetchData();
-  }, [startDate, endDate]);
+    // Reset saat filter berubah
+    setPenjualanList([]);
+    setPage(1);
+    setHasMore(true);
+    fetchData(1, true);
+  }, [startDate, endDate, searchTerm, statusFilter]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  useEffect(() => {
+    // Setup intersection observer untuk infinite scroll
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMore, loading, loadingMore, page]);
+
+  const fetchData = async (
+    pageNum: number,
+    reset: boolean = false,
+    retryCount: number = 0
+  ) => {
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
-      let url = "/api/penjualan?status=SELESAI&limit=1000";
+      let url = `/api/laporan/penjualan?page=${pageNum}&limit=20`;
 
-      if (startDate) {
-        url += `&startDate=${startDate}`;
-      }
-      if (endDate) {
-        url += `&endDate=${endDate}`;
-      }
+      if (startDate) url += `&startDate=${startDate}`;
+      if (endDate) url += `&endDate=${endDate}`;
+      if (searchTerm) url += `&search=${searchTerm}`;
+      if (statusFilter !== "all") url += `&statusPembayaran=${statusFilter}`;
 
       const res = await fetch(url);
+
+      // Handle 404 with retry logic (max 5 attempts)
+      if (res.status === 404 && retryCount < 5) {
+        console.warn(
+          `Attempt ${retryCount + 1}/5 failed (404). Retrying in 2s...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return fetchData(pageNum, reset, retryCount + 1);
+      }
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
       const data = await res.json();
 
       if (data.success) {
-        const penjualanData = data.data as PenjualanHeader[];
-        setPenjualanList(penjualanData);
-        calculateStats(penjualanData);
+        if (reset) {
+          setPenjualanList(data.data);
+        } else {
+          setPenjualanList((prev) => [...prev, ...data.data]);
+        }
+
+        setHasMore(data.pagination.hasMore);
+        setStats(data.stats.overall);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Gagal mengambil data penjualan");
+      if (retryCount >= 5) {
+        toast.error("Gagal mengambil data transaksi setelah 5 percobaan");
+      } else {
+        toast.error("Gagal mengambil data transaksi");
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const calculateStats = (data: PenjualanHeader[]) => {
-    let totalPenjualan = 0;
-    let totalModal = 0;
-    let totalLaba = 0;
-    let jumlahItem = 0;
-
-    data.forEach((penjualan) => {
-      totalPenjualan += penjualan.totalHarga;
-
-      penjualan.items?.forEach((item) => {
-        jumlahItem += item.jumlahDus;
-
-        // Hitung modal
-        const modalDus = item.hargaBeli * item.jumlahDus;
-        const modalPcs =
-          item.jumlahPcs > 0
-            ? Math.round(
-                (item.hargaBeli / item.barang.jumlahPerkardus) * item.jumlahPcs
-              )
-            : 0;
-        totalModal += modalDus + modalPcs;
-
-        // Ambil laba yang sudah tersimpan
-        totalLaba += item.laba;
-      });
-    });
-
-    const marginPersen =
-      totalPenjualan > 0 ? (totalLaba / totalPenjualan) * 100 : 0;
-
-    setStats({
-      totalPenjualan,
-      totalModal,
-      totalLaba,
-      marginPersen,
-      jumlahTransaksi: data.length,
-      jumlahItem,
-    });
+  const loadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchData(nextPage, false);
   };
 
   const handleViewDetail = (penjualan: PenjualanHeader) => {
@@ -173,6 +211,99 @@ const LaporanLabaRugiPage = () => {
     setStartDate("");
     setEndDate("");
     setSearchTerm("");
+    setStatusFilter("all");
+  };
+
+  const handleExport = async (
+    format: "excel" | "pdf",
+    exportType: "current" | "summary" | "detail" = "detail"
+  ) => {
+    if (exportType === "summary") {
+      setExportingSummary(true);
+    } else {
+      setExportingDetail(true);
+    }
+
+    try {
+      let url = `/api/laporan/penjualan/export?format=${format}`;
+
+      // Tentukan detail berdasarkan exportType
+      if (exportType === "summary") {
+        url += `&detail=false`;
+      } else {
+        url += `&detail=true`; // Detail dengan breakdown items
+      }
+
+      // ✅ GUNAKAN FILTER TANGGAL YANG SUDAH DIPILIH USER
+      if (startDate) url += `&startDate=${startDate}`;
+      if (endDate) url += `&endDate=${endDate}`;
+      if (searchTerm) url += `&search=${searchTerm}`;
+
+      const res = await fetch(url);
+      const blob = await res.blob();
+
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+
+      // Generate filename
+      let filename = "Laporan-Transaksi";
+      if (exportType === "summary") {
+        filename += "-Summary";
+      } else {
+        filename += "-Detail";
+      }
+
+      if (startDate && endDate) {
+        filename += `-${startDate}-sd-${endDate}`;
+      } else if (startDate) {
+        filename += `-sejak-${startDate}`;
+      } else if (endDate) {
+        filename += `-sampai-${endDate}`;
+      }
+
+      filename += `-${Date.now()}.${format === "excel" ? "xlsx" : "pdf"}`;
+
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      toast.success(`Laporan ${format.toUpperCase()} berhasil didownload`);
+    } catch (error) {
+      console.error("Error exporting:", error);
+      toast.error("Gagal export laporan");
+    } finally {
+      setExportingSummary(false);
+      setExportingDetail(false);
+    }
+  };
+
+  const handleExportYearly = async () => {
+    setExportingYearly(true);
+
+    try {
+      const year = new Date().getFullYear();
+      const url = `/api/laporan/penjualan/export?period=yearly&year=${year}`;
+
+      const res = await fetch(url);
+      const blob = await res.blob();
+
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `Laporan-Tahunan-${year}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      toast.success("Laporan Tahunan berhasil didownload");
+    } catch (error) {
+      console.error("Error exporting:", error);
+      toast.error("Gagal export laporan tahunan");
+    } finally {
+      setExportingYearly(false);
+    }
   };
 
   const formatRupiah = (number: number): string => {
@@ -201,14 +332,6 @@ const LaporanLabaRugiPage = () => {
     });
   };
 
-  const filteredPenjualan = penjualanList.filter(
-    (pj) =>
-      pj.kodePenjualan.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pj.namaCustomer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pj.customer?.nama.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Hitung total per penjualan
   const getTotalLabaPenjualan = (penjualan: PenjualanHeader): number => {
     return penjualan.items?.reduce((sum, item) => sum + item.laba, 0) || 0;
   };
@@ -229,60 +352,80 @@ const LaporanLabaRugiPage = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto">
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: { background: "#333", color: "#fff" },
-          success: { style: { background: "#22c55e" } },
-          error: { style: { background: "#ef4444" } },
-        }}
-      />
+    <div className="w-full max-w-7xl mx-auto pb-20">
+      <Toaster position="top-right" />
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-xl p-6 mb-6 shadow-lg">
+      <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl p-6 mb-6 shadow-lg">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/dashboard/admin/penjualan/riwayat"
-              className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-all"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">
-                Laporan Laba/Rugi Penjualan
-              </h1>
-              <p className="text-green-100">
-                Analisis keuntungan dan margin dari setiap transaksi penjualan
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Laporan Transaksi
+            </h1>
+            <p className="text-blue-100">
+              Analisis detail setiap transaksi penjualan
+            </p>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={fetchData}
-              disabled={loading}
-              className="bg-white hover:bg-green-50 text-green-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md disabled:opacity-50"
+              onClick={() => handleExport("excel", "summary")}
+              disabled={exportingSummary}
+              className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
+              title="Export ringkasan (tanpa detail item)"
             >
-              <RefreshCw
-                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-              />
-              Refresh
+              {exportingSummary ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Excel Summary
             </button>
             <button
-              onClick={() => window.print()}
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
+              onClick={() => handleExport("excel", "detail")}
+              disabled={exportingDetail}
+              className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
+              title="Export detail (dengan breakdown item per transaksi)"
             >
-              <Download className="w-4 h-4" />
-              Export
+              {exportingDetail ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Excel Detail
+            </button>
+            <button
+              onClick={handleExportYearly}
+              disabled={exportingYearly}
+              className="bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
+              title="Export laporan tahunan (per bulan)"
+            >
+              {exportingYearly ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Tahunan
             </button>
           </div>
         </div>
+
+        {/* Info tanggal yang akan di-export */}
+        {(startDate || endDate) && (
+          <div className="mt-4 bg-blue-700/50 rounded-lg px-4 py-2">
+            <p className="text-sm text-blue-100">
+              📅 Export akan menggunakan filter:{" "}
+              <span className="font-semibold text-white">
+                {startDate && `Dari ${formatDate(startDate)}`}
+                {startDate && endDate && " "}
+                {endDate && `Sampai ${formatDate(endDate)}`}
+              </span>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-blue-500">
           <div className="flex items-center justify-between mb-2">
             <p className="text-gray-500 text-sm font-medium">Total Penjualan</p>
@@ -304,9 +447,7 @@ const LaporanLabaRugiPage = () => {
           <p className="text-2xl font-bold text-gray-900">
             {formatRupiah(stats.totalModal)}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {stats.jumlahItem} item terjual
-          </p>
+          <p className="text-xs text-gray-500 mt-1">{stats.jumlahItem} item</p>
         </div>
 
         <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-green-500">
@@ -330,12 +471,24 @@ const LaporanLabaRugiPage = () => {
           </p>
           <p className="text-xs text-gray-500 mt-1">Persentase keuntungan</p>
         </div>
+
+        <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-indigo-500">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-gray-500 text-sm font-medium">Total Terjual</p>
+            <Package className="w-8 h-8 text-indigo-500" />
+          </div>
+          <p className="text-xl font-bold text-gray-900">
+            {stats.totalDus?.toLocaleString() || 0} dus
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {stats.totalPcs?.toLocaleString() || 0} pcs
+          </p>
+        </div>
       </div>
 
       {/* Filters */}
       <div className="bg-white rounded-lg p-4 mb-6 shadow-md border border-gray-100">
         <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -343,11 +496,10 @@ const LaporanLabaRugiPage = () => {
               placeholder="Cari kode transaksi atau customer..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent outline-none"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
             />
           </div>
 
-          {/* Date Range */}
           <div className="flex gap-2">
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -355,7 +507,8 @@ const LaporanLabaRugiPage = () => {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent outline-none"
+                className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                placeholder="Dari tanggal"
               />
             </div>
             <span className="flex items-center text-gray-500">-</span>
@@ -365,12 +518,23 @@ const LaporanLabaRugiPage = () => {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent outline-none"
+                className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                placeholder="Sampai tanggal"
               />
             </div>
           </div>
 
-          {(startDate || endDate || searchTerm) && (
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+          >
+            <option value="all">Semua Status</option>
+            <option value="LUNAS">Lunas</option>
+            <option value="HUTANG">Hutang</option>
+          </select>
+
+          {(startDate || endDate || searchTerm || statusFilter !== "all") && (
             <button
               onClick={handleClearFilters}
               className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-all flex items-center gap-2"
@@ -386,52 +550,55 @@ const LaporanLabaRugiPage = () => {
       <div className="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
                     Kode
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
                     Tanggal
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
                     Customer
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                     Penjualan
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                     Modal
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                     Laba
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                     Margin
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
                     Aksi
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredPenjualan.length === 0 ? (
+                {penjualanList.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-6 py-12 text-center text-gray-500"
                     >
                       <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                      <p>Tidak ada data penjualan</p>
+                      <p>Tidak ada data transaksi</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredPenjualan.map((pj) => {
+                  penjualanList.map((pj) => {
                     const totalLaba = getTotalLabaPenjualan(pj);
                     const totalModal = getTotalModalPenjualan(pj);
                     const margin =
@@ -454,11 +621,6 @@ const LaporanLabaRugiPage = () => {
                           <p className="text-sm font-medium text-gray-900">
                             {pj.customer?.nama || pj.namaCustomer || "-"}
                           </p>
-                          {pj.customer?.namaToko && (
-                            <p className="text-xs text-gray-500">
-                              {pj.customer.namaToko}
-                            </p>
-                          )}
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
                           {formatRupiah(pj.totalHarga)}
@@ -485,9 +647,20 @@ const LaporanLabaRugiPage = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
+                          <span
+                            className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                              pj.statusPembayaran === "LUNAS"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-yellow-100 text-yellow-700"
+                            }`}
+                          >
+                            {pj.statusPembayaran}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => handleViewDetail(pj)}
-                            className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all"
+                            className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
                             title="Lihat Detail"
                           >
                             <Eye className="w-4 h-4" />
@@ -501,51 +674,16 @@ const LaporanLabaRugiPage = () => {
             </table>
           </div>
         )}
-      </div>
 
-      {/* Summary Footer */}
-      {filteredPenjualan.length > 0 && (
-        <div className="mt-4 bg-green-50 rounded-lg p-4 border border-green-200">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Transaksi</p>
-              <p className="text-lg font-bold text-gray-900">
-                {filteredPenjualan.length}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Total Penjualan</p>
-              <p className="text-lg font-bold text-blue-600">
-                {formatRupiah(
-                  filteredPenjualan.reduce((sum, pj) => sum + pj.totalHarga, 0)
-                )}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Total Modal</p>
-              <p className="text-lg font-bold text-orange-600">
-                {formatRupiah(
-                  filteredPenjualan.reduce(
-                    (sum, pj) => sum + getTotalModalPenjualan(pj),
-                    0
-                  )
-                )}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Total Laba</p>
-              <p className="text-lg font-bold text-green-600">
-                {formatRupiah(
-                  filteredPenjualan.reduce(
-                    (sum, pj) => sum + getTotalLabaPenjualan(pj),
-                    0
-                  )
-                )}
-              </p>
-            </div>
+        {/* Infinite Scroll Trigger */}
+        {hasMore && (
+          <div ref={observerTarget} className="flex justify-center py-4">
+            {loadingMore && (
+              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Detail Modal */}
       {showDetailModal && selectedPenjualan && (
@@ -557,12 +695,12 @@ const LaporanLabaRugiPage = () => {
             className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-white">
-                  Detail Laba/Rugi
+                  Detail Transaksi
                 </h2>
-                <p className="text-green-100 text-sm">
+                <p className="text-blue-100 text-sm">
                   {selectedPenjualan.kodePenjualan}
                 </p>
               </div>
@@ -575,10 +713,9 @@ const LaporanLabaRugiPage = () => {
             </div>
 
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
-              {/* Header Info */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4 grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-500">Tanggal Transaksi</p>
+                  <p className="text-sm text-gray-500">Tanggal</p>
                   <p className="font-semibold">
                     {formatDateTime(selectedPenjualan.tanggalTransaksi)}
                   </p>
@@ -611,7 +748,6 @@ const LaporanLabaRugiPage = () => {
                 </div>
               </div>
 
-              {/* Items Table */}
               <h3 className="font-semibold text-gray-900 mb-3">
                 Detail Per Item
               </h3>
@@ -622,8 +758,6 @@ const LaporanLabaRugiPage = () => {
                       <th className="px-3 py-2 text-left">Barang</th>
                       <th className="px-3 py-2 text-center">Qty</th>
                       <th className="px-3 py-2 text-right">Harga Jual</th>
-                      <th className="px-3 py-2 text-right">Harga Beli</th>
-                      <th className="px-3 py-2 text-right">Diskon</th>
                       <th className="px-3 py-2 text-right">Modal</th>
                       <th className="px-3 py-2 text-right">Laba</th>
                     </tr>
@@ -646,9 +780,6 @@ const LaporanLabaRugiPage = () => {
                             <p className="font-medium">
                               {item.barang?.namaBarang}
                             </p>
-                            <p className="text-xs text-gray-500">
-                              {item.barang?.ukuran} {item.barang?.satuan}
-                            </p>
                           </td>
                           <td className="px-3 py-2 text-center">
                             {item.jumlahDus > 0 && (
@@ -665,16 +796,6 @@ const LaporanLabaRugiPage = () => {
                             {formatRupiah(item.hargaJual)}
                           </td>
                           <td className="px-3 py-2 text-right text-orange-600">
-                            {formatRupiah(item.hargaBeli)}
-                          </td>
-                          <td className="px-3 py-2 text-right text-red-500">
-                            {item.diskonPerItem > 0
-                              ? `-${formatRupiah(
-                                  item.diskonPerItem * item.jumlahDus
-                                )}`
-                              : "-"}
-                          </td>
-                          <td className="px-3 py-2 text-right font-medium text-orange-600">
                             {formatRupiah(totalModal)}
                           </td>
                           <td className="px-3 py-2 text-right font-bold text-green-600">
@@ -687,18 +808,7 @@ const LaporanLabaRugiPage = () => {
                 </table>
               </div>
 
-              {/* Summary */}
               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Subtotal Penjualan</span>
-                  <span>{formatRupiah(selectedPenjualan.subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Diskon Nota</span>
-                  <span className="text-red-500">
-                    -{formatRupiah(selectedPenjualan.diskonNota)}
-                  </span>
-                </div>
                 <div className="flex justify-between font-bold border-t pt-2">
                   <span>Total Penjualan</span>
                   <span className="text-blue-600">
@@ -717,19 +827,6 @@ const LaporanLabaRugiPage = () => {
                     {formatRupiah(getTotalLabaPenjualan(selectedPenjualan))}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Margin Keuntungan</span>
-                  <span className="font-bold text-purple-600">
-                    {selectedPenjualan.totalHarga > 0
-                      ? (
-                          (getTotalLabaPenjualan(selectedPenjualan) /
-                            selectedPenjualan.totalHarga) *
-                          100
-                        ).toFixed(2)
-                      : 0}
-                    %
-                  </span>
-                </div>
               </div>
             </div>
           </div>
@@ -739,4 +836,4 @@ const LaporanLabaRugiPage = () => {
   );
 };
 
-export default LaporanLabaRugiPage;
+export default LaporanPenjualanPage;

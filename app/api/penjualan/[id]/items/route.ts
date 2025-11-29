@@ -1,31 +1,52 @@
-// =====================================================
-// PATH: app/api/penjualan/[id]/items/route.ts
-// =====================================================
-
+// app/api/penjualan/[id]/items/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") return Number(obj);
+  if (obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(deepSerialize);
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+  return obj;
+}
+
+// Helper to convert BigInt to number safely
+function toNumber(value: any): number {
+  if (typeof value === "bigint") return Number(value);
+  return Number(value || 0);
+}
+
+// Helper function untuk menghitung total penjualan
 const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let subtotal = 0;
   let totalDiskonItem = 0;
 
   const calculatedItems = items.map((item) => {
-    const totalPcs =
-      item.jumlahDus * (item.barang?.jumlahPerkardus || 1) +
-      (item.jumlahPcs || 0);
-    const hargaTotal = item.hargaJual * item.jumlahDus;
+    const jumlahDus = toNumber(item.jumlahDus);
+    const jumlahPcs = toNumber(item.jumlahPcs);
+    const hargaJual = toNumber(item.hargaJual);
+    const diskonPerItem = toNumber(item.diskonPerItem);
+    const jumlahPerkardus = toNumber(item.barang?.jumlahPerkardus || 1);
+
+    const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+    const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      item.jumlahPcs > 0
-        ? Math.round(
-            (item.hargaJual / (item.barang?.jumlahPerkardus || 1)) *
-              item.jumlahPcs
-          )
-        : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
-    const diskon = item.diskonPerItem * item.jumlahDus;
+    const diskon = diskonPerItem * jumlahDus;
 
     subtotal += totalHargaSebelumDiskon;
     totalDiskonItem += diskon;
@@ -62,7 +83,6 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    // PENTING: await params dulu sebelum digunakan
     const { id } = await params;
     const penjualanId = parseInt(id);
 
@@ -107,12 +127,15 @@ export async function POST(
     }
 
     // Cek stok
-    const totalPcsNeeded = jumlahDus * barang.jumlahPerkardus + jumlahPcs;
-    if (barang.stok < totalPcsNeeded) {
+    const jumlahPerkardus = toNumber(barang.jumlahPerkardus);
+    const stokTersedia = toNumber(barang.stok);
+    const totalPcsNeeded = jumlahDus * jumlahPerkardus + jumlahPcs;
+
+    if (stokTersedia < totalPcsNeeded) {
       return NextResponse.json(
         {
           success: false,
-          error: `Stok tidak cukup. Tersedia: ${barang.stok} pcs, Dibutuhkan: ${totalPcsNeeded} pcs`,
+          error: `Stok tidak cukup. Tersedia: ${stokTersedia} pcs, Dibutuhkan: ${totalPcsNeeded} pcs`,
         },
         { status: 400 }
       );
@@ -134,16 +157,13 @@ export async function POST(
     }
 
     // Hitung laba
-    // Laba = (hargaJual - diskon - hargaBeli) * jumlahDus + (hargaJualPerPcs - hargaBeliPerPcs) * jumlahPcs
-    const hargaBeliPerPcs = Math.round(
-      barang.hargaBeli / barang.jumlahPerkardus
-    );
-    const hargaJualPerPcs = Math.round(
-      (hargaJual || barang.hargaJual) / barang.jumlahPerkardus
-    );
+    const hargaBeliBarang = toNumber(barang.hargaBeli);
+    const hargaJualFinal = hargaJual || toNumber(barang.hargaJual);
 
-    const labaPerDus =
-      (hargaJual || barang.hargaJual) - diskonPerItem - barang.hargaBeli;
+    const hargaBeliPerPcs = Math.round(hargaBeliBarang / jumlahPerkardus);
+    const hargaJualPerPcs = Math.round(hargaJualFinal / jumlahPerkardus);
+
+    const labaPerDus = hargaJualFinal - diskonPerItem - hargaBeliBarang;
     const labaFromDus = labaPerDus * jumlahDus;
 
     const labaPerPcs = hargaJualPerPcs - hargaBeliPerPcs;
@@ -156,12 +176,12 @@ export async function POST(
       data: {
         penjualanId,
         barangId,
-        jumlahDus,
-        jumlahPcs,
-        hargaJual: hargaJual || barang.hargaJual,
+        jumlahDus: BigInt(jumlahDus),
+        jumlahPcs: BigInt(jumlahPcs),
+        hargaJual: BigInt(hargaJualFinal),
         hargaBeli: barang.hargaBeli, // Simpan harga beli dari master barang
-        diskonPerItem,
-        laba: totalLaba, // Simpan total laba
+        diskonPerItem: BigInt(diskonPerItem),
+        laba: BigInt(totalLaba), // Simpan total laba
       },
       include: { barang: true },
     });
@@ -172,21 +192,24 @@ export async function POST(
       include: { barang: true },
     });
 
-    const calculation = calculatePenjualan(allItems, penjualan.diskonNota);
+    const diskonNotaPenjualan = toNumber(penjualan.diskonNota);
+    const calculation = calculatePenjualan(allItems, diskonNotaPenjualan);
 
     await prisma.penjualanHeader.update({
       where: { id: penjualanId },
       data: {
-        subtotal: calculation.ringkasan.subtotal,
-        totalHarga: calculation.ringkasan.totalHarga,
+        subtotal: BigInt(calculation.ringkasan.subtotal),
+        totalHarga: BigInt(calculation.ringkasan.totalHarga),
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Item berhasil ditambahkan",
-      data: item,
-    });
+    return NextResponse.json(
+      deepSerialize({
+        success: true,
+        message: "Item berhasil ditambahkan",
+        data: item,
+      })
+    );
   } catch (err) {
     console.error("Error adding item:", err);
     return NextResponse.json(

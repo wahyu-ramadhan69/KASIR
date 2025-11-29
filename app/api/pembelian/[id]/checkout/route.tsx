@@ -4,6 +4,46 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: any): number {
+  if (value == null) return 0;
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return Number(value);
+}
+
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "bigint") {
+    return Number(obj);
+  }
+
+  if (obj instanceof Date) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(deepSerialize);
+  }
+
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+
+  return obj;
+}
+
 // Helper: Hitung ulang total hutang supplier dari semua transaksi
 async function recalculateSupplierHutang(tx: any, supplierId: number) {
   const pembelianHutang = await tx.pembelianHeader.findMany({
@@ -19,12 +59,14 @@ async function recalculateSupplierHutang(tx: any, supplierId: number) {
   });
 
   const totalHutang = pembelianHutang.reduce((sum: number, pb: any) => {
-    return sum + (pb.totalHarga - pb.jumlahDibayar);
+    const totalHarga = bigIntToNumber(pb.totalHarga);
+    const jumlahDibayar = bigIntToNumber(pb.jumlahDibayar);
+    return sum + (totalHarga - jumlahDibayar);
   }, 0);
 
   await tx.supplier.update({
     where: { id: supplierId },
-    data: { hutang: Math.max(0, totalHutang) }, // Pastikan tidak minus
+    data: { hutang: BigInt(Math.max(0, totalHutang)) },
   });
 
   return totalHutang;
@@ -85,15 +127,20 @@ export async function POST(
       );
     }
 
-    // Hitung subtotal
+    // Hitung subtotal dengan BigInt conversion
     const subtotal = pembelian.items.reduce((total, item) => {
-      const totalHarga = item.hargaPokok * item.jumlahDus;
-      const totalDiskon = item.diskonPerItem * item.jumlahDus;
+      const hargaPokok = bigIntToNumber(item.hargaPokok);
+      const jumlahDus = bigIntToNumber(item.jumlahDus);
+      const diskonPerItem = bigIntToNumber(item.diskonPerItem);
+      const totalHarga = hargaPokok * jumlahDus;
+      const totalDiskon = diskonPerItem * jumlahDus;
       return total + (totalHarga - totalDiskon);
     }, 0);
 
     const finalDiskonNota =
-      diskonNota !== undefined ? diskonNota : pembelian.diskonNota;
+      diskonNota !== undefined
+        ? diskonNota
+        : bigIntToNumber(pembelian.diskonNota);
     const totalHarga = subtotal - finalDiskonNota;
 
     // Cek limit hutang jika pembayaran kurang
@@ -114,15 +161,16 @@ export async function POST(
       });
 
       const totalHutangExisting =
-        (hutangExisting._sum.totalHarga || 0) -
-        (hutangExisting._sum.jumlahDibayar || 0);
+        bigIntToNumber(hutangExisting._sum.totalHarga || BigInt(0)) -
+        bigIntToNumber(hutangExisting._sum.jumlahDibayar || BigInt(0));
       const totalHutangBaru = totalHutangExisting + sisaHutangBaru;
+      const limitHutang = bigIntToNumber(pembelian.supplier.limitHutang);
 
-      if (totalHutangBaru > pembelian.supplier.limitHutang) {
+      if (totalHutangBaru > limitHutang) {
         return NextResponse.json(
           {
             success: false,
-            error: `Melebihi limit hutang supplier. Limit: Rp ${pembelian.supplier.limitHutang.toLocaleString(
+            error: `Melebihi limit hutang supplier. Limit: Rp ${limitHutang.toLocaleString(
               "id-ID"
             )}, Hutang saat ini: Rp ${totalHutangExisting.toLocaleString(
               "id-ID"
@@ -156,23 +204,27 @@ export async function POST(
     const result = await prisma.$transaction(async (tx) => {
       // Update stok barang
       for (const item of pembelian.items) {
-        const totalUnit = item.jumlahDus * item.barang.jumlahPerkardus;
+        const jumlahDus = bigIntToNumber(item.jumlahDus);
+        const jumlahPerkardus = bigIntToNumber(item.barang.jumlahPerkardus);
+        const totalUnit = jumlahDus * jumlahPerkardus;
+        const hargaPokok = bigIntToNumber(item.hargaPokok);
+
         await tx.barang.update({
           where: { id: item.barangId },
           data: {
-            stok: { increment: totalUnit },
-            hargaBeli: item.hargaPokok,
+            stok: { increment: BigInt(totalUnit) },
+            hargaBeli: BigInt(hargaPokok),
           },
         });
       }
 
       // Update pembelian dengan kembalian dan tanggal jatuh tempo
       const updateData: any = {
-        subtotal,
-        diskonNota: finalDiskonNota,
-        totalHarga,
-        jumlahDibayar,
-        kembalian,
+        subtotal: BigInt(subtotal),
+        diskonNota: BigInt(finalDiskonNota),
+        totalHarga: BigInt(totalHarga),
+        jumlahDibayar: BigInt(jumlahDibayar),
+        kembalian: BigInt(kembalian),
         statusPembayaran,
         statusTransaksi: "SELESAI",
       };
@@ -199,7 +251,7 @@ export async function POST(
       return updatedPembelian;
     });
 
-    // Buat receipt
+    // Buat receipt dengan serialized data
     const receipt = {
       kodePembelian: result.kodePembelian,
       tanggal: result.updatedAt,
@@ -208,38 +260,46 @@ export async function POST(
         alamat: result.supplier.alamat,
         noHp: result.supplier.noHp,
       },
-      items: result.items.map((item) => ({
-        namaBarang: item.barang.namaBarang,
-        jumlahDus: item.jumlahDus,
-        totalUnit: item.jumlahDus * item.barang.jumlahPerkardus,
-        hargaPokok: item.hargaPokok,
-        diskonPerItem: item.diskonPerItem,
-        totalHarga: item.hargaPokok * item.jumlahDus,
-        totalDiskon: item.diskonPerItem * item.jumlahDus,
-        subtotal:
-          item.hargaPokok * item.jumlahDus -
-          item.diskonPerItem * item.jumlahDus,
-      })),
-      subtotal: result.subtotal,
-      diskonNota: result.diskonNota,
-      totalHarga: result.totalHarga,
-      jumlahDibayar: result.jumlahDibayar,
-      kembalian: result.kembalian,
-      sisaHutang:
-        result.statusPembayaran === "HUTANG"
-          ? result.totalHarga - result.jumlahDibayar
-          : 0,
-      statusPembayaran: result.statusPembayaran,
-      tanggalJatuhTempo:
-        result.statusPembayaran === "HUTANG" ? result.tanggalJatuhTempo : null,
+      items: result.items.map((item) => {
+        const hargaPokok = bigIntToNumber(item.hargaPokok);
+        const jumlahDus = bigIntToNumber(item.jumlahDus);
+        const diskonPerItem = bigIntToNumber(item.diskonPerItem);
+        const jumlahPerkardus = bigIntToNumber(item.barang.jumlahPerkardus);
+
+        return {
+          namaBarang: item.barang.namaBarang,
+          jumlahDus,
+          totalUnit: jumlahDus * jumlahPerkardus,
+          hargaPokok,
+          diskonPerItem,
+          totalHarga: hargaPokok * jumlahDus,
+          totalDiskon: diskonPerItem * jumlahDus,
+          subtotal: hargaPokok * jumlahDus - diskonPerItem * jumlahDus,
+        };
+      }),
+      subtotal,
+      diskonNota: finalDiskonNota,
+      totalHarga,
+      jumlahDibayar,
+      kembalian,
+      sisaHutang: statusPembayaran === "HUTANG" ? sisaHutang : 0,
+      statusPembayaran,
+      tanggalJatuhTempo: statusPembayaran === "HUTANG" ? jatuhTempo : null,
     };
 
-    return NextResponse.json({
+    // Deep serialize the entire response to ensure no BigInt remains
+    const serializedResponse = deepSerialize({
       success: true,
       message: `Pembelian berhasil diselesaikan dengan status ${statusPembayaran}`,
-      data: { pembelian: result, receipt },
+      data: {
+        pembelian: result,
+        receipt,
+      },
     });
+
+    return NextResponse.json(serializedResponse);
   } catch (err) {
+    console.error("Error checkout:", err);
     return NextResponse.json(
       { success: false, error: "Gagal menyelesaikan pembelian" },
       { status: 500 }

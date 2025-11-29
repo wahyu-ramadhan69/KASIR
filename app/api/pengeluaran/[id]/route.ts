@@ -1,8 +1,38 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { isAuthenticated, getAuthData } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
+
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "bigint") {
+    return Number(obj);
+  }
+
+  if (obj instanceof Date) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(deepSerialize);
+  }
+
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+
+  return obj;
+}
 
 // PUT - Update pengeluaran
 export async function PUT(
@@ -13,34 +43,32 @@ export async function PUT(
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const authData = await getAuthData();
+  if (!authData) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const { id } = await params; // ← Await params
     const body = await request.json();
-    const { jenis, jumlah, keterangan } = body;
-
-    // Validasi enum JenisPengeluaran
-    const validJenis = ["BAHAN_BAKAR", "UPAH_KULI", "LAINNYA"];
-    if (jenis && !validJenis.includes(jenis)) {
-      return NextResponse.json(
-        { success: false, error: "Jenis pengeluaran tidak valid" },
-        { status: 400 }
-      );
-    }
+    const { namaPengeluaran, jumlah, keterangan } = body;
 
     const pengeluaran = await prisma.pengeluaran.update({
-      where: { id: parseInt(id) }, // ← Gunakan id yang sudah di-await
+      where: { id: parseInt(id) },
       data: {
-        jenis,
+        namaPengeluaran: namaPengeluaran,
         jumlah: parseInt(jumlah),
         keterangan: keterangan || null,
+        userId: parseInt(authData.userId),
       },
       include: {
         user: true,
       },
     });
 
+    const serialized = deepSerialize(pengeluaran);
+
     return NextResponse.json(
-      { success: true, data: pengeluaran },
+      { success: true, data: serialized },
       { status: 200 }
     );
   } catch (error) {

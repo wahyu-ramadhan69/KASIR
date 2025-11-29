@@ -8,24 +8,69 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "bigint") {
+    return Number(obj);
+  }
+
+  if (obj instanceof Date) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(deepSerialize);
+  }
+
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+
+  return obj;
+}
+
 const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let subtotal = 0;
   let totalDiskonItem = 0;
 
   const calculatedItems = items.map((item) => {
-    const totalPcs =
-      item.jumlahDus * (item.barang?.jumlahPerkardus || 1) +
-      (item.jumlahPcs || 0);
-    const hargaTotal = item.hargaJual * item.jumlahDus;
+    const jumlahDus =
+      typeof item.jumlahDus === "bigint"
+        ? Number(item.jumlahDus)
+        : item.jumlahDus;
+    const jumlahPcs =
+      typeof item.jumlahPcs === "bigint"
+        ? Number(item.jumlahPcs)
+        : item.jumlahPcs;
+    const hargaJual =
+      typeof item.hargaJual === "bigint"
+        ? Number(item.hargaJual)
+        : item.hargaJual;
+    const diskonPerItem =
+      typeof item.diskonPerItem === "bigint"
+        ? Number(item.diskonPerItem)
+        : item.diskonPerItem;
+    const jumlahPerkardus =
+      typeof item.barang?.jumlahPerkardus === "bigint"
+        ? Number(item.barang.jumlahPerkardus)
+        : item.barang?.jumlahPerkardus || 1;
+
+    const totalPcs = jumlahDus * jumlahPerkardus + (jumlahPcs || 0);
+    const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      item.jumlahPcs > 0
-        ? Math.round(
-            (item.hargaJual / (item.barang?.jumlahPerkardus || 1)) *
-              item.jumlahPcs
-          )
-        : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
-    const diskon = item.diskonPerItem * item.jumlahDus;
+    const diskon = diskonPerItem * jumlahDus;
 
     subtotal += totalHargaSebelumDiskon;
     totalDiskonItem += diskon;
@@ -87,16 +132,18 @@ export async function GET(
 
     const calculation = calculatePenjualan(
       penjualan.items,
-      penjualan.diskonNota
+      Number(penjualan.diskonNota)
     );
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...penjualan,
-        calculation,
-      },
-    });
+    return NextResponse.json(
+      deepSerialize({
+        success: true,
+        data: {
+          ...penjualan,
+          calculation,
+        },
+      })
+    );
   } catch (err) {
     console.error("Error fetching penjualan:", err);
     return NextResponse.json(
@@ -160,7 +207,7 @@ export async function PUT(
     }
 
     if (body.diskonNota !== undefined) {
-      updateData.diskonNota = body.diskonNota;
+      updateData.diskonNota = BigInt(body.diskonNota);
     }
 
     if (body.tanggalTransaksi !== undefined) {
@@ -177,11 +224,11 @@ export async function PUT(
 
     const calculation = calculatePenjualan(
       penjualan.items,
-      body.diskonNota ?? penjualan.diskonNota
+      body.diskonNota ?? Number(penjualan.diskonNota)
     );
 
-    updateData.subtotal = calculation.ringkasan.subtotal;
-    updateData.totalHarga = calculation.ringkasan.totalHarga;
+    updateData.subtotal = BigInt(calculation.ringkasan.subtotal);
+    updateData.totalHarga = BigInt(calculation.ringkasan.totalHarga);
 
     const updated = await prisma.penjualanHeader.update({
       where: { id: penjualanId },
@@ -195,14 +242,19 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Penjualan berhasil diupdate",
-      data: {
-        ...updated,
-        calculation: calculatePenjualan(updated.items, updated.diskonNota),
-      },
-    });
+    return NextResponse.json(
+      deepSerialize({
+        success: true,
+        message: "Penjualan berhasil diupdate",
+        data: {
+          ...updated,
+          calculation: calculatePenjualan(
+            updated.items,
+            Number(updated.diskonNota)
+          ),
+        },
+      })
+    );
   } catch (err) {
     console.error("Error updating penjualan:", err);
     return NextResponse.json(
@@ -256,29 +308,30 @@ export async function DELETE(
       if (penjualan.statusTransaksi === "SELESAI") {
         // Kembalikan stok barang
         for (const item of penjualan.items) {
-          const totalPcs =
-            item.jumlahDus * (item.barang?.jumlahPerkardus || 1) +
-            (item.jumlahPcs || 0);
+          const jumlahDus = Number(item.jumlahDus);
+          const jumlahPcs = Number(item.jumlahPcs);
+          const jumlahPerkardus = Number(item.barang?.jumlahPerkardus || 1);
+          const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+
           await tx.barang.update({
             where: { id: item.barangId },
             data: {
-              stok: { increment: totalPcs },
+              stok: { increment: BigInt(totalPcs) },
             },
           });
         }
 
-        // =====================================================
-        // KURANGI PIUTANG CUSTOMER JIKA TRANSAKSI HUTANG
-        // =====================================================
+        // Kurangi piutang customer jika transaksi hutang
         if (penjualan.statusPembayaran === "HUTANG" && penjualan.customerId) {
-          // Hitung sisa hutang yang belum dibayar
-          const sisaHutang = penjualan.totalHarga - penjualan.jumlahDibayar;
+          const totalHarga = Number(penjualan.totalHarga);
+          const jumlahDibayar = Number(penjualan.jumlahDibayar);
+          const sisaHutang = totalHarga - jumlahDibayar;
 
           if (sisaHutang > 0) {
             await tx.customer.update({
               where: { id: penjualan.customerId },
               data: {
-                piutang: { decrement: sisaHutang },
+                piutang: { decrement: BigInt(sisaHutang) },
               },
             });
           }

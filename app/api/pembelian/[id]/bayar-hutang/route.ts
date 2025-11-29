@@ -4,12 +4,51 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize pembelian data
+function serializePembelian(pembelian: any) {
+  return {
+    ...pembelian,
+    subtotal: bigIntToNumber(pembelian.subtotal),
+    diskonNota: bigIntToNumber(pembelian.diskonNota),
+    totalHarga: bigIntToNumber(pembelian.totalHarga),
+    jumlahDibayar: bigIntToNumber(pembelian.jumlahDibayar),
+    kembalian: bigIntToNumber(pembelian.kembalian),
+    supplier: pembelian.supplier
+      ? {
+          ...pembelian.supplier,
+          limitHutang: bigIntToNumber(pembelian.supplier.limitHutang),
+          hutang: bigIntToNumber(pembelian.supplier.hutang),
+        }
+      : undefined,
+    items: pembelian.items?.map((item: any) => ({
+      ...item,
+      hargaPokok: bigIntToNumber(item.hargaPokok),
+      diskonPerItem: bigIntToNumber(item.diskonPerItem),
+      jumlahDus: bigIntToNumber(item.jumlahDus),
+      barang: item.barang
+        ? {
+            ...item.barang,
+            hargaBeli: bigIntToNumber(item.barang.hargaBeli),
+            hargaJual: bigIntToNumber(item.barang.hargaJual),
+            stok: bigIntToNumber(item.barang.stok),
+            jumlahPerkardus: bigIntToNumber(item.barang.jumlahPerkardus),
+            ukuran: bigIntToNumber(item.barang.ukuran),
+          }
+        : undefined,
+    })),
+  };
+}
+
 // Helper: Hitung ulang total hutang supplier dari semua transaksi
 async function recalculateSupplierHutang(tx: any, supplierId: number) {
-  const auth = await isAuthenticated();
-  if (!auth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
   const pembelianHutang = await tx.pembelianHeader.findMany({
     where: {
       supplierId: supplierId,
@@ -23,12 +62,14 @@ async function recalculateSupplierHutang(tx: any, supplierId: number) {
   });
 
   const totalHutang = pembelianHutang.reduce((sum: number, pb: any) => {
-    return sum + (pb.totalHarga - pb.jumlahDibayar);
+    const totalHarga = bigIntToNumber(pb.totalHarga);
+    const jumlahDibayar = bigIntToNumber(pb.jumlahDibayar);
+    return sum + (totalHarga - jumlahDibayar);
   }, 0);
 
   await tx.supplier.update({
     where: { id: supplierId },
-    data: { hutang: Math.max(0, totalHutang) }, // Pastikan tidak minus
+    data: { hutang: BigInt(Math.max(0, totalHutang)) }, // Pastikan tidak minus
   });
 
   return totalHutang;
@@ -87,8 +128,10 @@ export async function POST(
       );
     }
 
-    // Hitung sisa hutang saat ini
-    const sisaHutangSekarang = pembelian.totalHarga - pembelian.jumlahDibayar;
+    // Hitung sisa hutang saat ini dengan BigInt conversion
+    const totalHarga = bigIntToNumber(pembelian.totalHarga);
+    const jumlahDibayarSebelum = bigIntToNumber(pembelian.jumlahDibayar);
+    const sisaHutangSekarang = totalHarga - jumlahDibayarSebelum;
 
     if (sisaHutangSekarang <= 0) {
       return NextResponse.json(
@@ -105,7 +148,7 @@ export async function POST(
         ? jumlahBayarInt - sisaHutangSekarang
         : 0;
     const sisaHutangBaru = sisaHutangSekarang - pembayaranEfektif;
-    const jumlahDibayarBaru = pembelian.jumlahDibayar + pembayaranEfektif;
+    const jumlahDibayarBaru = jumlahDibayarSebelum + pembayaranEfektif;
     const statusPembayaranBaru = sisaHutangBaru <= 0 ? "LUNAS" : "HUTANG";
 
     // Transaction: Update pembelian dan hitung ulang hutang supplier
@@ -114,8 +157,8 @@ export async function POST(
       const updatedPembelian = await tx.pembelianHeader.update({
         where: { id: pembelianId },
         data: {
-          jumlahDibayar: jumlahDibayarBaru,
-          kembalian: kembalian,
+          jumlahDibayar: BigInt(jumlahDibayarBaru),
+          kembalian: BigInt(kembalian),
           statusPembayaran: statusPembayaranBaru,
         },
         include: {
@@ -141,7 +184,7 @@ export async function POST(
               "id-ID"
             )}`,
       data: {
-        pembelian: result,
+        pembelian: serializePembelian(result),
         pembayaran: {
           jumlahBayar: jumlahBayarInt,
           pembayaranEfektif,

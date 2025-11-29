@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "Barang" ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true;
+
+-- AlterTable
+ALTER TABLE "Customer" ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true;
+
+-- AlterTable
+ALTER TABLE "Supplier" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true;

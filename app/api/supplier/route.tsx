@@ -5,6 +5,46 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: any): number {
+  if (value == null) return 0;
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return Number(value);
+}
+
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "bigint") {
+    return Number(obj);
+  }
+
+  if (obj instanceof Date) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(deepSerialize);
+  }
+
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+
+  return obj;
+}
+
 export async function POST(request: NextRequest) {
   const auth = await isAuthenticated();
   if (!auth) {
@@ -27,32 +67,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (
-      typeof namaSupplier !== "string" ||
-      typeof alamat !== "string" ||
-      typeof noHp !== "string"
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Nama, alamat, dan noHp harus berupa string" },
-        { status: 400 }
-      );
-    }
-
     const supplier = await prisma.supplier.create({
       data: {
         namaSupplier: namaSupplier.trim(),
         alamat: alamat.trim(),
         noHp: noHp.trim(),
-        limitHutang: Number(limitHutang),
-        hutang: Number(hutang),
+        limitHutang: BigInt(limitHutang),
+        hutang: BigInt(hutang),
+      },
+      include: {
+        barang: { where: { isActive: true } },
       },
     });
+
+    // Deep serialize to convert all BigInt
+    const serialized = deepSerialize(supplier);
 
     return NextResponse.json(
       {
         success: true,
         message: "Supplier berhasil ditambahkan",
-        data: supplier,
+        data: serialized,
       },
       { status: 201 }
     );
@@ -77,16 +112,20 @@ export async function GET() {
   }
   try {
     const suppliers = await prisma.supplier.findMany({
+      where: { isActive: true },
       orderBy: { id: "desc" },
       include: {
-        barang: true,
+        barang: { where: { isActive: true } },
       },
     });
+
+    // Deep serialize to convert ALL BigInt fields recursively
+    const serialized = deepSerialize(suppliers);
 
     return NextResponse.json(
       {
         success: true,
-        data: suppliers,
+        data: serialized,
       },
       { status: 200 }
     );

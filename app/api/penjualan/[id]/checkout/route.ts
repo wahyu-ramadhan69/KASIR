@@ -1,27 +1,52 @@
+// app/api/penjualan/[id]/checkout/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") return Number(obj);
+  if (obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(deepSerialize);
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+  return obj;
+}
+
+// Helper to convert BigInt to number safely
+function toNumber(value: any): number {
+  if (typeof value === "bigint") return Number(value);
+  return Number(value || 0);
+}
+
+// Helper function untuk menghitung total penjualan
 const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let subtotal = 0;
   let totalDiskonItem = 0;
 
   const calculatedItems = items.map((item) => {
-    const totalPcs =
-      item.jumlahDus * (item.barang?.jumlahPerkardus || 1) +
-      (item.jumlahPcs || 0);
-    const hargaTotal = item.hargaJual * item.jumlahDus;
+    const jumlahDus = toNumber(item.jumlahDus);
+    const jumlahPcs = toNumber(item.jumlahPcs);
+    const hargaJual = toNumber(item.hargaJual);
+    const diskonPerItem = toNumber(item.diskonPerItem);
+    const jumlahPerkardus = toNumber(item.barang?.jumlahPerkardus || 1);
+
+    const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+    const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      item.jumlahPcs > 0
-        ? Math.round(
-            (item.hargaJual / (item.barang?.jumlahPerkardus || 1)) *
-              item.jumlahPcs
-          )
-        : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
-    const diskon = item.diskonPerItem * item.jumlahDus;
+    const diskon = diskonPerItem * jumlahDus;
 
     subtotal += totalHargaSebelumDiskon;
     totalDiskonItem += diskon;
@@ -58,7 +83,6 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    // PENTING: await params dulu sebelum digunakan
     const { id } = await params;
     const penjualanId = parseInt(id);
     const body = await request.json();
@@ -115,11 +139,7 @@ export async function POST(
     const sisaHutang =
       statusPembayaran === "HUTANG" ? totalHarga - jumlahDibayar : 0;
 
-    // =====================================================
-    // VALIDASI PIUTANG CUSTOMER
-    // =====================================================
-
-    // Jika HUTANG, customer harus terdaftar (tidak boleh namaCustomer manual)
+    // Validasi piutang customer untuk transaksi HUTANG
     if (statusPembayaran === "HUTANG") {
       if (!customerId) {
         return NextResponse.json(
@@ -132,7 +152,6 @@ export async function POST(
         );
       }
 
-      // Ambil data customer untuk cek limit
       const customer = await prisma.customer.findUnique({
         where: { id: customerId },
       });
@@ -145,16 +164,18 @@ export async function POST(
       }
 
       // Cek apakah piutang baru melebihi limit
-      const piutangBaru = customer.piutang + sisaHutang;
+      const piutangSekarang = toNumber(customer.piutang);
+      const limitPiutang = toNumber(customer.limit_piutang);
+      const piutangBaru = piutangSekarang + sisaHutang;
 
-      if (customer.limit_piutang > 0 && piutangBaru > customer.limit_piutang) {
-        const sisaLimit = customer.limit_piutang - customer.piutang;
+      if (limitPiutang > 0 && piutangBaru > limitPiutang) {
+        const sisaLimit = limitPiutang - piutangSekarang;
         return NextResponse.json(
           {
             success: false,
-            error: `Piutang melebihi limit! Limit: Rp ${customer.limit_piutang.toLocaleString(
+            error: `Piutang melebihi limit! Limit: Rp ${limitPiutang.toLocaleString(
               "id-ID"
-            )}, Piutang saat ini: Rp ${customer.piutang.toLocaleString(
+            )}, Piutang saat ini: Rp ${piutangSekarang.toLocaleString(
               "id-ID"
             )}, Sisa limit: Rp ${sisaLimit.toLocaleString(
               "id-ID"
@@ -175,13 +196,18 @@ export async function POST(
 
     // Cek stok sebelum checkout
     for (const item of penjualan.items) {
-      const totalPcsNeeded =
-        item.jumlahDus * item.barang.jumlahPerkardus + item.jumlahPcs;
-      if (item.barang.stok < totalPcsNeeded) {
+      const jumlahDus = toNumber(item.jumlahDus);
+      const jumlahPcs = toNumber(item.jumlahPcs);
+      const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+      const stokTersedia = toNumber(item.barang.stok);
+
+      const totalPcsNeeded = jumlahDus * jumlahPerkardus + jumlahPcs;
+
+      if (stokTersedia < totalPcsNeeded) {
         return NextResponse.json(
           {
             success: false,
-            error: `Stok ${item.barang.namaBarang} tidak cukup. Tersedia: ${item.barang.stok} pcs`,
+            error: `Stok ${item.barang.namaBarang} tidak cukup. Tersedia: ${stokTersedia} pcs, Dibutuhkan: ${totalPcsNeeded} pcs`,
           },
           { status: 400 }
         );
@@ -201,26 +227,66 @@ export async function POST(
 
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Calculate total modal first
+      let totalModal = 0;
+      for (const item of penjualan.items) {
+        const jumlahDus = toNumber(item.jumlahDus);
+        const jumlahPcs = toNumber(item.jumlahPcs);
+        const hargaBeli = toNumber(item.hargaBeli);
+        const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+
+        const modalDus = hargaBeli * jumlahDus;
+        const modalPcs =
+          jumlahPcs > 0
+            ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+            : 0;
+        totalModal += modalDus + modalPcs;
+      }
+
+      // Recalculate laba after diskonNota
+      const totalLabaSebelum = penjualan.items.reduce(
+        (sum, item) => sum + toNumber(item.laba),
+        0
+      );
+
+      const totalLabaSesudah = totalHarga - totalModal;
+
+      // Update each item's laba proportionally if diskonNota > 0
+      if (diskonNota > 0 && totalLabaSebelum > 0) {
+        const adjustmentFactor = totalLabaSesudah / totalLabaSebelum;
+
+        for (const item of penjualan.items) {
+          const labaOriginal = toNumber(item.laba);
+          const labaAdjusted = Math.round(labaOriginal * adjustmentFactor);
+
+          await tx.penjualanItem.update({
+            where: { id: item.id },
+            data: { laba: BigInt(labaAdjusted) },
+          });
+        }
+      }
+
       // Kurangi stok barang
       for (const item of penjualan.items) {
-        const totalPcs =
-          item.jumlahDus * item.barang.jumlahPerkardus + item.jumlahPcs;
+        const jumlahDus = toNumber(item.jumlahDus);
+        const jumlahPcs = toNumber(item.jumlahPcs);
+        const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+        const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+
         await tx.barang.update({
           where: { id: item.barangId },
           data: {
-            stok: { decrement: totalPcs },
+            stok: { decrement: BigInt(totalPcs) },
           },
         });
       }
 
-      // =====================================================
-      // UPDATE PIUTANG CUSTOMER JIKA HUTANG
-      // =====================================================
+      // Update piutang customer jika HUTANG
       if (statusPembayaran === "HUTANG" && customerId) {
         await tx.customer.update({
           where: { id: customerId },
           data: {
-            piutang: { increment: sisaHutang },
+            piutang: { increment: BigInt(sisaHutang) },
           },
         });
       }
@@ -231,11 +297,11 @@ export async function POST(
         data: {
           customerId: customerId || null,
           namaCustomer: customerId ? null : namaCustomer,
-          subtotal: calculation.ringkasan.subtotal,
-          diskonNota,
-          totalHarga,
-          jumlahDibayar,
-          kembalian,
+          subtotal: BigInt(calculation.ringkasan.subtotal),
+          diskonNota: BigInt(diskonNota),
+          totalHarga: BigInt(totalHarga),
+          jumlahDibayar: BigInt(jumlahDibayar),
+          kembalian: BigInt(kembalian),
           metodePembayaran,
           statusPembayaran,
           statusTransaksi: "SELESAI",
@@ -263,43 +329,46 @@ export async function POST(
         ? {
             nama: result.customer.nama,
             namaToko: result.customer.namaToko,
-            piutang: result.customer.piutang,
-            limit_piutang: result.customer.limit_piutang,
+            piutang: toNumber(result.customer.piutang),
+            limit_piutang: toNumber(result.customer.limit_piutang),
           }
         : { nama: result.namaCustomer, namaToko: null },
       items: result.items.map((item) => ({
         namaBarang: item.barang.namaBarang,
-        jumlahDus: item.jumlahDus,
-        jumlahPcs: item.jumlahPcs,
-        hargaJual: item.hargaJual,
-        diskon: item.diskonPerItem * item.jumlahDus,
+        jumlahDus: toNumber(item.jumlahDus),
+        jumlahPcs: toNumber(item.jumlahPcs),
+        hargaJual: toNumber(item.hargaJual),
+        diskon: toNumber(item.diskonPerItem) * toNumber(item.jumlahDus),
         subtotal:
-          item.hargaJual * item.jumlahDus - item.diskonPerItem * item.jumlahDus,
+          toNumber(item.hargaJual) * toNumber(item.jumlahDus) -
+          toNumber(item.diskonPerItem) * toNumber(item.jumlahDus),
       })),
-      subtotal: result.subtotal,
-      diskonNota: result.diskonNota,
-      totalHarga: result.totalHarga,
+      subtotal: toNumber(result.subtotal),
+      diskonNota: toNumber(result.diskonNota),
+      totalHarga: toNumber(result.totalHarga),
       metodePembayaran: result.metodePembayaran,
-      jumlahDibayar: result.jumlahDibayar,
-      kembalian: result.kembalian,
+      jumlahDibayar: toNumber(result.jumlahDibayar),
+      kembalian: toNumber(result.kembalian),
       sisaHutang,
       statusPembayaran: result.statusPembayaran,
       tanggalJatuhTempo: result.tanggalJatuhTempo,
     };
 
-    return NextResponse.json({
-      success: true,
-      message:
-        statusPembayaran === "LUNAS"
-          ? "Penjualan berhasil diselesaikan - LUNAS"
-          : `Penjualan berhasil diselesaikan - HUTANG (Sisa: Rp ${sisaHutang.toLocaleString(
-              "id-ID"
-            )})`,
-      data: {
-        penjualan: result,
-        receipt,
-      },
-    });
+    return NextResponse.json(
+      deepSerialize({
+        success: true,
+        message:
+          statusPembayaran === "LUNAS"
+            ? "Penjualan berhasil diselesaikan - LUNAS"
+            : `Penjualan berhasil diselesaikan - HUTANG (Sisa: Rp ${sisaHutang.toLocaleString(
+                "id-ID"
+              )})`,
+        data: {
+          penjualan: result,
+          receipt,
+        },
+      })
+    );
   } catch (err) {
     console.error("Error checkout penjualan:", err);
     return NextResponse.json(

@@ -9,13 +9,40 @@ type RouteCtx = {
   params: Promise<{ id: string }>;
 };
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize barang data with BigInt conversion
+function serializeBarang(barang: any) {
+  return {
+    ...barang,
+    hargaBeli: bigIntToNumber(barang.hargaBeli),
+    hargaJual: bigIntToNumber(barang.hargaJual),
+    stok: bigIntToNumber(barang.stok),
+    jumlahPerkardus: bigIntToNumber(barang.jumlahPerkardus),
+    ukuran: bigIntToNumber(barang.ukuran),
+    supplier: barang.supplier
+      ? {
+          ...barang.supplier,
+          limitHutang: bigIntToNumber(barang.supplier.limitHutang),
+          hutang: bigIntToNumber(barang.supplier.hutang),
+        }
+      : undefined,
+  };
+}
+
 function parseId(id: string | undefined) {
   const num = Number(id);
   if (!id || Number.isNaN(num)) return null;
   return num;
 }
 
-// (opsional) GET detail barang per ID
+// GET detail barang per ID
 export async function GET(_req: NextRequest, { params }: RouteCtx) {
   const auth = await isAuthenticated();
   if (!auth) {
@@ -37,14 +64,17 @@ export async function GET(_req: NextRequest, { params }: RouteCtx) {
       include: { supplier: true },
     });
 
-    if (!barang) {
+    if (!barang || barang.isActive === false) {
       return NextResponse.json(
         { success: false, error: "Barang tidak ditemukan" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, data: barang }, { status: 200 });
+    return NextResponse.json(
+      { success: true, data: serializeBarang(barang) },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error fetching barang:", error);
     return NextResponse.json(
@@ -100,17 +130,21 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       );
     }
 
+    // Convert to BigInt for database
     const barang = await prisma.barang.update({
       where: { id: idNum },
       data: {
         namaBarang: String(namaBarang).trim(),
-        hargaBeli: Number(hargaBeli),
-        hargaJual: Number(hargaJual),
-        stok: stok == null ? 0 : Number(stok),
-        jumlahPerkardus: Number(jumlahPerkardus),
-        ukuran: Number(ukuran),
+        hargaBeli: BigInt(hargaBeli),
+        hargaJual: BigInt(hargaJual),
+        stok: stok != null ? BigInt(stok) : BigInt(0),
+        jumlahPerkardus: BigInt(jumlahPerkardus),
+        ukuran: BigInt(ukuran),
         satuan: String(satuan).trim(),
         supplierId: Number(supplierId),
+      },
+      include: {
+        supplier: true,
       },
     });
 
@@ -118,7 +152,7 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       {
         success: true,
         message: "Barang berhasil diperbarui",
-        data: barang,
+        data: serializeBarang(barang),
       },
       { status: 200 }
     );
@@ -126,6 +160,61 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
     console.error("Error updating barang:", error);
     return NextResponse.json(
       { success: false, error: "Terjadi kesalahan saat memperbarui barang" },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// DELETE Barang (Soft Delete)
+export async function DELETE(_req: NextRequest, { params }: RouteCtx) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { id } = await params;
+  const idNum = parseId(id);
+
+  if (idNum === null) {
+    return NextResponse.json(
+      { success: false, error: "ID tidak valid" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Cek apakah barang ada
+    const barang = await prisma.barang.findUnique({
+      where: { id: idNum },
+    });
+
+    if (!barang) {
+      return NextResponse.json(
+        { success: false, error: "Barang tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    // Soft delete - set isActive to false
+    await prisma.barang.update({
+      where: { id: idNum },
+      data: {
+        isActive: false,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Barang berhasil dihapus",
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error deleting barang:", error);
+    return NextResponse.json(
+      { success: false, error: "Terjadi kesalahan saat menghapus barang" },
       { status: 500 }
     );
   } finally {

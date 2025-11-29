@@ -4,6 +4,53 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize data
+function serializeItem(item: any) {
+  return {
+    ...item,
+    hargaPokok: bigIntToNumber(item.hargaPokok),
+    diskonPerItem: bigIntToNumber(item.diskonPerItem),
+    jumlahDus: bigIntToNumber(item.jumlahDus),
+    barang: item.barang
+      ? {
+          ...item.barang,
+          hargaBeli: bigIntToNumber(item.barang.hargaBeli),
+          hargaJual: bigIntToNumber(item.barang.hargaJual),
+          stok: bigIntToNumber(item.barang.stok),
+          jumlahPerkardus: bigIntToNumber(item.barang.jumlahPerkardus),
+          ukuran: bigIntToNumber(item.barang.ukuran),
+        }
+      : undefined,
+  };
+}
+
+function serializePembelian(pembelian: any) {
+  return {
+    ...pembelian,
+    subtotal: bigIntToNumber(pembelian.subtotal),
+    diskonNota: bigIntToNumber(pembelian.diskonNota),
+    totalHarga: bigIntToNumber(pembelian.totalHarga),
+    jumlahDibayar: bigIntToNumber(pembelian.jumlahDibayar),
+    kembalian: bigIntToNumber(pembelian.kembalian),
+    supplier: pembelian.supplier
+      ? {
+          ...pembelian.supplier,
+          limitHutang: bigIntToNumber(pembelian.supplier.limitHutang),
+          hutang: bigIntToNumber(pembelian.supplier.hutang),
+        }
+      : undefined,
+    items: pembelian.items?.map(serializeItem),
+  };
+}
+
 // Helper: Update totals di header
 async function updatePembelianTotals(pembelianId: number) {
   const items = await prisma.pembelianItem.findMany({
@@ -11,8 +58,11 @@ async function updatePembelianTotals(pembelianId: number) {
   });
 
   const subtotal = items.reduce((total, item) => {
-    const totalHarga = item.hargaPokok * item.jumlahDus;
-    const totalDiskon = item.diskonPerItem * item.jumlahDus;
+    const hargaPokok = bigIntToNumber(item.hargaPokok);
+    const jumlahDus = bigIntToNumber(item.jumlahDus);
+    const diskonPerItem = bigIntToNumber(item.diskonPerItem);
+    const totalHarga = hargaPokok * jumlahDus;
+    const totalDiskon = diskonPerItem * jumlahDus;
     return total + (totalHarga - totalDiskon);
   }, 0);
 
@@ -20,12 +70,15 @@ async function updatePembelianTotals(pembelianId: number) {
     where: { id: pembelianId },
   });
 
-  const diskonNota = pembelian?.diskonNota || 0;
+  const diskonNota = bigIntToNumber(pembelian?.diskonNota || BigInt(0));
   const totalHarga = subtotal - diskonNota;
 
   await prisma.pembelianHeader.update({
     where: { id: pembelianId },
-    data: { subtotal, totalHarga },
+    data: {
+      subtotal: BigInt(subtotal),
+      totalHarga: BigInt(totalHarga),
+    },
   });
 }
 
@@ -49,10 +102,14 @@ export async function GET(
     });
 
     const itemsWithCalc = items.map((item) => {
-      const totalHarga = item.hargaPokok * item.jumlahDus;
-      const totalDiskon = item.diskonPerItem * item.jumlahDus;
+      const hargaPokok = bigIntToNumber(item.hargaPokok);
+      const jumlahDus = bigIntToNumber(item.jumlahDus);
+      const diskonPerItem = bigIntToNumber(item.diskonPerItem);
+      const totalHarga = hargaPokok * jumlahDus;
+      const totalDiskon = diskonPerItem * jumlahDus;
+
       return {
-        ...item,
+        ...serializeItem(item),
         totalHarga,
         totalDiskon,
         subtotal: totalHarga - totalDiskon,
@@ -61,6 +118,7 @@ export async function GET(
 
     return NextResponse.json({ success: true, data: itemsWithCalc });
   } catch (err) {
+    console.error("Error fetching items:", err);
     return NextResponse.json(
       { success: false, error: "Gagal mengambil data items" },
       { status: 500 }
@@ -147,12 +205,13 @@ export async function POST(
 
     if (existingItem) {
       // Update jumlah jika sudah ada
+      const newJumlahDus = bigIntToNumber(existingItem.jumlahDus) + jumlahDus;
       item = await prisma.pembelianItem.update({
         where: { id: existingItem.id },
         data: {
-          jumlahDus: existingItem.jumlahDus + jumlahDus,
-          hargaPokok,
-          diskonPerItem,
+          jumlahDus: BigInt(newJumlahDus),
+          hargaPokok: BigInt(hargaPokok),
+          diskonPerItem: BigInt(diskonPerItem),
         },
         include: { barang: true },
       });
@@ -163,9 +222,9 @@ export async function POST(
         data: {
           pembelianId,
           barangId,
-          jumlahDus,
-          hargaPokok,
-          diskonPerItem,
+          jumlahDus: BigInt(jumlahDus),
+          hargaPokok: BigInt(hargaPokok),
+          diskonPerItem: BigInt(diskonPerItem),
         },
         include: { barang: true },
       });
@@ -191,11 +250,17 @@ export async function POST(
       {
         success: true,
         message,
-        data: { item, pembelian: updatedPembelian },
+        data: {
+          item: serializeItem(item),
+          pembelian: updatedPembelian
+            ? serializePembelian(updatedPembelian)
+            : null,
+        },
       },
       { status: existingItem ? 200 : 201 }
     );
   } catch (err) {
+    console.error("Error adding item:", err);
     return NextResponse.json(
       { success: false, error: "Gagal menambahkan barang" },
       { status: 500 }

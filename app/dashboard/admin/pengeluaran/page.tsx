@@ -10,6 +10,7 @@ import {
   Edit,
   Trash2,
   X,
+  Filter,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -21,17 +22,16 @@ interface User {
 
 interface Pengeluaran {
   id: number;
-  jenis: string;
+  namaPengeluaran: string;
   jumlah: number;
   keterangan: string | null;
   tanggalInput: string;
   updatedAt: string;
-  userId: number;
   user: User;
 }
 
 interface PengeluaranFormData {
-  jenis: string;
+  namaPengeluaran: string;
   jumlah: string;
   keterangan: string;
 }
@@ -47,7 +47,11 @@ const DataPengeluaranPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterJenis, setFilterJenis] = useState<string>("all");
-  const [filterTanggal, setFilterTanggal] = useState<string>("");
+
+  // Date range states
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [editingPengeluaran, setEditingPengeluaran] = useState<{
@@ -57,20 +61,26 @@ const DataPengeluaranPage = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [jumlahInput, setJumlahInput] = useState<string>("");
   const [jumlahEditInput, setJumlahEditInput] = useState<string>("");
-  const [jenisInput, setJenisInput] = useState<string>("");
+  const [namaPengeluaranInput, setNamaPengeluaranInput] = useState<string>("");
   const [keteranganInput, setKeteranganInput] = useState<string>("");
-
-  // Hardcoded userId - sesuaikan dengan sistem auth Anda
-  const currentUserId = 1;
 
   useEffect(() => {
     fetchPengeluaran();
-  }, []);
+  }, [startDate, endDate]);
 
   const fetchPengeluaran = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/pengeluaran");
+      let url = "/api/pengeluaran?limit=1000"; // Fetch all data for client-side filtering
+
+      if (startDate) {
+        url += `&startDate=${startDate}`;
+      }
+      if (endDate) {
+        url += `&endDate=${endDate}`;
+      }
+
+      const res = await fetch(url);
       const data = await res.json();
 
       if (data.success) {
@@ -88,7 +98,7 @@ const DataPengeluaranPage = () => {
     setEditingPengeluaran({
       id: pengeluaran.id,
       data: {
-        jenis: pengeluaran.jenis,
+        namaPengeluaran: pengeluaran.namaPengeluaran,
         jumlah: pengeluaran.jumlah.toString(),
         keterangan: pengeluaran.keterangan || "",
       },
@@ -97,11 +107,11 @@ const DataPengeluaranPage = () => {
     setShowEditModal(true);
   };
 
-  const handleDelete = async (id: number, jenis: string) => {
+  const handleDelete = async (id: number, namaPengeluaran: string) => {
     if (
       !confirm(
         `Apakah Anda yakin ingin menghapus pengeluaran "${getJenisLabel(
-          jenis
+          namaPengeluaran
         )}"?`
       )
     ) {
@@ -150,8 +160,8 @@ const DataPengeluaranPage = () => {
 
     const jumlahValue = parseRupiahInput(jumlahInput);
 
-    if (!jenisInput) {
-      toast.error("Jenis pengeluaran harus dipilih!");
+    if (!namaPengeluaranInput) {
+      toast.error("Nama pengeluaran harus dipilih!");
       setIsSubmitting(false);
       return;
     }
@@ -169,10 +179,9 @@ const DataPengeluaranPage = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jenis: jenisInput,
+          namaPengeluaran: namaPengeluaranInput,
           jumlah: jumlahValue,
           keterangan: keteranganInput || null,
-          userId: currentUserId,
         }),
       });
 
@@ -181,9 +190,8 @@ const DataPengeluaranPage = () => {
       if (data.success) {
         toast.success("Pengeluaran berhasil ditambahkan!");
         setShowAddModal(false);
-        // Reset semua input
         setJumlahInput("");
-        setJenisInput("");
+        setNamaPengeluaranInput("");
         setKeteranganInput("");
         fetchPengeluaran();
       } else {
@@ -218,7 +226,7 @@ const DataPengeluaranPage = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jenis: editingPengeluaran.data.jenis,
+          namaPengeluaran: editingPengeluaran.data.namaPengeluaran,
           jumlah: jumlahValue,
           keterangan: editingPengeluaran.data.keterangan || null,
         }),
@@ -252,18 +260,13 @@ const DataPengeluaranPage = () => {
   };
 
   const formatRupiahInput = (value: string): string => {
-    // Hapus semua karakter non-digit
     const numbers = value.replace(/\D/g, "");
-
-    // Format ke Rupiah
     if (numbers === "") return "";
-
     const formatted = new Intl.NumberFormat("id-ID").format(parseInt(numbers));
     return `Rp ${formatted}`;
   };
 
   const parseRupiahInput = (value: string): number => {
-    // Hapus "Rp", spasi, dan titik pemisah ribuan
     const numbers = value.replace(/[^0-9]/g, "");
     return numbers === "" ? 0 : parseInt(numbers);
   };
@@ -295,13 +298,15 @@ const DataPengeluaranPage = () => {
     });
   };
 
-  const getJenisLabel = (jenis: string): string => {
-    const option = jenisPengeluaranOptions.find((opt) => opt.value === jenis);
-    return option ? option.label : jenis;
+  const getJenisLabel = (namaPengeluaran: string): string => {
+    const option = jenisPengeluaranOptions.find(
+      (opt) => opt.value === namaPengeluaran
+    );
+    return option ? option.label : namaPengeluaran;
   };
 
-  const getJenisColor = (jenis: string): string => {
-    switch (jenis) {
+  const getJenisColor = (namaPengeluaran: string): string => {
+    switch (namaPengeluaran) {
       case "BAHAN_BAKAR":
         return "bg-red-100 text-red-800";
       case "UPAH_KULI":
@@ -313,23 +318,49 @@ const DataPengeluaranPage = () => {
     }
   };
 
+  const clearDateFilter = () => {
+    setStartDate("");
+    setEndDate("");
+  };
+
+  const setTodayFilter = () => {
+    const today = new Date().toISOString().split("T")[0];
+    setStartDate(today);
+    setEndDate(today);
+  };
+
+  const setThisWeekFilter = () => {
+    const today = new Date();
+    const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
+    const lastDay = new Date(
+      today.setDate(today.getDate() - today.getDay() + 6)
+    );
+
+    setStartDate(firstDay.toISOString().split("T")[0]);
+    setEndDate(lastDay.toISOString().split("T")[0]);
+  };
+
+  const setThisMonthFilter = () => {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    setStartDate(firstDay.toISOString().split("T")[0]);
+    setEndDate(lastDay.toISOString().split("T")[0]);
+  };
+
   const filteredPengeluaran = pengeluaranList.filter((item) => {
     const matchSearch =
-      getJenisLabel(item.jenis)
+      getJenisLabel(item.namaPengeluaran)
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       item.keterangan?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.user?.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchJenis = filterJenis === "all" || item.jenis === filterJenis;
+    const matchJenis =
+      filterJenis === "all" || item.namaPengeluaran === filterJenis;
 
-    let matchTanggal = true;
-    if (filterTanggal) {
-      const itemDate = new Date(item.tanggalInput).toISOString().split("T")[0];
-      matchTanggal = itemDate === filterTanggal;
-    }
-
-    return matchSearch && matchJenis && matchTanggal;
+    return matchSearch && matchJenis;
   });
 
   const totalPengeluaran = filteredPengeluaran.reduce(
@@ -400,7 +431,7 @@ const DataPengeluaranPage = () => {
             <button
               onClick={() => {
                 setJumlahInput("");
-                setJenisInput("");
+                setNamaPengeluaranInput("");
                 setKeteranganInput("");
                 setShowAddModal(true);
               }}
@@ -467,35 +498,74 @@ const DataPengeluaranPage = () => {
       </div>
 
       <div className="bg-white rounded-lg p-4 mb-6 shadow-md border border-gray-100">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <div className="flex flex-col gap-4">
+          {/* Search and Filter Row */}
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Cari nama pengeluaran, keterangan, atau user..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
+              />
+            </div>
+
             <input
-              type="text"
-              placeholder="Cari jenis pengeluaran, keterangan, atau user..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              placeholder="dd/mm/yyyy"
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-auto"
+            />
+
+            <span className="hidden lg:flex items-center text-gray-500 font-medium">
+              -
+            </span>
+
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              placeholder="dd/mm/yyyy"
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-auto"
             />
           </div>
-          <select
-            value={filterJenis}
-            onChange={(e) => setFilterJenis(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
-          >
-            <option value="all">Semua Jenis</option>
-            {jenisPengeluaranOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={filterTanggal}
-            onChange={(e) => setFilterTanggal(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
-          />
+
+          {/* Quick Filter Buttons */}
+          {(startDate || endDate) && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-sm text-gray-600 font-medium">
+                Quick filter:
+              </span>
+              <button
+                onClick={setTodayFilter}
+                className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-all"
+              >
+                Hari Ini
+              </button>
+              <button
+                onClick={setThisWeekFilter}
+                className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium transition-all"
+              >
+                Minggu Ini
+              </button>
+              <button
+                onClick={setThisMonthFilter}
+                className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-medium transition-all"
+              >
+                Bulan Ini
+              </button>
+              <button
+                onClick={clearDateFilter}
+                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
+              >
+                <X className="w-3.5 h-3.5" />
+                Reset Filter
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -513,7 +583,7 @@ const DataPengeluaranPage = () => {
                     No
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Jenis
+                    Nama Pengeluaran
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Jumlah
@@ -557,10 +627,10 @@ const DataPengeluaranPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-semibold ${getJenisColor(
-                            item.jenis
+                            item.namaPengeluaran
                           )}`}
                         >
-                          {getJenisLabel(item.jenis)}
+                          {getJenisLabel(item.namaPengeluaran)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
@@ -591,7 +661,9 @@ const DataPengeluaranPage = () => {
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(item.id, item.jenis)}
+                            onClick={() =>
+                              handleDelete(item.id, item.namaPengeluaran)
+                            }
                             className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
                             title="Hapus"
                           >
@@ -613,6 +685,7 @@ const DataPengeluaranPage = () => {
         pengeluaran
       </div>
 
+      {/* Add Modal - unchanged */}
       {showAddModal && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -630,7 +703,7 @@ const DataPengeluaranPage = () => {
                 onClick={() => {
                   setShowAddModal(false);
                   setJumlahInput("");
-                  setJenisInput("");
+                  setNamaPengeluaranInput("");
                   setKeteranganInput("");
                 }}
                 className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
@@ -643,21 +716,16 @@ const DataPengeluaranPage = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Jenis Pengeluaran <span className="text-red-500">*</span>
+                    Nama Pengeluaran <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={jenisInput}
-                    onChange={(e) => setJenisInput(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
+                  <input
+                    type="text"
+                    value={namaPengeluaranInput}
+                    onChange={(e) => setNamaPengeluaranInput(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
+                    placeholder="Contoh Bahan Bakar"
                     required
-                  >
-                    <option value="">Pilih Jenis</option>
-                    {jenisPengeluaranOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -697,7 +765,7 @@ const DataPengeluaranPage = () => {
                   onClick={() => {
                     setShowAddModal(false);
                     setJumlahInput("");
-                    setJenisInput("");
+                    setNamaPengeluaranInput("");
                     setKeteranganInput("");
                   }}
                   className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
@@ -717,6 +785,7 @@ const DataPengeluaranPage = () => {
         </div>
       )}
 
+      {/* Edit Modal - unchanged */}
       {showEditModal && editingPengeluaran && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -745,22 +814,24 @@ const DataPengeluaranPage = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Jenis Pengeluaran <span className="text-red-500">*</span>
+                    Nama Pengeluaran <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="jenis"
-                    value={editingPengeluaran.data.jenis}
-                    onChange={handleInputChange}
+                  <input
+                    type="text"
+                    value={editingPengeluaran.data.namaPengeluaran}
+                    onChange={(e) =>
+                      setEditingPengeluaran({
+                        ...editingPengeluaran,
+                        data: {
+                          ...editingPengeluaran.data,
+                          namaPengeluaran: e.target.value,
+                        },
+                      })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
+                    placeholder="Contoh Bahan Bakar"
                     required
-                  >
-                    <option value="">Pilih Jenis</option>
-                    {jenisPengeluaranOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div>

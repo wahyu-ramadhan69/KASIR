@@ -11,13 +11,44 @@ type RouteCtx = {
   }>;
 };
 
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "bigint") {
+    return Number(obj);
+  }
+
+  if (obj instanceof Date) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(deepSerialize);
+  }
+
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+
+  return obj;
+}
+
 function parseId(id: string | undefined) {
   const num = Number(id);
   if (!id || Number.isNaN(num)) return null;
   return num;
 }
 
-// (Opsional) GET detail supplier by ID
+// GET detail supplier by ID
 export async function GET(_request: NextRequest, { params }: RouteCtx) {
   const auth = await isAuthenticated();
   if (!auth) {
@@ -37,7 +68,7 @@ export async function GET(_request: NextRequest, { params }: RouteCtx) {
     const supplier = await prisma.supplier.findUnique({
       where: { id: idNum },
       include: {
-        barang: true,
+        barang: { where: { isActive: true } },
       },
     });
 
@@ -49,7 +80,10 @@ export async function GET(_request: NextRequest, { params }: RouteCtx) {
     }
 
     return NextResponse.json(
-      { success: true, data: supplier },
+      {
+        success: true,
+        data: deepSerialize(supplier),
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -102,8 +136,11 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
         namaSupplier: String(namaSupplier).trim(),
         alamat: String(alamat).trim(),
         noHp: String(noHp).trim(),
-        limitHutang: Number(limitHutang),
-        hutang: Number(hutang),
+        limitHutang: BigInt(limitHutang),
+        hutang: BigInt(hutang),
+      },
+      include: {
+        barang: { where: { isActive: true } },
       },
     });
 
@@ -111,7 +148,7 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       {
         success: true,
         message: "Supplier berhasil diperbarui",
-        data: supplier,
+        data: deepSerialize(supplier),
       },
       { status: 200 }
     );
@@ -126,7 +163,7 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
   }
 }
 
-// DELETE supplier
+// DELETE supplier (Soft Delete)
 export async function DELETE(_request: NextRequest, { params }: RouteCtx) {
   const auth = await isAuthenticated();
   if (!auth) {
@@ -154,8 +191,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteCtx) {
       );
     }
 
-    await prisma.supplier.delete({
+    await prisma.supplier.update({
       where: { id: idNum },
+      data: { isActive: false },
     });
 
     return NextResponse.json(

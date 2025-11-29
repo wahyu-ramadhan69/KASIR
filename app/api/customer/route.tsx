@@ -4,6 +4,23 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Helper function to convert BigInt to number safely
+function bigIntToNumber(value: bigint | number): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+// Helper to serialize customer data with BigInt conversion
+function serializeCustomer(customer: any) {
+  return {
+    ...customer,
+    limit_piutang: bigIntToNumber(customer.limit_piutang),
+    piutang: bigIntToNumber(customer.piutang),
+  };
+}
+
 export async function POST(request: NextRequest) {
   const auth = await isAuthenticated();
   if (!auth) {
@@ -32,6 +49,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Convert to BigInt for database
+    const limitPiutang = limit_piutang ? BigInt(limit_piutang) : BigInt(0);
+    const piutangValue = piutang ? BigInt(piutang) : BigInt(0);
+
     const customer = await prisma.customer.create({
       data: {
         nik,
@@ -39,8 +60,8 @@ export async function POST(request: NextRequest) {
         alamat,
         namaToko,
         noHp,
-        limit_piutang: limit_piutang ?? 0,
-        piutang: piutang ?? 0,
+        limit_piutang: limitPiutang,
+        piutang: piutangValue,
       },
     });
 
@@ -48,7 +69,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         message: "Customer berhasil ditambahkan",
-        data: customer,
+        data: serializeCustomer(customer),
       },
       { status: 201 }
     );
@@ -63,20 +84,45 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET all customers
-export async function GET() {
+// GET customers with pagination
+export async function GET(request: NextRequest) {
   const auth = await isAuthenticated();
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
   try {
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "12");
+    const skip = (page - 1) * limit;
+
+    // Get total count
+    const totalCount = await prisma.customer.count();
+
+    // Get customers with pagination
     const customers = await prisma.customer.findMany({
       orderBy: { id: "desc" },
+      skip,
+      take: limit,
     });
+
+    // Serialize all customers to convert BigInt to number
+    const serializedCustomers = customers.map(serializeCustomer);
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = page < totalPages;
 
     return NextResponse.json({
       success: true,
-      data: customers,
+      data: serializedCustomers,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        limit,
+        hasMore,
+      },
     });
   } catch (err) {
     console.error("Error fetching customers:", err);

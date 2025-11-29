@@ -55,7 +55,6 @@ const DataSupplierPage = () => {
     null
   );
 
-  // Form state
   const [formData, setFormData] = useState({
     namaSupplier: "",
     alamat: "",
@@ -64,7 +63,6 @@ const DataSupplierPage = () => {
     hutang: "",
   });
 
-  // Fetch data from API
   useEffect(() => {
     fetchSupplier();
   }, []);
@@ -87,22 +85,18 @@ const DataSupplierPage = () => {
     }
   };
 
-  // Format input as Rupiah while typing
   const formatInputRupiah = (value: string): string => {
-    // Remove all non-digit characters
     const numbers = value.replace(/\D/g, "");
 
-    // Format as Rupiah
     if (numbers === "") return "";
 
     const formatted = new Intl.NumberFormat("id-ID").format(parseInt(numbers));
     return `Rp ${formatted}`;
   };
 
-  // Parse Rupiah string to number
   const parseRupiahToNumber = (value: string): number => {
     const numbers = value.replace(/\D/g, "");
-    return numbers === "" ? 0 : parseInt(numbers);
+    return numbers === "" ? 0 : parseInt(numbers, 10);
   };
 
   const handleInputChange = (
@@ -110,7 +104,6 @@ const DataSupplierPage = () => {
   ) => {
     const { name, value } = e.target;
 
-    // Format currency fields
     if (name === "limitHutang" || name === "hutang") {
       const formattedValue = formatInputRupiah(value);
       setFormData((prev) => ({
@@ -125,11 +118,77 @@ const DataSupplierPage = () => {
     }
   };
 
+  const handleOpenAddModal = () => {
+    setFormData({
+      namaSupplier: "",
+      alamat: "",
+      noHp: "",
+      limitHutang: "",
+      hutang: "",
+    });
+    setShowAddModal(true);
+  };
+
+  const handleCloseAddModal = () => {
+    setShowAddModal(false);
+    setFormData({
+      namaSupplier: "",
+      alamat: "",
+      noHp: "",
+      limitHutang: "",
+      hutang: "",
+    });
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingSupplierId(null);
+    setFormData({
+      namaSupplier: "",
+      alamat: "",
+      noHp: "",
+      limitHutang: "",
+      hutang: "",
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      const limitHutangValue = parseRupiahToNumber(formData.limitHutang);
+      const hutangValue = parseRupiahToNumber(formData.hutang);
+
+      if (isNaN(limitHutangValue) || isNaN(hutangValue)) {
+        toast.error("Format angka tidak valid", {
+          duration: 4000,
+          position: "top-right",
+          style: {
+            background: "#ef4444",
+            color: "#fff",
+            fontWeight: "500",
+          },
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const MAX_BIGINT = 9007199254740991;
+      if (limitHutangValue > MAX_BIGINT || hutangValue > MAX_BIGINT) {
+        toast.error("Nilai terlalu besar. Maksimal Rp 9.007.199.254.740.991", {
+          duration: 4000,
+          position: "top-right",
+          style: {
+            background: "#ef4444",
+            color: "#fff",
+            fontWeight: "500",
+          },
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const res = await fetch("/api/supplier", {
         method: "POST",
         headers: {
@@ -139,8 +198,8 @@ const DataSupplierPage = () => {
           namaSupplier: formData.namaSupplier,
           alamat: formData.alamat,
           noHp: formData.noHp,
-          limitHutang: parseRupiahToNumber(formData.limitHutang),
-          hutang: parseRupiahToNumber(formData.hutang),
+          limitHutang: limitHutangValue.toString(),
+          hutang: hutangValue.toString(),
         }),
       });
 
@@ -160,15 +219,8 @@ const DataSupplierPage = () => {
             secondary: "#10b981",
           },
         });
-        setShowAddModal(false);
-        setFormData({
-          namaSupplier: "",
-          alamat: "",
-          noHp: "",
-          limitHutang: "",
-          hutang: "",
-        });
-        fetchSupplier(); // Refresh data
+        handleCloseAddModal();
+        fetchSupplier();
       } else {
         toast.error(data.error || "Gagal menambahkan supplier", {
           duration: 4000,
@@ -215,6 +267,38 @@ const DataSupplierPage = () => {
     setIsSubmitting(true);
 
     try {
+      const limitHutangValue = parseRupiahToNumber(formData.limitHutang);
+      const hutangValue = parseRupiahToNumber(formData.hutang);
+
+      if (isNaN(limitHutangValue) || isNaN(hutangValue)) {
+        toast.error("Format angka tidak valid", {
+          duration: 4000,
+          position: "top-right",
+          style: {
+            background: "#ef4444",
+            color: "#fff",
+            fontWeight: "500",
+          },
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const MAX_BIGINT = 9007199254740991;
+      if (limitHutangValue > MAX_BIGINT || hutangValue > MAX_BIGINT) {
+        toast.error("Nilai terlalu besar. Maksimal Rp 9.007.199.254.740.991", {
+          duration: 4000,
+          position: "top-right",
+          style: {
+            background: "#ef4444",
+            color: "#fff",
+            fontWeight: "500",
+          },
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const res = await fetch(`/api/supplier/${editingSupplierId}`, {
         method: "PUT",
         headers: {
@@ -224,8 +308,8 @@ const DataSupplierPage = () => {
           namaSupplier: formData.namaSupplier,
           alamat: formData.alamat,
           noHp: formData.noHp,
-          limitHutang: parseRupiahToNumber(formData.limitHutang),
-          hutang: parseRupiahToNumber(formData.hutang),
+          limitHutang: limitHutangValue.toString(),
+          hutang: hutangValue.toString(),
         }),
       });
 
@@ -245,16 +329,8 @@ const DataSupplierPage = () => {
             secondary: "#10b981",
           },
         });
-        setShowEditModal(false);
-        setEditingSupplierId(null);
-        setFormData({
-          namaSupplier: "",
-          alamat: "",
-          noHp: "",
-          limitHutang: "",
-          hutang: "",
-        });
-        fetchSupplier(); // Refresh data
+        handleCloseEditModal();
+        fetchSupplier();
       } else {
         toast.error(data.error || "Gagal mengupdate supplier", {
           duration: 4000,
@@ -310,7 +386,7 @@ const DataSupplierPage = () => {
             secondary: "#10b981",
           },
         });
-        fetchSupplier(); // Refresh data
+        fetchSupplier();
       } else {
         toast.error(data.error || "Gagal menghapus supplier", {
           duration: 4000,
@@ -336,7 +412,27 @@ const DataSupplierPage = () => {
     }
   };
 
+  // ✅ FUNGSI FORMAT RUPIAH YANG DIUBAH
   const formatRupiah = (number: number): string => {
+    // Untuk nilai milyar (>= 1.000.000.000)
+    if (number >= 1000000000) {
+      const milyar = number / 1000000000;
+      // Tampilkan tanpa desimal jika bilangan bulat
+      return milyar % 1 === 0
+        ? `Rp ${milyar.toFixed(0)} M`
+        : `Rp ${milyar.toFixed(1)} M`;
+    }
+
+    // Untuk nilai juta (>= 1.000.000)
+    if (number >= 1000000) {
+      const juta = number / 1000000;
+      // Tampilkan tanpa desimal jika bilangan bulat
+      return juta % 1 === 0
+        ? `Rp ${juta.toFixed(0)} Jt`
+        : `Rp ${juta.toFixed(1)} Jt`;
+    }
+
+    // Untuk nilai di bawah 1 juta, tampilkan normal
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
@@ -348,8 +444,8 @@ const DataSupplierPage = () => {
     return phone.replace(/(\d{4})(\d{4})(\d+)/, "$1-$2-$3");
   };
 
-  const getLimitStatus = (hutang: number, pembelian: number) => {
-    const percentage = (hutang / pembelian) * 100;
+  const getLimitStatus = (hutang: number, limitHutang: number) => {
+    const percentage = (hutang / limitHutang) * 100;
     if (percentage < 50)
       return { color: "bg-green-100 text-green-700", label: "Aman" };
     if (percentage < 75)
@@ -377,7 +473,6 @@ const DataSupplierPage = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto">
-      {/* Toaster Component */}
       <Toaster />
 
       {/* Header Section */}
@@ -393,7 +488,7 @@ const DataSupplierPage = () => {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={handleOpenAddModal}
               className="bg-white hover:bg-blue-50 text-blue-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
             >
               <Plus className="w-4 h-4" />
@@ -500,8 +595,8 @@ const DataSupplierPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSupplier.map((supplier) => {
             const limitStatus = getLimitStatus(
-              supplier.limitHutang,
-              supplier.hutang
+              supplier.hutang,
+              supplier.limitHutang
             );
             const limitPercentage =
               (supplier.hutang / supplier.limitHutang) * 100;
@@ -649,7 +744,7 @@ const DataSupplierPage = () => {
         supplier
       </div>
 
-      {/* Detail Modal (Optional) */}
+      {/* Detail Modal */}
       {selectedSupplier && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -722,7 +817,7 @@ const DataSupplierPage = () => {
       {showAddModal && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowAddModal(false)}
+          onClick={handleCloseAddModal}
         >
           <div
             className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
@@ -733,7 +828,7 @@ const DataSupplierPage = () => {
                 Tambah Supplier Baru
               </h2>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={handleCloseAddModal}
                 className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
               >
                 <X className="w-6 h-6" />
@@ -742,7 +837,6 @@ const DataSupplierPage = () => {
 
             <form onSubmit={handleSubmit} className="p-6">
               <div className="space-y-4">
-                {/* Nama Supplier */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Nama Supplier <span className="text-red-500">*</span>
@@ -758,7 +852,6 @@ const DataSupplierPage = () => {
                   />
                 </div>
 
-                {/* Alamat */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Alamat <span className="text-red-500">*</span>
@@ -774,7 +867,6 @@ const DataSupplierPage = () => {
                   />
                 </div>
 
-                {/* Nomor HP */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Nomor HP <span className="text-red-500">*</span>
@@ -790,43 +882,43 @@ const DataSupplierPage = () => {
                   />
                 </div>
 
-                {/* Limit Hutang */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Limit Hutang <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="limitHutang"
-                    value={formData.limitHutang}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                    placeholder="Contoh: Rp 50.000.000"
-                    required
-                  />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Limit Hutang <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="limitHutang"
+                      value={formData.limitHutang}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                      placeholder="Contoh: Rp 50.000.000"
+                      required
+                    />
+                  </div>
 
-                {/* Hutang Awal */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Hutang Awal <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="hutang"
-                    value={formData.hutang}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                    placeholder="Contoh: Rp 100.000.000"
-                    required
-                  />
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Hutang Awal <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="hutang"
+                      value={formData.hutang}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                      placeholder="Contoh: Rp 100.000.000"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="flex gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={handleCloseAddModal}
                   className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
                 >
                   Batal
@@ -848,7 +940,7 @@ const DataSupplierPage = () => {
       {showEditModal && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowEditModal(false)}
+          onClick={handleCloseEditModal}
         >
           <div
             className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
@@ -857,7 +949,7 @@ const DataSupplierPage = () => {
             <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-6 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-white">Edit Supplier</h2>
               <button
-                onClick={() => setShowEditModal(false)}
+                onClick={handleCloseEditModal}
                 className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
               >
                 <X className="w-6 h-6" />
@@ -866,7 +958,6 @@ const DataSupplierPage = () => {
 
             <form onSubmit={handleUpdate} className="p-6">
               <div className="space-y-4">
-                {/* Nama Supplier */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Nama Supplier <span className="text-red-500">*</span>
@@ -882,7 +973,6 @@ const DataSupplierPage = () => {
                   />
                 </div>
 
-                {/* Alamat */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Alamat <span className="text-red-500">*</span>
@@ -898,7 +988,6 @@ const DataSupplierPage = () => {
                   />
                 </div>
 
-                {/* Nomor HP */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Nomor HP <span className="text-red-500">*</span>
@@ -914,43 +1003,43 @@ const DataSupplierPage = () => {
                   />
                 </div>
 
-                {/* Limit Hutang */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Limit Hutang <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="limitHutang"
-                    value={formData.limitHutang}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                    placeholder="Contoh: Rp 50.000.000"
-                    required
-                  />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Limit Hutang <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="limitHutang"
+                      value={formData.limitHutang}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
+                      placeholder="Contoh: Rp 50.000.000"
+                      required
+                    />
+                  </div>
 
-                {/* Hutang Awal */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Hutang Awal <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="hutang"
-                    value={formData.hutang}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                    placeholder="Contoh: Rp 100.000.000"
-                    required
-                  />
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Hutang Awal <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="hutang"
+                      value={formData.hutang}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
+                      placeholder="Contoh: Rp 100.000.000"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="flex gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowEditModal(false)}
+                  onClick={handleCloseEditModal}
                   className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
                 >
                   Batal
