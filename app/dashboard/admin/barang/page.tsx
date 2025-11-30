@@ -21,7 +21,19 @@ import {
   Calendar,
   Activity,
   BarChart3,
+  ShoppingBag,
 } from "lucide-react";
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import toast, { Toaster } from "react-hot-toast";
 
 interface Supplier {
@@ -66,6 +78,23 @@ interface PaginationInfo {
   hasMore: boolean;
 }
 
+type QuickFilterType = 1 | 7 | 30 | 90;
+
+interface ChartData {
+  namaBarang: string;
+  totalTerjual: number;
+  totalPenjualan: number;
+  sisaStok: number;
+  persentase?: number;
+}
+
+interface Stats {
+  totalProducts: number;
+  totalRevenue: number;
+  totalUnitsSold: number;
+  avgRevenuePerProduct: number;
+}
+
 const DataBarangPage = () => {
   const [barangList, setBarangList] = useState<Barang[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -103,6 +132,21 @@ const DataBarangPage = () => {
     limit: 12,
     hasMore: false,
   });
+
+  const [view, setView] = useState("products");
+
+  const [rentangHari, setRentangHari] = useState<number>(30);
+  const [quickFilter, setQuickFilter] = useState<QuickFilterType>(30);
+  const [data, setData] = useState<ChartData[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    totalProducts: 0,
+    totalRevenue: 0,
+    totalUnitsSold: 0,
+    avgRevenuePerProduct: 0,
+  });
+  const [loadingChart, setLoadingChart] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
+  const [animationKey, setAnimationKey] = useState(0);
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -477,6 +521,118 @@ const DataBarangPage = () => {
     }, 0);
   };
 
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `/api/barang/grafik?rentangHari=${rentangHari}`
+      );
+      const result = await response.json();
+
+      const totalRev = result.reduce(
+        (sum: number, item: ChartData) => sum + item.totalPenjualan,
+        0
+      );
+      const totalUnits = result.reduce(
+        (sum: number, item: ChartData) => sum + item.totalTerjual,
+        0
+      );
+
+      const dataWithPercentage = result.map((item: ChartData) => ({
+        ...item,
+        persentase: totalUnits > 0 ? (item.totalTerjual / totalUnits) * 100 : 0,
+      }));
+
+      setData(dataWithPercentage);
+      setStats({
+        totalProducts: result.length,
+        totalRevenue: totalRev,
+        totalUnitsSold: totalUnits,
+        avgRevenuePerProduct: totalRev / result.length || 0,
+      });
+      setAnimationKey((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [rentangHari]);
+
+  const handleQuickFilter = (days: QuickFilterType) => {
+    setQuickFilter(days);
+    setRentangHari(days);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const formatCurrencySimple = (amount: number): string => {
+    const absAmount = Math.abs(amount);
+    if (absAmount >= 1e9) {
+      return `Rp ${(amount / 1e9).toFixed(1)}M`;
+    } else if (absAmount >= 1e6) {
+      return `Rp ${(amount / 1e6).toFixed(1)}Jt`;
+    } else if (absAmount >= 1e3) {
+      return `Rp ${(amount / 1e3).toFixed(0)}Rb`;
+    } else {
+      return `Rp ${amount}`;
+    }
+  };
+
+  const formatNumber = (value: number) => {
+    return new Intl.NumberFormat("id-ID").format(value);
+  };
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-4 rounded-xl shadow-2xl border-2 border-blue-200">
+          <p className="font-bold text-gray-800 mb-2 text-base">
+            {payload[0].payload.namaBarang}
+          </p>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-600">
+              Total Terjual:{" "}
+              <span className="font-semibold text-purple-600">
+                {formatNumber(payload[0].payload.totalTerjual)} pcs
+              </span>
+            </p>
+            <p className="text-sm text-gray-600">
+              Sisa Stok:{" "}
+              <span className="font-semibold text-orange-600">
+                {formatNumber(payload[0].payload.sisaStok)} pcs
+              </span>
+            </p>
+            <p className="text-sm text-gray-600">
+              Total Penjualan:{" "}
+              <span className="font-semibold text-green-600">
+                {formatCurrency(payload[0].payload.totalPenjualan)}
+              </span>
+            </p>
+            {payload[0].payload.persentase && (
+              <p className="text-sm text-gray-600">
+                Kontribusi:{" "}
+                <span className="font-semibold text-blue-600">
+                  {payload[0].payload.persentase.toFixed(1)}%
+                </span>
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="w-full px-6 pb-8">
@@ -517,6 +673,59 @@ const DataBarangPage = () => {
                 <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
                 Tambah Barang
               </button>
+
+              <div className="relative">
+                <button
+                  onClick={() =>
+                    setView(view === "products" ? "chart" : "products")
+                  }
+                  className="relative w-24 h-12 rounded-full transition-all duration-300 ease-in-out focus:outline-none hover:scale-110 active:scale-95 shadow-lg"
+                  style={{
+                    backgroundColor: view === "chart" ? "#4f46e5" : "#6366f1",
+                    boxShadow:
+                      view === "chart"
+                        ? "0 0 20px rgba(79, 70, 229, 0.5)"
+                        : "0 0 20px rgba(99, 102, 241, 0.5)",
+                  }}
+                >
+                  {/* Background gradient animation */}
+                  <div className="absolute inset-0 rounded-full opacity-50 bg-gradient-to-r from-indigo-400 to-purple-500 animate-pulse" />
+
+                  {/* Sliding circle */}
+                  <span
+                    className="absolute top-1 w-10 h-10 bg-white rounded-full shadow-xl transform transition-all duration-300 ease-in-out flex items-center justify-center"
+                    style={{
+                      left: view === "chart" ? "calc(100% - 44px)" : "4px",
+                    }}
+                  >
+                    {view === "products" ? (
+                      <ShoppingBag size={18} className="text-indigo-600" />
+                    ) : (
+                      <TrendingUp size={18} className="text-indigo-600" />
+                    )}
+                  </span>
+
+                  {/* Ripple effect saat klik */}
+                  <span
+                    className="absolute inset-0 rounded-full border-4 border-white opacity-0 animate-ping"
+                    style={{ animationDuration: "1s" }}
+                  />
+                </button>
+
+                {/* Indicator dots */}
+                <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1">
+                  <span
+                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                      view === "products" ? "bg-indigo-600 w-6" : "bg-gray-300"
+                    }`}
+                  />
+                  <span
+                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                      view === "chart" ? "bg-indigo-600 w-6" : "bg-gray-300"
+                    }`}
+                  />
+                </div>
+              </div>
               <button
                 onClick={fetchBarang}
                 disabled={loading}
@@ -606,277 +815,555 @@ const DataBarangPage = () => {
             </div>
           </div>
         </div>
+        {view === "products" ? (
+          <>
+            {/* Search and Filter Section */}
+            <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Cari nama barang atau supplier..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
 
-        {/* Search and Filter Section */}
-        <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Cari nama barang atau supplier..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex gap-3">
+                  <select
+                    value={filterSupplier}
+                    onChange={(e) => setFilterSupplier(e.target.value)}
+                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
+                  >
+                    <option value="all">Semua Supplier</option>
+                    {uniqueSuppliers.map((supplier) => (
+                      <option key={supplier.id} value={supplier.id.toString()}>
+                        {supplier.namaSupplier}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={filterStok}
+                    onChange={(e) => setFilterStok(e.target.value as any)}
+                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
+                  >
+                    <option value="all">Semua Stok</option>
+                    <option value="low">Stok Rendah</option>
+                    <option value="medium">Stok Sedang</option>
+                    <option value="high">Stok Aman</option>
+                  </select>
+
+                  <button className="px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2">
+                    <Filter className="w-5 h-5 text-gray-600" />
+                    <span className="hidden lg:inline text-gray-700 font-medium">
+                      Filter
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {debouncedSearchTerm && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
+                  <Search className="w-4 h-4 text-blue-600" />
+                  <span>
+                    Menampilkan hasil pencarian untuk:{" "}
+                    <span className="font-semibold text-blue-700">
+                      "{debouncedSearchTerm}"
+                    </span>
+                  </span>
+                </div>
               )}
             </div>
 
-            <div className="flex gap-3">
-              <select
-                value={filterSupplier}
-                onChange={(e) => setFilterSupplier(e.target.value)}
-                className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
-              >
-                <option value="all">Semua Supplier</option>
-                {uniqueSuppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id.toString()}>
-                    {supplier.namaSupplier}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={filterStok}
-                onChange={(e) => setFilterStok(e.target.value as any)}
-                className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
-              >
-                <option value="all">Semua Stok</option>
-                <option value="low">Stok Rendah</option>
-                <option value="medium">Stok Sedang</option>
-                <option value="high">Stok Aman</option>
-              </select>
-
-              <button className="px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2">
-                <Filter className="w-5 h-5 text-gray-600" />
-                <span className="hidden lg:inline text-gray-700 font-medium">
-                  Filter
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {debouncedSearchTerm && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
-              <Search className="w-4 h-4 text-blue-600" />
-              <span>
-                Menampilkan hasil pencarian untuk:{" "}
-                <span className="font-semibold text-blue-700">
-                  "{debouncedSearchTerm}"
-                </span>
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Barang Cards Grid */}
-        {loading ? (
-          <div className="flex justify-center items-center py-32">
-            <div className="text-center">
-              <div className="relative">
-                <div className="w-24 h-24 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-                <Package className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+            {/* Barang Table */}
+            {loading ? (
+              <div className="flex justify-center items-center py-32">
+                <div className="text-center">
+                  <div className="relative">
+                    <div className="w-24 h-24 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+                    <Package className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                  </div>
+                  <p className="text-gray-500 mt-6 text-lg font-medium">
+                    Memuat data barang...
+                  </p>
+                </div>
               </div>
-              <p className="text-gray-500 mt-6 text-lg font-medium">
-                Memuat data barang...
-              </p>
-            </div>
-          </div>
-        ) : filteredBarang.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-16 text-center">
-            <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Package className="w-12 h-12 text-gray-400" />
-            </div>
-            <p className="text-gray-500 text-lg font-medium">
-              {debouncedSearchTerm
-                ? `Tidak ada barang ditemukan untuk "${debouncedSearchTerm}"`
-                : "Tidak ada data barang"}
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {filteredBarang.map((item) => {
-                const { profit, percentage } = calculateProfit(
-                  item.hargaBeli,
-                  item.hargaJual
-                );
-                const stokStatus = getStokStatus(item.stok);
+            ) : filteredBarang.length === 0 ? (
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-16 text-center">
+                <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Package className="w-12 h-12 text-gray-400" />
+                </div>
+                <p className="text-gray-500 text-lg font-medium">
+                  {debouncedSearchTerm
+                    ? `Tidak ada barang ditemukan untuk "${debouncedSearchTerm}"`
+                    : "Tidak ada data barang"}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-blue-600 to-indigo-700">
+                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                          No
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                          Nama Barang
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                          Supplier
+                        </th>
+                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
+                          Harga Beli
+                        </th>
+                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
+                          Harga Jual
+                        </th>
+                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
+                          Profit
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Stok
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Ukuran
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Per Kardus
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider sticky right-0 bg-gradient-to-r from-blue-600 to-indigo-700">
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredBarang.map((item, index) => {
+                        const { profit, percentage } = calculateProfit(
+                          item.hargaBeli,
+                          item.hargaJual
+                        );
+                        const stokStatus = getStokStatus(item.stok);
 
-                return (
-                  <div
-                    key={item.id}
-                    className="group bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
-                  >
-                    {/* Card Header */}
-                    <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-4">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-10 rounded-full -mr-12 -mt-12"></div>
-                      <div className="relative z-10">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-base font-bold text-white pr-2 line-clamp-1">
-                            {item.namaBarang}
-                          </h3>
-                          <div
-                            className={`w-2 h-2 rounded-full ${stokStatus.badgeColor} flex-shrink-0 mt-2`}
-                          ></div>
-                        </div>
-                        <div className="flex items-center gap-2 text-blue-100 text-xs">
-                          <Store className="w-3 h-3 flex-shrink-0" />
-                          <span className="truncate font-medium">
-                            {item.supplier?.namaSupplier || "-"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Card Body */}
-                    <div className="p-4">
-                      {/* Harga Section */}
-                      <div className="mb-3 pb-3 border-b border-gray-200">
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                              Harga Beli
-                            </span>
-                            <span className="text-xs font-bold text-gray-900">
-                              {formatRupiahSimple(item.hargaBeli)}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                              Harga Jual
-                            </span>
-                            <span className="text-xs font-bold text-blue-600">
-                              {formatRupiahSimple(item.hargaJual)}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-                            <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                              Profit
-                            </span>
-                            <div className="text-right">
-                              <span
-                                className={`text-xs font-bold ${getProfitColor(
+                        return (
+                          <tr
+                            key={item.id}
+                            className="hover:bg-blue-50 transition-colors group"
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {index + 1}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
+                                  <Package className="w-4 h-4 text-blue-600" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-bold text-gray-900">
+                                    {item.namaBarang}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    ID: {item.id}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <Store className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm text-gray-700 font-medium">
+                                  {item.supplier?.namaSupplier || "-"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <div className="text-sm font-semibold text-gray-900">
+                                {formatRupiahSimple(item.hargaBeli)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {formatRupiah(item.hargaBeli)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <div className="text-sm font-semibold text-blue-600">
+                                {formatRupiahSimple(item.hargaJual)}
+                              </div>
+                              <div className="text-xs text-blue-500">
+                                {formatRupiah(item.hargaJual)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <div
+                                className={`text-sm font-bold ${getProfitColor(
                                   profit
                                 )}`}
                               >
                                 {formatRupiahSimple(profit)}
-                              </span>
+                              </div>
                               <div
-                                className={`text-[10px] ${getProfitColor(
+                                className={`text-xs ${getProfitColor(
                                   profit
                                 )} opacity-75`}
                               >
                                 {getPercentagePrefix(profit)}
                                 {percentage}%
                               </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${stokStatus.color}`}
+                              >
+                                <span
+                                  className={`w-2 h-2 rounded-full ${stokStatus.badgeColor} mr-2`}
+                                ></span>
+                                {item.stok} {item.satuan}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="text-sm font-semibold text-gray-700">
+                                {item.ukuran} {item.satuan}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="text-sm font-semibold text-gray-700">
+                                {item.jumlahPerkardus} pcs
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-blue-50 transition-colors">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedBarang(item);
+                                    setShowDetailModal(true);
+                                  }}
+                                  className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
+                                  title="Lihat Detail"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleEdit(item)}
+                                  className="p-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-600 rounded-lg transition-all"
+                                  title="Edit"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDelete(item.id, item.namaBarang)
+                                  }
+                                  className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
+                                  title="Hapus"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
-                      {/* Stok & Ukuran Section */}
-                      <div className="mb-3 pb-3 border-b border-gray-200">
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                              Stok
-                            </span>
-                            <span
-                              className={`px-2 py-1 rounded-full text-[10px] font-semibold ${stokStatus.color}`}
-                            >
-                              {item.stok} {item.satuan}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                              Ukuran
-                            </span>
-                            <span className="text-xs font-semibold text-gray-700">
-                              {item.ukuran} {item.satuan}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                              Per Kardus
-                            </span>
-                            <span className="text-xs font-semibold text-gray-700">
-                              {item.jumlahPerkardus} pcs
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="group/btn bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-2 py-2 rounded-lg transition-all font-semibold text-xs flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                        >
-                          <Edit className="w-3 h-3 group-hover/btn:rotate-12 transition-transform" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id, item.namaBarang)}
-                          className="group/btn bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-2 py-2 rounded-lg transition-all font-semibold text-xs flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                        >
-                          <Trash2 className="w-3 h-3 group-hover/btn:scale-110 transition-transform" />
-                          Hapus
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          setSelectedBarang(item);
-                          setShowDetailModal(true);
-                        }}
-                        className="w-full mt-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-3 py-2 rounded-lg transition-all font-semibold text-xs shadow-md hover:shadow-lg flex items-center justify-center gap-1"
-                      >
-                        <Eye className="w-3 h-3" />
-                        Lihat Detail
-                      </button>
+            {/* Footer Info */}
+            <div className="mt-8 text-center">
+              <div className="inline-flex items-center gap-3 px-6 py-3 bg-white rounded-full shadow-md border border-gray-100">
+                <Activity className="w-5 h-5 text-blue-600" />
+                <span className="text-sm text-gray-600">
+                  Menampilkan{" "}
+                  <span className="font-bold text-gray-900">
+                    {filteredBarang.length}
+                  </span>{" "}
+                  dari{" "}
+                  <span className="font-bold text-gray-900">
+                    {barangList.length}
+                  </span>{" "}
+                  barang
+                  {debouncedSearchTerm && (
+                    <span className="text-blue-600 font-semibold">
+                      {" "}
+                      (hasil pencarian)
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-6 bg-white rounded-xl p-4 shadow-md border border-gray-100">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Rentang Hari
+                    </p>
+                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-1.5 rounded-lg border border-blue-200 shadow-md">
+                      <span className="text-xl font-bold text-white">
+                        {rentangHari}
+                      </span>
+                      <span className="text-xs text-blue-100 ml-1.5">Hari</span>
                     </div>
                   </div>
-                );
-              })}
+                  <input
+                    type="range"
+                    min="1"
+                    max="365"
+                    value={rentangHari}
+                    onChange={(e) => setRentangHari(Number(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1.5 font-medium">
+                    <span>1 hari</span>
+                    <span>365 hari</span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                    Quick Filter
+                  </p>
+                  <div className="flex gap-2">
+                    {[1, 7, 30, 90].map((days) => (
+                      <button
+                        key={days}
+                        onClick={() =>
+                          handleQuickFilter(days as QuickFilterType)
+                        }
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                          quickFilter === days
+                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md scale-105"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105"
+                        }`}
+                      >
+                        {days} Hari
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 shadow-xl border border-gray-200 mb-8 relative overflow-hidden">
+              {/* Decorative background elements */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -z-0"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -z-0"></div>
+
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <BarChart3 className="w-6 h-6 text-white" />
+                      </div>
+                      10 Barang Terlaris
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1 ml-13">
+                      Analisis performa produk terbaik
+                    </p>
+                  </div>
+                  {data.length > 0 && (
+                    <div className="flex gap-4">
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 px-4 py-2 rounded-xl border border-blue-200">
+                        <p className="text-xs text-blue-600 font-semibold">
+                          Total Produk
+                        </p>
+                        <p className="text-2xl font-bold text-blue-700">
+                          {data.length}
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-br from-orange-50 to-orange-100 px-4 py-2 rounded-xl border border-orange-200">
+                        <p className="text-xs text-orange-600 font-semibold">
+                          Total Terjual
+                        </p>
+                        <p className="text-2xl font-bold text-orange-700">
+                          {data.reduce(
+                            (sum, item) => sum + item.totalTerjual,
+                            0
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {loadingChart ? (
+                  <div className="h-96 flex flex-col items-center justify-center">
+                    <div className="relative">
+                      <div className="w-28 h-28 border-8 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                      <div
+                        className="w-28 h-28 border-8 border-indigo-100 border-b-indigo-600 rounded-full animate-spin absolute top-0 left-0"
+                        style={{
+                          animationDirection: "reverse",
+                          animationDuration: "1.5s",
+                        }}
+                      ></div>
+                      <BarChart3 className="w-12 h-12 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                    </div>
+                    <p className="text-gray-600 mt-8 text-lg font-semibold animate-pulse">
+                      Memuat data grafik...
+                    </p>
+                    <p className="text-gray-400 text-sm mt-2">
+                      Mohon tunggu sebentar
+                    </p>
+                  </div>
+                ) : data.length === 0 ? (
+                  <div className="h-96 flex flex-col items-center justify-center">
+                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 w-28 h-28 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                      <Package className="w-14 h-14 text-gray-400" />
+                    </div>
+                    <p className="text-gray-700 text-xl font-bold mb-2">
+                      Tidak ada data tersedia
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      Belum ada transaksi dalam periode ini
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-white/50 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50">
+                    <ResponsiveContainer width="100%" height={450}>
+                      <BarChart
+                        key={animationKey}
+                        data={data}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#e5e7eb"
+                          opacity={0.5}
+                        />
+                        <XAxis
+                          dataKey="namaBarang"
+                          angle={-45}
+                          textAnchor="end"
+                          height={100}
+                          tick={{
+                            fill: "#374151",
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                          stroke="#9ca3af"
+                        />
+                        <YAxis
+                          tick={{
+                            fill: "#374151",
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                          stroke="#9ca3af"
+                        />
+                        <Tooltip
+                          content={<CustomTooltip />}
+                          cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
+                        />
+                        <Legend
+                          wrapperStyle={{ paddingTop: "20px" }}
+                          iconType="circle"
+                          iconSize={12}
+                        />
+                        <Bar
+                          dataKey="totalTerjual"
+                          fill="url(#colorGradient)"
+                          radius={[12, 12, 0, 0]}
+                          name="Total Terjual (pcs)"
+                          animationDuration={1200}
+                          animationEasing="ease-out"
+                        />
+                        <Bar
+                          dataKey="sisaStok"
+                          fill="url(#colorGradientOrange)"
+                          radius={[12, 12, 0, 0]}
+                          name="Sisa Stok (pcs)"
+                          animationDuration={1200}
+                          animationEasing="ease-out"
+                        />
+                        <defs>
+                          <linearGradient
+                            id="colorGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#3b82f6"
+                              stopOpacity={1}
+                            />
+                            <stop
+                              offset="50%"
+                              stopColor="#6366f1"
+                              stopOpacity={0.9}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="#8b5cf6"
+                              stopOpacity={0.8}
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id="colorGradientOrange"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#f97316"
+                              stopOpacity={1}
+                            />
+                            <stop
+                              offset="50%"
+                              stopColor="#fb923c"
+                              stopOpacity={0.9}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="#fdba74"
+                              stopOpacity={0.8}
+                            />
+                          </linearGradient>
+
+                          {/* Shadow effects */}
+                          <filter
+                            id="shadow"
+                            x="-50%"
+                            y="-50%"
+                            width="200%"
+                            height="200%"
+                          >
+                            <feDropShadow
+                              dx="0"
+                              dy="4"
+                              stdDeviation="3"
+                              floodColor="#3b82f6"
+                              floodOpacity="0.3"
+                            />
+                          </filter>
+                        </defs>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
-
-        {/* Footer Info */}
-        <div className="mt-8 text-center">
-          <div className="inline-flex items-center gap-3 px-6 py-3 bg-white rounded-full shadow-md border border-gray-100">
-            <Activity className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-600">
-              Menampilkan{" "}
-              <span className="font-bold text-gray-900">
-                {filteredBarang.length}
-              </span>{" "}
-              dari{" "}
-              <span className="font-bold text-gray-900">
-                {barangList.length}
-              </span>{" "}
-              barang
-              {debouncedSearchTerm && (
-                <span className="text-blue-600 font-semibold">
-                  {" "}
-                  (hasil pencarian)
-                </span>
-              )}
-            </span>
-          </div>
-        </div>
 
         {/* Detail Modal */}
         {showDetailModal && selectedBarang && (

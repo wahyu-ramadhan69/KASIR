@@ -320,19 +320,23 @@ async function exportDetail(
   const worksheet = workbook.addWorksheet("Laporan Detail Pembelian");
 
   worksheet.columns = [
-    { key: "col1", width: 5 },
-    { key: "col2", width: 12 },
-    { key: "col3", width: 30 },
-    { key: "col4", width: 12 },
-    { key: "col5", width: 10 },
-    { key: "col6", width: 15 },
-    { key: "col7", width: 12 },
-    { key: "col8", width: 15 },
-    { key: "col9", width: 15 },
+    { key: "col1", width: 5 },   // No
+    { key: "col2", width: 12 },  // Tanggal
+    { key: "col3", width: 20 },  // Kode Pembelian
+    { key: "col4", width: 24 },  // Supplier
+    { key: "col5", width: 18 },  // Status Pembayaran
+    { key: "col6", width: 12 },  // Kode Barang
+    { key: "col7", width: 22 },  // Nama Barang
+    { key: "col8", width: 12 },  // Ukuran
+    { key: "col9", width: 14 },  // Qty
+    { key: "col10", width: 14 }, // Harga Beli
+    { key: "col11", width: 12 }, // Diskon/Item
+    { key: "col12", width: 14 }, // Total Harga
+    { key: "col13", width: 14 }, // Subtotal
   ];
 
   // Title
-  worksheet.mergeCells("A1:I1");
+  worksheet.mergeCells("A1:M1");
   const titleCell = worksheet.getCell("A1");
   titleCell.value = "LAPORAN DETAIL PEMBELIAN";
   titleCell.font = { size: 18, bold: true, color: { argb: "FFFFFFFF" } };
@@ -344,7 +348,7 @@ async function exportDetail(
   };
 
   // DATE RANGE ROW
-  worksheet.mergeCells("A2:I2");
+  worksheet.mergeCells("A2:M2");
   const periodCell = worksheet.getCell("A2");
   periodCell.value = `Periode: ${formatDateRange(startDate, endDate)}`;
   periodCell.alignment = { horizontal: "center" };
@@ -356,38 +360,18 @@ async function exportDetail(
   let grandTotal = { subtotal: 0, diskon: 0, total: 0 };
 
   pembelianList.forEach((pembelian, idx) => {
-    currentRow++;
-
-    // Transaction header
-    worksheet.mergeCells(`A${currentRow}:I${currentRow}`);
-    const headerCell = worksheet.getCell(`A${currentRow}`);
-    headerCell.value = `${idx + 1}. ${pembelian.kodePembelian} | ${new Date(
-      pembelian.createdAt
-    ).toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })} | ${pembelian.supplier.namaSupplier} | ${pembelian.statusPembayaran}`;
-    headerCell.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
-    headerCell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF1976D2" },
-    };
-    headerCell.alignment = { horizontal: "left", vertical: "middle" };
-    addBorder(headerCell);
-    currentRow++;
-
     // Item headers
     const itemHeader = worksheet.addRow([
       "No",
+      "Tanggal",
+      "Kode Pembelian",
+      "Supplier",
+      "Status Pembayaran",
       "Kode",
       "Nama Barang",
       "Ukuran",
-      "Qty (Dus)",
-      "Harga Pokok",
+      "Qty (Dus/Pcs)",
+      "Harga Beli",
       "Diskon/Item",
       "Total Harga",
       "Subtotal",
@@ -425,6 +409,10 @@ async function exportDetail(
 
       const row = worksheet.addRow([
         itemIdx + 1,
+        new Date(pembelian.createdAt).toLocaleDateString("id-ID"),
+        pembelian.kodePembelian,
+        pembelian.supplier.namaSupplier,
+        pembelian.statusPembayaran,
         item.barang.id,
         item.barang.namaBarang,
         `${ukuran} ${item.barang.satuan}`,
@@ -435,10 +423,10 @@ async function exportDetail(
         subtotal,
       ]);
 
-      row.getCell(6).numFmt = "#,##0";
-      row.getCell(7).numFmt = "#,##0";
-      row.getCell(8).numFmt = "#,##0";
-      row.getCell(9).numFmt = "#,##0";
+      row.getCell(10).numFmt = "#,##0";
+      row.getCell(11).numFmt = "#,##0";
+      row.getCell(12).numFmt = "#,##0";
+      row.getCell(13).numFmt = "#,##0";
 
       row.eachCell((cell) => {
         addBorder(cell);
@@ -456,12 +444,16 @@ async function exportDetail(
         "",
         "",
         "",
+        "",
+        "",
+        "",
+        "",
         "Diskon Nota:",
         "",
         toNumber(pembelian.diskonNota),
       ]);
-      diskonNotaRow.getCell(9).numFmt = "#,##0";
-      diskonNotaRow.getCell(9).font = { color: { argb: "FFD32F2F" } };
+      diskonNotaRow.getCell(13).numFmt = "#,##0";
+      diskonNotaRow.getCell(13).font = { color: { argb: "FFD32F2F" } };
       diskonNotaRow.eachCell((cell) => addBorder(cell));
       currentRow++;
     }
@@ -469,6 +461,10 @@ async function exportDetail(
     // Subtotal transaksi
     const totalHargaPembelian = toNumber(pembelian.totalHarga);
     const subtotalRow = worksheet.addRow([
+      "",
+      "",
+      "",
+      "",
       "",
       "",
       "",
@@ -487,7 +483,7 @@ async function exportDetail(
         pattern: "solid",
         fgColor: { argb: "FFFFF9C4" },
       };
-      if (col === 9) {
+      if (col === 13) {
         cell.numFmt = "#,##0";
       }
       cell.border = {
@@ -510,7 +506,7 @@ async function exportDetail(
 
   // Grand Total
   currentRow++;
-  worksheet.mergeCells(`A${currentRow}:H${currentRow}`);
+  worksheet.mergeCells(`A${currentRow}:L${currentRow}`);
   const grandLabel = worksheet.getCell(`A${currentRow}`);
   grandLabel.value = `GRAND TOTAL (${pembelianList.length} Transaksi)`;
   grandLabel.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
@@ -527,7 +523,7 @@ async function exportDetail(
     right: { style: "thin" },
   };
 
-  const grandCell = worksheet.getCell(`I${currentRow}`);
+  const grandCell = worksheet.getCell(`M${currentRow}`);
   grandCell.value = grandTotal.total;
   grandCell.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
   grandCell.fill = {
