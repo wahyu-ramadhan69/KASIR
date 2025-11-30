@@ -1,7 +1,4 @@
-// =====================================================
-// PATH: app/api/penjualan/[id]/route.ts
-// =====================================================
-
+// app/api/penjualan/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { isAuthenticated } from "@/app/AuthGuard";
@@ -10,22 +7,10 @@ const prisma = new PrismaClient();
 
 // Deep serialize to handle all BigInt in nested objects
 function deepSerialize(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-
-  if (typeof obj === "bigint") {
-    return Number(obj);
-  }
-
-  if (obj instanceof Date) {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(deepSerialize);
-  }
-
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") return Number(obj);
+  if (obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(deepSerialize);
   if (typeof obj === "object") {
     const serialized: any = {};
     for (const key in obj) {
@@ -35,37 +20,28 @@ function deepSerialize(obj: any): any {
     }
     return serialized;
   }
-
   return obj;
 }
 
+// Helper to convert BigInt to number safely
+function toNumber(value: any): number {
+  if (typeof value === "bigint") return Number(value);
+  return Number(value || 0);
+}
+
+// Helper function untuk menghitung total penjualan
 const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let subtotal = 0;
   let totalDiskonItem = 0;
 
   const calculatedItems = items.map((item) => {
-    const jumlahDus =
-      typeof item.jumlahDus === "bigint"
-        ? Number(item.jumlahDus)
-        : item.jumlahDus;
-    const jumlahPcs =
-      typeof item.jumlahPcs === "bigint"
-        ? Number(item.jumlahPcs)
-        : item.jumlahPcs;
-    const hargaJual =
-      typeof item.hargaJual === "bigint"
-        ? Number(item.hargaJual)
-        : item.hargaJual;
-    const diskonPerItem =
-      typeof item.diskonPerItem === "bigint"
-        ? Number(item.diskonPerItem)
-        : item.diskonPerItem;
-    const jumlahPerkardus =
-      typeof item.barang?.jumlahPerkardus === "bigint"
-        ? Number(item.barang.jumlahPerkardus)
-        : item.barang?.jumlahPerkardus || 1;
+    const jumlahDus = toNumber(item.jumlahDus);
+    const jumlahPcs = toNumber(item.jumlahPcs);
+    const hargaJual = toNumber(item.hargaJual);
+    const diskonPerItem = toNumber(item.diskonPerItem);
+    const jumlahPerkardus = toNumber(item.barang?.jumlahPerkardus || 1);
 
-    const totalPcs = jumlahDus * jumlahPerkardus + (jumlahPcs || 0);
+    const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
       jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
@@ -114,6 +90,7 @@ export async function GET(
       where: { id: penjualanId },
       include: {
         customer: true,
+        sales: true,
         items: {
           include: {
             barang: true,
@@ -130,24 +107,25 @@ export async function GET(
       );
     }
 
-    const calculation = calculatePenjualan(
-      penjualan.items,
-      Number(penjualan.diskonNota)
-    );
+    // Add calculation
+    const penjualanWithCalculation = {
+      ...penjualan,
+      calculation: calculatePenjualan(
+        penjualan.items,
+        Number(penjualan.diskonNota)
+      ),
+    };
 
     return NextResponse.json(
       deepSerialize({
         success: true,
-        data: {
-          ...penjualan,
-          calculation,
-        },
+        data: penjualanWithCalculation,
       })
     );
   } catch (err) {
-    console.error("Error fetching penjualan:", err);
+    console.error("Error fetching penjualan detail:", err);
     return NextResponse.json(
-      { success: false, error: "Gagal mengambil data penjualan" },
+      { success: false, error: "Gagal mengambil detail penjualan" },
       { status: 500 }
     );
   } finally {
@@ -155,7 +133,7 @@ export async function GET(
   }
 }
 
-// PUT: Update penjualan
+// PUT: Update penjualan (untuk update diskon nota, dll)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -171,7 +149,6 @@ export async function PUT(
 
     const penjualan = await prisma.penjualanHeader.findUnique({
       where: { id: penjualanId },
-      include: { items: { include: { barang: true } } },
     });
 
     if (!penjualan) {
@@ -183,61 +160,56 @@ export async function PUT(
 
     if (penjualan.statusTransaksi !== "KERANJANG") {
       return NextResponse.json(
-        { success: false, error: "Penjualan sudah selesai, tidak bisa diubah" },
+        { success: false, error: "Penjualan sudah selesai" },
         { status: 400 }
       );
     }
 
+    // Build update data
     const updateData: any = {};
-
-    if (body.customerId !== undefined) {
-      if (body.customerId === null) {
-        updateData.customerId = null;
-      } else {
-        updateData.customerId = body.customerId;
-        updateData.namaCustomer = null;
-      }
-    }
-
-    if (body.namaCustomer !== undefined) {
-      updateData.namaCustomer = body.namaCustomer;
-      if (body.namaCustomer) {
-        updateData.customerId = null;
-      }
-    }
 
     if (body.diskonNota !== undefined) {
       updateData.diskonNota = BigInt(body.diskonNota);
     }
 
-    if (body.tanggalTransaksi !== undefined) {
-      updateData.tanggalTransaksi = new Date(body.tanggalTransaksi);
-    }
-
-    if (body.tanggalJatuhTempo !== undefined) {
-      updateData.tanggalJatuhTempo = new Date(body.tanggalJatuhTempo);
-    }
-
-    if (body.metodePembayaran !== undefined) {
-      updateData.metodePembayaran = body.metodePembayaran;
-    }
-
-    const calculation = calculatePenjualan(
-      penjualan.items,
-      body.diskonNota ?? Number(penjualan.diskonNota)
-    );
-
-    updateData.subtotal = BigInt(calculation.ringkasan.subtotal);
-    updateData.totalHarga = BigInt(calculation.ringkasan.totalHarga);
-
+    // Update penjualan
     const updated = await prisma.penjualanHeader.update({
       where: { id: penjualanId },
       data: updateData,
       include: {
         customer: true,
+        sales: true,
         items: {
           include: { barang: true },
-          orderBy: { id: "asc" },
+        },
+      },
+    });
+
+    // Recalculate total
+    const items = await prisma.penjualanItem.findMany({
+      where: { penjualanId },
+      include: { barang: true },
+    });
+
+    const diskonNota = toNumber(updated.diskonNota || 0);
+    const calculation = calculatePenjualan(items, diskonNota);
+
+    // Update total harga
+    await prisma.penjualanHeader.update({
+      where: { id: penjualanId },
+      data: {
+        totalHarga: BigInt(calculation.ringkasan.totalHarga),
+      },
+    });
+
+    // Fetch updated data
+    const finalData = await prisma.penjualanHeader.findUnique({
+      where: { id: penjualanId },
+      include: {
+        customer: true,
+        sales: true,
+        items: {
+          include: { barang: true },
         },
       },
     });
@@ -246,13 +218,7 @@ export async function PUT(
       deepSerialize({
         success: true,
         message: "Penjualan berhasil diupdate",
-        data: {
-          ...updated,
-          calculation: calculatePenjualan(
-            updated.items,
-            Number(updated.diskonNota)
-          ),
-        },
+        data: finalData,
       })
     );
   } catch (err) {
@@ -266,7 +232,7 @@ export async function PUT(
   }
 }
 
-// DELETE: Batalkan penjualan
+// DELETE: Cancel/batalkan penjualan
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -281,10 +247,6 @@ export async function DELETE(
 
     const penjualan = await prisma.penjualanHeader.findUnique({
       where: { id: penjualanId },
-      include: {
-        items: { include: { barang: true } },
-        customer: true,
-      },
     });
 
     if (!penjualan) {
@@ -294,64 +256,27 @@ export async function DELETE(
       );
     }
 
-    // Tidak bisa membatalkan transaksi yang sudah dibatalkan
-    if (penjualan.statusTransaksi === "DIBATALKAN") {
+    if (penjualan.statusTransaksi !== "KERANJANG") {
       return NextResponse.json(
-        { success: false, error: "Penjualan sudah dibatalkan sebelumnya" },
+        {
+          success: false,
+          error: "Hanya penjualan dengan status KERANJANG yang bisa dibatalkan",
+        },
         { status: 400 }
       );
     }
 
-    // Start transaction
-    await prisma.$transaction(async (tx) => {
-      // Jika transaksi sudah SELESAI
-      if (penjualan.statusTransaksi === "SELESAI") {
-        // Kembalikan stok barang
-        for (const item of penjualan.items) {
-          const jumlahDus = Number(item.jumlahDus);
-          const jumlahPcs = Number(item.jumlahPcs);
-          const jumlahPerkardus = Number(item.barang?.jumlahPerkardus || 1);
-          const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
-
-          await tx.barang.update({
-            where: { id: item.barangId },
-            data: {
-              stok: { increment: BigInt(totalPcs) },
-            },
-          });
-        }
-
-        // Kurangi piutang customer jika transaksi hutang
-        if (penjualan.statusPembayaran === "HUTANG" && penjualan.customerId) {
-          const totalHarga = Number(penjualan.totalHarga);
-          const jumlahDibayar = Number(penjualan.jumlahDibayar);
-          const sisaHutang = totalHarga - jumlahDibayar;
-
-          if (sisaHutang > 0) {
-            await tx.customer.update({
-              where: { id: penjualan.customerId },
-              data: {
-                piutang: { decrement: BigInt(sisaHutang) },
-              },
-            });
-          }
-        }
-      }
-
-      // Update status to DIBATALKAN
-      await tx.penjualanHeader.update({
-        where: { id: penjualanId },
-        data: { statusTransaksi: "DIBATALKAN" },
-      });
+    // Delete penjualan (items will be cascade deleted)
+    await prisma.penjualanHeader.delete({
+      where: { id: penjualanId },
     });
 
     return NextResponse.json({
       success: true,
-      message:
-        "Penjualan berhasil dibatalkan. Stok barang dan piutang customer telah dikembalikan.",
+      message: "Penjualan berhasil dibatalkan",
     });
   } catch (err) {
-    console.error("Error canceling penjualan:", err);
+    console.error("Error deleting penjualan:", err);
     return NextResponse.json(
       { success: false, error: "Gagal membatalkan penjualan" },
       { status: 500 }

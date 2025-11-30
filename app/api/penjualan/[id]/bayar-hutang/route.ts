@@ -54,7 +54,10 @@ export async function POST(
     // Validasi penjualan
     const penjualan = await prisma.penjualanHeader.findUnique({
       where: { id: penjualanId },
-      include: { customer: true },
+      include: {
+        customer: true,
+        sales: true,
+      },
     });
 
     if (!penjualan) {
@@ -115,7 +118,10 @@ export async function POST(
           kembalian: BigInt(kembalianLama + kembalianBaru),
           statusPembayaran: isLunas ? "LUNAS" : "HUTANG",
         },
-        include: { customer: true },
+        include: {
+          customer: true,
+          sales: true,
+        },
       });
 
       return updated;
@@ -146,6 +152,7 @@ export async function POST(
             statusPembayaran: result.statusPembayaran,
             piutangCustomer: result.customer?.piutang || 0,
           },
+          tipePenjualan: result.salesId ? "sales" : "toko",
         },
       })
     );

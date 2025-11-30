@@ -21,6 +21,8 @@ import {
   Menu,
   X,
   User2,
+  Database,
+  Truck,
 } from "lucide-react";
 
 const navLinks = [
@@ -29,25 +31,40 @@ const navLinks = [
     href: "/dashboard/admin",
     icon: <LayoutDashboard className="w-5 h-5" />,
   },
+];
+
+const masterDataLinks = [
   {
-    label: "Barang",
+    label: "Master Data",
     href: "/dashboard/admin/barang",
-    icon: <Package className="w-5 h-5" />,
-  },
-  {
-    label: "Supplier",
-    href: "/dashboard/admin/supplier",
-    icon: <Users className="w-5 h-5" />,
-  },
-  {
-    label: "Customer",
-    href: "/dashboard/admin/customer",
-    icon: <UserCheck className="w-5 h-5" />,
-  },
-  {
-    label: "Users",
-    href: "/dashboard/admin/users",
-    icon: <User2 className="w-5 h-5" />,
+    icon: <Database className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Barang",
+        href: "/dashboard/admin/barang",
+        icon: <Package className="w-4 h-4" />,
+      },
+      {
+        label: "Supplier",
+        href: "/dashboard/admin/supplier",
+        icon: <Users className="w-4 h-4" />,
+      },
+      {
+        label: "Customer",
+        href: "/dashboard/admin/customer",
+        icon: <UserCheck className="w-4 h-4" />,
+      },
+      {
+        label: "Sales",
+        href: "/dashboard/admin/sales",
+        icon: <Truck className="w-4 h-4" />,
+      },
+      {
+        label: "Users",
+        href: "/dashboard/admin/users",
+        icon: <User2 className="w-4 h-4" />,
+      },
+    ],
   },
 ];
 
@@ -75,9 +92,14 @@ const transactionLinks = [
     icon: <ShoppingBag className="w-5 h-5" />,
     subMenu: [
       {
-        label: "Transaksi Penjualan",
+        label: "Penjualan Toko",
         href: "/dashboard/admin/penjualan",
         icon: <ShoppingBag className="w-4 h-4" />,
+      },
+      {
+        label: "Penjualan Sales",
+        href: "/dashboard/admin/penjualan/sales",
+        icon: <Truck className="w-4 h-4" />,
       },
       {
         label: "Riwayat Penjualan",
@@ -135,6 +157,14 @@ const Sidebar: React.FC = () => {
 
   // Auto-expand menu jika ada submenu yang aktif
   useEffect(() => {
+    // Check master data links
+    masterDataLinks.forEach((link) => {
+      if (isSubMenuActive(link.subMenu) && !openMenus.includes(link.label)) {
+        setOpenMenus((prev) => [...prev, link.label]);
+      }
+    });
+
+    // Check transaction links
     transactionLinks.forEach((link) => {
       if (isSubMenuActive(link.subMenu) && !openMenus.includes(link.label)) {
         setOpenMenus((prev) => [...prev, link.label]);
@@ -249,6 +279,82 @@ const Sidebar: React.FC = () => {
                       <span>{link.label}</span>
                     </button>
                   </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Master Data */}
+          <div className="mb-6">
+            <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+              Data
+            </h3>
+            <ul className="flex flex-col gap-1">
+              {masterDataLinks.map((link) => (
+                <li key={link.label}>
+                  {/* Parent Menu Button */}
+                  <button
+                    onClick={() => toggleMenu(link.label)}
+                    className={`group w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                      isSubMenuActive(link.subMenu)
+                        ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
+                        : "text-gray-300 hover:bg-white/5 hover:text-white"
+                    }`}
+                    type="button"
+                  >
+                    <span
+                      className={`${
+                        isSubMenuActive(link.subMenu)
+                          ? "text-white"
+                          : "text-gray-400 group-hover:text-white"
+                      }`}
+                    >
+                      {link.icon}
+                    </span>
+                    <span className="flex-1 text-left">{link.label}</span>
+                    <span
+                      className={`transform transition-transform duration-200 ${
+                        isMenuOpen(link.label) ? "rotate-180" : ""
+                      }`}
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </span>
+                  </button>
+
+                  {/* Sub Menu */}
+                  <ul
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      isMenuOpen(link.label)
+                        ? "max-h-96 opacity-100 mt-1"
+                        : "max-h-0 opacity-0"
+                    }`}
+                  >
+                    {link.subMenu.map((subItem) => (
+                      <li key={subItem.href}>
+                        <Link href={subItem.href} scroll={false}>
+                          <button
+                            className={`group w-full flex items-center gap-3 pl-12 pr-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
+                              pathname === subItem.href
+                                ? "text-blue-400 bg-blue-500/10"
+                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                            }`}
+                            type="button"
+                          >
+                            <span
+                              className={`${
+                                pathname === subItem.href
+                                  ? "text-blue-400"
+                                  : "text-gray-500 group-hover:text-gray-300"
+                              }`}
+                            >
+                              {subItem.icon}
+                            </span>
+                            <span className="text-xs">{subItem.label}</span>
+                          </button>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ul>

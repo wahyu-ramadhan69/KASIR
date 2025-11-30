@@ -156,7 +156,7 @@ async function generateSummaryReport(
   titleCell.fill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FFD32F2F" },
+    fgColor: { argb: "FF2196F3" },
   };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   worksheet.getRow(1).height = 30;
@@ -247,11 +247,14 @@ async function generateSummaryReport(
   totalRow.getCell(4).value = grandTotal;
 
   totalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FFD32F2F" },
-  };
+  // Color only up to column E so it doesn't spill into the extra column
+  for (let i = 1; i <= 5; i++) {
+    totalRow.getCell(i).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFD32F2F" },
+    };
+  }
 
   totalRow.getCell(4).numFmt = "#,##0";
 
@@ -316,7 +319,7 @@ async function generateDetailReport(
   titleCell.fill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FFD32F2F" },
+    fgColor: { argb: "FF2196F3" },
   };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   worksheet.getRow(1).height = 30;
@@ -416,11 +419,14 @@ async function generateDetailReport(
   totalRow.getCell(5).value = grandTotal;
 
   totalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FFD32F2F" },
-  };
+  // Limit highlight to columns A-E to avoid coloring the "Input By" column
+  for (let i = 1; i <= 5; i++) {
+    totalRow.getCell(i).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFD32F2F" },
+    };
+  }
 
   totalRow.getCell(5).numFmt = "#,##0";
 
@@ -461,7 +467,7 @@ async function generateYearlyReport(
   titleCell.fill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FFD32F2F" },
+    fgColor: { argb: "FF2196F3" },
   };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   worksheet.getRow(1).height = 30;

@@ -68,6 +68,12 @@ export async function GET(request: NextRequest) {
             nama: { contains: search, mode: "insensitive" },
           },
         },
+        {
+          sales: {
+            namaSales: { contains: search, mode: "insensitive" },
+          },
+        },
+        { namaSales: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -91,6 +97,12 @@ export async function GET(request: NextRequest) {
             id: true,
             nama: true,
             namaToko: true,
+          },
+        },
+        sales: {
+          select: {
+            id: true,
+            namaSales: true,
           },
         },
         items: {
@@ -156,6 +168,19 @@ export async function GET(request: NextRequest) {
                 jumlahPerkardus: true,
               },
             },
+          },
+        },
+        sales: {
+          select: {
+            id: true,
+            namaSales: true,
+          },
+        },
+        customer: {
+          select: {
+            id: true,
+            nama: true,
+            namaToko: true,
           },
         },
       },

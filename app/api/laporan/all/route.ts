@@ -9,6 +9,12 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+function getCustomerOrSalesName(penjualan: any): string {
+  if (penjualan.customer) return penjualan.customer.nama;
+  if (penjualan.sales) return penjualan.sales.namaSales;
+  return penjualan.namaCustomer || penjualan.namaSales || "-";
+}
+
 function formatDateRange(startDate?: string, endDate?: string): string {
   const months = [
     "Januari",
@@ -162,6 +168,7 @@ async function generateLaporanPenjualan(
     orderBy: { tanggalTransaksi: "desc" },
     include: {
       customer: true,
+      sales: true,
       items: {
         include: {
           barang: {
@@ -293,8 +300,7 @@ async function generateLaporanPenjualan(
     row.getCell(3).value = new Date(
       penjualan.tanggalTransaksi
     ).toLocaleDateString("id-ID");
-    row.getCell(4).value =
-      penjualan.customer?.nama || penjualan.namaCustomer || "-";
+    row.getCell(4).value = getCustomerOrSalesName(penjualan);
     row.getCell(5).value = totalDus;
     row.getCell(6).value = totalPcs;
     row.getCell(7).value = totalHarga;
@@ -356,11 +362,14 @@ async function generateLaporanPenjualan(
     grandTotalPenjualan > 0 ? (grandTotalLaba / grandTotalPenjualan) * 100 : 0;
 
   totalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF388E3C" },
-  };
+  // Limit fill to the data columns only (A-J)
+  for (let i = 1; i <= 10; i++) {
+    totalRow.getCell(i).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+  }
   totalRow.height = 25;
 
   totalRow.getCell(5).alignment = { horizontal: "center", vertical: "middle" };
@@ -545,11 +554,14 @@ async function generateLaporanPembelian(
   totalRow.getCell(7).value = grandTotalDiskon;
 
   totalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF388E3C" },
-  };
+  // Limit fill to columns A-G only
+  for (let i = 1; i <= 7; i++) {
+    totalRow.getCell(i).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+  }
   totalRow.height = 25;
 
   totalRow.getCell(5).alignment = { horizontal: "center", vertical: "middle" };
@@ -599,7 +611,7 @@ async function generateLaporanPengeluaran(
   });
 
   // Title
-  worksheet.mergeCells("A1:E1");
+  worksheet.mergeCells("A1:F1");
   const titleCell = worksheet.getCell("A1");
   titleCell.value = "LAPORAN PENGELUARAN";
   titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
@@ -612,7 +624,7 @@ async function generateLaporanPengeluaran(
   worksheet.getRow(1).height = 30;
 
   // Periode
-  worksheet.mergeCells("A2:E2");
+  worksheet.mergeCells("A2:F2");
   const periodeCell = worksheet.getCell("A2");
   periodeCell.value = `Periode: ${formatDateRange(
     startDate || undefined,
@@ -623,8 +635,15 @@ async function generateLaporanPengeluaran(
 
   worksheet.getRow(3).height = 5;
 
-  // Headers
-  const headers = ["No", "Tanggal", "Nama Pengeluaran", "Jumlah", "Input By"];
+  // Headers - UPDATED ORDER: No, Tanggal, Nama Pengeluaran, Keterangan, Input By, Jumlah
+  const headers = [
+    "No",
+    "Tanggal",
+    "Nama Pengeluaran",
+    "Keterangan",
+    "Input By",
+    "Jumlah",
+  ];
   const headerRow = worksheet.getRow(4);
   headers.forEach((header, index) => {
     const cell = headerRow.getCell(index + 1);
@@ -646,11 +665,12 @@ async function generateLaporanPengeluaran(
   headerRow.height = 20;
 
   // Column widths
-  worksheet.getColumn(1).width = 5;
-  worksheet.getColumn(2).width = 12;
-  worksheet.getColumn(3).width = 30;
-  worksheet.getColumn(4).width = 15;
-  worksheet.getColumn(5).width = 25;
+  worksheet.getColumn(1).width = 5; // No
+  worksheet.getColumn(2).width = 12; // Tanggal
+  worksheet.getColumn(3).width = 25; // Nama Pengeluaran
+  worksheet.getColumn(4).width = 35; // Keterangan
+  worksheet.getColumn(5).width = 25; // Input By
+  worksheet.getColumn(6).width = 15; // Jumlah
 
   // Data rows
   let currentRow = 5;
@@ -661,20 +681,21 @@ async function generateLaporanPengeluaran(
     grandTotal += jumlah;
 
     const row = worksheet.getRow(currentRow);
-    row.getCell(1).value = index + 1;
+    row.getCell(1).value = index + 1; // No
     row.getCell(2).value = new Date(
       pengeluaran.tanggalInput
-    ).toLocaleDateString("id-ID");
-    row.getCell(3).value = pengeluaran.namaPengeluaran;
-    row.getCell(4).value = jumlah;
-    row.getCell(5).value = pengeluaran.user?.email || "-";
+    ).toLocaleDateString("id-ID"); // Tanggal
+    row.getCell(3).value = pengeluaran.namaPengeluaran; // Nama Pengeluaran
+    row.getCell(4).value = pengeluaran.keterangan || "-"; // Keterangan
+    row.getCell(5).value = pengeluaran.user?.email || "-"; // Input By
+    row.getCell(6).value = jumlah; // Jumlah
 
     // Format
-    row.getCell(4).numFmt = "#,##0";
-    row.getCell(4).alignment = { horizontal: "right" };
+    row.getCell(6).numFmt = "#,##0";
+    row.getCell(6).alignment = { horizontal: "right" };
 
     // Borders
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 6; i++) {
       row.getCell(i).border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -688,30 +709,41 @@ async function generateLaporanPengeluaran(
 
   // Grand total row
   const totalRow = worksheet.getRow(currentRow);
-  worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+  worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
   totalRow.getCell(1).value = "TOTAL";
   totalRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-  totalRow.getCell(4).value = grandTotal;
+  totalRow.getCell(6).value = grandTotal;
 
-  totalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF388E3C" },
-  };
   totalRow.height = 25;
 
-  totalRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
-  totalRow.getCell(4).numFmt = "#,##0";
+  // Apply formatting only to columns 1-6 (A-F)
+  for (let i = 1; i <= 6; i++) {
+    const cell = totalRow.getCell(i);
 
-  for (let i = 1; i <= 5; i++) {
-    totalRow.getCell(i).border = {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+    cell.border = {
       top: { style: "medium" },
       left: { style: "thin" },
       bottom: { style: "medium" },
       right: { style: "thin" },
     };
   }
+
+  // Clear formatting for columns beyond F (7 onwards) to prevent green bleeding
+  for (let i = 7; i <= 50; i++) {
+    const cell = totalRow.getCell(i);
+    cell.fill = undefined;
+    cell.font = undefined;
+    cell.border = undefined;
+  }
+
+  totalRow.getCell(6).alignment = { horizontal: "right", vertical: "middle" };
+  totalRow.getCell(6).numFmt = "#,##0";
 }
 
 // ====================================
@@ -914,15 +946,27 @@ async function generateRingkasan(
     row.getCell(3).alignment = { horizontal: "right" };
     row.getCell(3).numFmt = "#,##0";
 
-    // Highlight special rows
+    // Highlight special rows (only columns A-D)
     if (data.isBold) {
-      row.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      row.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: data.color },
-      };
       row.height = 25;
+
+      // Apply formatting only to columns 1-4 (A-D)
+      for (let i = 1; i <= 4; i++) {
+        const cell = row.getCell(i);
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: data.color },
+        };
+      }
+
+      // Clear formatting for columns beyond D (5 onwards)
+      for (let i = 5; i <= 50; i++) {
+        const cell = row.getCell(i);
+        cell.fill = undefined;
+        cell.font = undefined;
+      }
     }
 
     // Borders
@@ -1164,13 +1208,33 @@ async function generateLaporanPenjualanDetail(
   totalRow.getCell(12).value =
     grandTotalPenjualan > 0 ? (grandTotalLaba / grandTotalPenjualan) * 100 : 0;
 
-  totalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF388E3C" },
-  };
   totalRow.height = 25;
+
+  // Apply formatting only to columns 1-12 (A-L)
+  for (let i = 1; i <= 12; i++) {
+    const cell = totalRow.getCell(i);
+
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+    cell.border = {
+      top: { style: "medium" },
+      left: { style: "thin" },
+      bottom: { style: "medium" },
+      right: { style: "thin" },
+    };
+  }
+
+  // Clear formatting for columns beyond L (13 onwards) to prevent green bleeding
+  for (let i = 13; i <= 50; i++) {
+    const cell = totalRow.getCell(i);
+    cell.fill = undefined;
+    cell.font = undefined;
+    cell.border = undefined;
+  }
 
   totalRow.getCell(9).alignment = { horizontal: "right", vertical: "middle" };
   totalRow.getCell(10).alignment = { horizontal: "right", vertical: "middle" };
@@ -1181,15 +1245,6 @@ async function generateLaporanPenjualanDetail(
   totalRow.getCell(10).numFmt = "#,##0";
   totalRow.getCell(11).numFmt = "#,##0";
   totalRow.getCell(12).numFmt = "0.00";
-
-  for (let i = 1; i <= 12; i++) {
-    totalRow.getCell(i).border = {
-      top: { style: "medium" },
-      left: { style: "thin" },
-      bottom: { style: "medium" },
-      right: { style: "thin" },
-    };
-  }
 }
 
 // ====================================
@@ -1358,26 +1413,37 @@ async function generateLaporanPembelianDetail(
   totalRow.getCell(9).value = grandTotalDiskon;
   totalRow.getCell(10).value = grandTotal;
 
-  totalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF388E3C" },
-  };
   totalRow.height = 25;
 
-  totalRow.getCell(9).alignment = { horizontal: "right", vertical: "middle" };
-  totalRow.getCell(10).alignment = { horizontal: "right", vertical: "middle" };
-
-  totalRow.getCell(9).numFmt = "#,##0";
-  totalRow.getCell(10).numFmt = "#,##0";
-
+  // Apply formatting only to columns 1-10 (A-J)
   for (let i = 1; i <= 10; i++) {
-    totalRow.getCell(i).border = {
+    const cell = totalRow.getCell(i);
+
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+    cell.border = {
       top: { style: "medium" },
       left: { style: "thin" },
       bottom: { style: "medium" },
       right: { style: "thin" },
     };
   }
+
+  // Clear formatting for columns beyond J (11 onwards) to prevent green bleeding
+  for (let i = 11; i <= 50; i++) {
+    const cell = totalRow.getCell(i);
+    cell.fill = undefined;
+    cell.font = undefined;
+    cell.border = undefined;
+  }
+
+  totalRow.getCell(9).alignment = { horizontal: "right", vertical: "middle" };
+  totalRow.getCell(10).alignment = { horizontal: "right", vertical: "middle" };
+
+  totalRow.getCell(9).numFmt = "#,##0";
+  totalRow.getCell(10).numFmt = "#,##0";
 }

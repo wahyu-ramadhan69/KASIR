@@ -472,124 +472,181 @@ const DataSupplierPage = () => {
   );
 
   return (
-    <div className="w-full max-w-7xl mx-auto">
-      <Toaster />
+    <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="w-full max-w-7xl mx-auto px-6 pb-8">
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: { background: "#333", color: "#fff" },
+            success: { style: { background: "#22c55e" } },
+            error: { style: { background: "#ef4444" } },
+          }}
+        />
 
-      {/* Header Section */}
-      <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl p-6 mb-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Data Supplier
-            </h1>
-            <p className="text-blue-100">
-              Kelola informasi supplier dan mitra bisnis
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={handleOpenAddModal}
-              className="bg-white hover:bg-blue-50 text-blue-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              Tambah Supplier
-            </button>
-            <button
-              onClick={fetchSupplier}
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-          </div>
-        </div>
-      </div>
+        {/* Header Section */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-8 mb-8 shadow-2xl">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-6 shadow-md border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">
-                Total Supplier
-              </p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {supplierList.length}
-              </p>
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
+                <Users className="w-10 h-10 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
+                  Data Supplier
+                </h1>
+                <p className="text-blue-100 text-lg">
+                  Kelola informasi supplier dan mitra bisnis
+                </p>
+              </div>
             </div>
-            <div className="bg-blue-100 p-3 rounded-lg">
-              <Users className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 shadow-md border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Total Barang</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {totalBarang}
-              </p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-lg">
-              <Package className="w-6 h-6 text-blue-600" />
+            <div className="flex gap-3">
+              <button
+                onClick={handleOpenAddModal}
+                className="group bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
+              >
+                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                Tambah Supplier
+              </button>
+              <button
+                onClick={fetchSupplier}
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg"
+              >
+                <RefreshCw className="w-5 h-5" />
+                Refresh
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 shadow-md border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Limit Hutang</p>
-              <p className="text-lg font-bold text-gray-900 mt-1">
-                {formatRupiah(totalLimitHutang)}
-              </p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                  Total Supplier
+                </p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">
+                  {supplierList.length}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Mitra terdaftar</p>
+              </div>
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <Users className="w-8 h-8 text-white" />
+              </div>
             </div>
-            <div className="bg-red-100 p-3 rounded-lg">
-              <CreditCard className="w-6 h-6 text-red-600" />
+          </div>
+
+          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                  Total Barang
+                </p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">
+                  {totalBarang}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Produk aktif</p>
+              </div>
+              <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <Package className="w-8 h-8 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                  Limit Hutang
+                </p>
+                <p className="text-2xl font-bold text-indigo-600 mt-2">
+                  {formatRupiah(totalLimitHutang)}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Total plafon</p>
+              </div>
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <CreditCard className="w-8 h-8 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                  Hutang Awal
+                </p>
+                <p className="text-2xl font-bold text-green-600 mt-2">
+                  {formatRupiah(totalhutang)}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Total awal</p>
+              </div>
+              <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <ShoppingCart className="w-8 h-8 text-white" />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 shadow-md border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">
-                Total Hutang Awal
-              </p>
-              <p className="text-lg font-bold text-gray-900 mt-1">
-                {formatRupiah(totalhutang)}
-              </p>
-            </div>
-            <div className="bg-green-100 p-3 rounded-lg">
-              <ShoppingCart className="w-6 h-6 text-green-600" />
-            </div>
+        {/* Search Section */}
+        <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Cari nama supplier, alamat, atau nomor HP..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
+          {searchTerm && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
+              <Search className="w-4 h-4 text-blue-600" />
+              <span>
+                Menampilkan hasil untuk: {""}
+                <span className="font-semibold text-blue-700">
+                  "{searchTerm}"
+                </span>
+              </span>
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Search Section */}
-      <div className="bg-white rounded-lg p-4 mb-6 shadow-md border border-gray-100">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Cari nama supplier, alamat, atau nomor HP..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-          />
-        </div>
-      </div>
 
       {/* Supplier Cards Grid */}
       {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex justify-center items-center py-24">
+          <div className="text-center">
+            <div className="relative">
+              <div className="w-24 h-24 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+              <Users className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            <p className="text-gray-500 mt-6 text-lg font-medium">
+              Memuat data supplier...
+            </p>
+          </div>
         </div>
       ) : filteredSupplier.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md border border-gray-100 p-12 text-center">
-          <p className="text-gray-500">Tidak ada data supplier ditemukan</p>
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-16 text-center">
+          <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Users className="w-12 h-12 text-gray-400" />
+          </div>
+          <p className="text-gray-500 text-lg font-medium">
+            Tidak ada data supplier ditemukan
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -605,7 +662,7 @@ const DataSupplierPage = () => {
             return (
               <div
                 key={supplier.id}
-                className="bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden"
+                className="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
               >
                 {/* Card Header */}
                 <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4">
@@ -1056,6 +1113,7 @@ const DataSupplierPage = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

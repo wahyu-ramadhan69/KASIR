@@ -4,6 +4,24 @@ import ExcelJS from "exceljs";
 
 const prisma = new PrismaClient();
 
+function getCustomerOrSalesName(penjualan: any): string {
+  if (penjualan.customer) return penjualan.customer.nama;
+  if (penjualan.sales) return penjualan.sales.namaSales;
+  return penjualan.namaCustomer || "-";
+}
+
+function getCustomerName(p: any): string {
+  if (p.customer) return p.customer.nama;
+  if (p.sales) return p.sales.namaSales;
+  return p.namaCustomer || "-";
+}
+
+function getCustomerType(p: any): string {
+  if (p.customer) return "Customer";
+  if (p.sales) return "Sales";
+  return "-";
+}
+
 function toNumber(value: any): number {
   if (typeof value === "bigint") return Number(value);
   return Number(value || 0);
@@ -134,6 +152,9 @@ async function generateSummaryReport(
       { kodePenjualan: { contains: filters.search, mode: "insensitive" } },
       { namaCustomer: { contains: filters.search, mode: "insensitive" } },
       { customer: { nama: { contains: filters.search, mode: "insensitive" } } },
+      {
+        sales: { namaSales: { contains: filters.search, mode: "insensitive" } },
+      },
     ];
   }
 
@@ -142,6 +163,7 @@ async function generateSummaryReport(
     orderBy: { tanggalTransaksi: "desc" },
     include: {
       customer: true,
+      sales: true, // ⬅️ tambahkan ini
       items: {
         include: {
           barang: {
@@ -191,6 +213,7 @@ async function generateSummaryReport(
     "Tanggal",
     "Customer",
     "Dus",
+    "Tipe Penjualan",
     "Pcs",
     "Penjualan",
     "Modal",
@@ -223,12 +246,13 @@ async function generateSummaryReport(
   worksheet.getColumn(3).width = 12;
   worksheet.getColumn(4).width = 20;
   worksheet.getColumn(5).width = 8;
-  worksheet.getColumn(6).width = 8;
+  worksheet.getColumn(6).width = 14;
   worksheet.getColumn(7).width = 15;
   worksheet.getColumn(8).width = 15;
   worksheet.getColumn(9).width = 15;
   worksheet.getColumn(10).width = 10;
   worksheet.getColumn(11).width = 10;
+  worksheet.getColumn(12).width = 12;
 
   // Data rows
   let currentRow = 6;
@@ -284,24 +308,29 @@ async function generateSummaryReport(
     row.getCell(3).value = new Date(
       penjualan.tanggalTransaksi
     ).toLocaleDateString("id-ID");
-    row.getCell(4).value =
-      penjualan.customer?.nama || penjualan.namaCustomer || "-";
+    row.getCell(4).value = penjualan.customer
+      ? getCustomerOrSalesName(penjualan) // nama customer
+      : penjualan.sales
+      ? `${getCustomerOrSalesName(penjualan)} (Sales)` // nama sales + label
+      : "-";
+
     row.getCell(5).value = totalDus;
-    row.getCell(6).value = totalPcs;
-    row.getCell(7).value = penjualanAmount;
-    row.getCell(8).value = totalModal;
-    row.getCell(9).value = totalLaba;
-    row.getCell(10).value = margin;
-    row.getCell(11).value = penjualan.statusPembayaran;
+    row.getCell(6).value = getCustomerType(penjualan);
+    row.getCell(7).value = totalPcs;
+    row.getCell(8).value = penjualanAmount;
+    row.getCell(9).value = totalModal;
+    row.getCell(10).value = totalLaba;
+    row.getCell(11).value = margin;
+    row.getCell(12).value = penjualan.statusPembayaran;
 
     // Format
-    row.getCell(7).numFmt = "#,##0";
     row.getCell(8).numFmt = "#,##0";
     row.getCell(9).numFmt = "#,##0";
-    row.getCell(10).numFmt = "0.00";
+    row.getCell(10).numFmt = "#,##0";
+    row.getCell(11).numFmt = "0.00";
 
     // Borders
-    for (let i = 1; i <= 11; i++) {
+    for (let i = 1; i <= 12; i++) {
       row.getCell(i).border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -317,26 +346,29 @@ async function generateSummaryReport(
   const totalRow = worksheet.getRow(currentRow);
   totalRow.getCell(1).value = "TOTAL";
   totalRow.getCell(5).value = grandTotalDus;
-  totalRow.getCell(6).value = grandTotalPcs;
-  totalRow.getCell(7).value = grandTotalPenjualan;
-  totalRow.getCell(8).value = grandTotalModal;
-  totalRow.getCell(9).value = grandTotalLaba;
-  totalRow.getCell(10).value =
+  totalRow.getCell(7).value = grandTotalPcs;
+  totalRow.getCell(8).value = grandTotalPenjualan;
+  totalRow.getCell(9).value = grandTotalModal;
+  totalRow.getCell(10).value = grandTotalLaba;
+  totalRow.getCell(11).value =
     grandTotalPenjualan > 0 ? (grandTotalLaba / grandTotalPenjualan) * 100 : 0;
 
   totalRow.font = { bold: true };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FFFFF59D" },
-  };
+  // Limit highlight to data columns only
+  for (let i = 1; i <= 12; i++) {
+    totalRow.getCell(i).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFFFF59D" },
+    };
+  }
 
-  totalRow.getCell(7).numFmt = "#,##0";
   totalRow.getCell(8).numFmt = "#,##0";
   totalRow.getCell(9).numFmt = "#,##0";
-  totalRow.getCell(10).numFmt = "0.00";
+  totalRow.getCell(10).numFmt = "#,##0";
+  totalRow.getCell(11).numFmt = "0.00";
 
-  for (let i = 1; i <= 11; i++) {
+  for (let i = 1; i <= 12; i++) {
     totalRow.getCell(i).border = {
       top: { style: "medium" },
       left: { style: "thin" },
@@ -375,6 +407,9 @@ async function generateDetailReport(
       { kodePenjualan: { contains: filters.search, mode: "insensitive" } },
       { namaCustomer: { contains: filters.search, mode: "insensitive" } },
       { customer: { nama: { contains: filters.search, mode: "insensitive" } } },
+      {
+        sales: { namaSales: { contains: filters.search, mode: "insensitive" } },
+      },
     ];
   }
 
@@ -383,6 +418,7 @@ async function generateDetailReport(
     orderBy: { tanggalTransaksi: "desc" },
     include: {
       customer: true,
+      sales: true, // ⬅️
       items: {
         include: {
           barang: {
@@ -454,9 +490,12 @@ async function generateDetailReport(
     const headerCell = worksheet.getCell(`A${currentRow}`);
     headerCell.value = `${transIndex + 1}. ${
       penjualan.kodePenjualan
-    } | ${new Date(penjualan.tanggalTransaksi).toLocaleDateString("id-ID")} | ${
-      penjualan.customer?.nama || penjualan.namaCustomer || "-"
-    } | ${penjualan.statusPembayaran}`;
+    } | ${new Date(penjualan.tanggalTransaksi).toLocaleDateString(
+      "id-ID"
+    )} | ${getCustomerOrSalesName(penjualan)} (${getCustomerType(
+      penjualan
+    )}) | ${penjualan.statusPembayaran}`;
+
     headerCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
     headerCell.fill = {
       type: "pattern",
@@ -609,11 +648,13 @@ async function generateDetailReport(
       subtotalPenjualan > 0 ? (subtotalLaba / subtotalPenjualan) * 100 : 0;
 
     subtotalRow.font = { bold: true };
-    subtotalRow.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFFFF9C4" },
-    };
+    for (let i = 1; i <= 12; i++) {
+      subtotalRow.getCell(i).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFF9C4" },
+      };
+    }
 
     subtotalRow.getCell(9).numFmt = "#,##0";
     subtotalRow.getCell(10).numFmt = "#,##0";
@@ -644,11 +685,13 @@ async function generateDetailReport(
     grandTotalPenjualan > 0 ? (grandTotalLaba / grandTotalPenjualan) * 100 : 0;
 
   grandTotalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  grandTotalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF388E3C" },
-  };
+  for (let i = 1; i <= 12; i++) {
+    grandTotalRow.getCell(i).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+  }
 
   grandTotalRow.getCell(9).numFmt = "#,##0";
   grandTotalRow.getCell(10).numFmt = "#,##0";
@@ -768,6 +811,7 @@ async function generateYearlyReport(
             },
           },
         },
+        sales: true,
       },
     });
 
@@ -856,11 +900,13 @@ async function generateYearlyReport(
       : 0;
 
   totalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  totalRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF388E3C" },
-  };
+  for (let i = 1; i <= 8; i++) {
+    totalRow.getCell(i).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+  }
 
   totalRow.getCell(5).numFmt = "#,##0";
   totalRow.getCell(6).numFmt = "#,##0";

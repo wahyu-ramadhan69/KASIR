@@ -93,6 +93,8 @@ export async function POST(
       tanggalJatuhTempo,
       customerId,
       namaCustomer,
+      salesId,
+      namaSales,
       tanggalTransaksi,
     } = body;
 
@@ -101,6 +103,7 @@ export async function POST(
       where: { id: penjualanId },
       include: {
         customer: true,
+        sales: true,
         items: {
           include: { barang: true },
         },
@@ -139,8 +142,58 @@ export async function POST(
     const sisaHutang =
       statusPembayaran === "HUTANG" ? totalHarga - jumlahDibayar : 0;
 
-    // Validasi piutang customer untuk transaksi HUTANG
-    if (statusPembayaran === "HUTANG") {
+    // Deteksi tipe penjualan berdasarkan data yang ada
+    const isPenjualanSales =
+      salesId !== undefined || penjualan.salesId !== null;
+
+    // Validasi hutang untuk sales
+    if (statusPembayaran === "HUTANG" && isPenjualanSales) {
+      if (!salesId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Transaksi dengan hutang harus menggunakan sales terdaftar",
+          },
+          { status: 400 }
+        );
+      }
+
+      const sales = await prisma.sales.findUnique({
+        where: { id: salesId },
+      });
+
+      if (!sales) {
+        return NextResponse.json(
+          { success: false, error: "Sales tidak ditemukan" },
+          { status: 404 }
+        );
+      }
+
+      // Cek limit hutang sales
+      const hutangSekarang = toNumber(sales.hutang);
+      const limitHutang = toNumber(sales.limitHutang);
+      const hutangBaru = hutangSekarang + sisaHutang;
+
+      if (limitHutang > 0 && hutangBaru > limitHutang) {
+        const sisaLimit = limitHutang - hutangSekarang;
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Hutang melebihi limit! Limit: Rp ${limitHutang.toLocaleString(
+              "id-ID"
+            )}, Hutang saat ini: Rp ${hutangSekarang.toLocaleString(
+              "id-ID"
+            )}, Sisa limit: Rp ${sisaLimit.toLocaleString(
+              "id-ID"
+            )}, Hutang baru: Rp ${sisaHutang.toLocaleString("id-ID")}`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validasi piutang customer untuk penjualan toko dengan hutang
+    if (statusPembayaran === "HUTANG" && !isPenjualanSales) {
       if (!customerId) {
         return NextResponse.json(
           {
@@ -186,12 +239,31 @@ export async function POST(
       }
     }
 
-    // Validasi customer atau nama customer untuk transaksi LUNAS
-    if (statusPembayaran === "LUNAS" && !customerId && !namaCustomer) {
+    // Validasi customer atau nama customer untuk transaksi LUNAS toko
+    if (
+      statusPembayaran === "LUNAS" &&
+      !isPenjualanSales &&
+      !customerId &&
+      !namaCustomer
+    ) {
       return NextResponse.json(
         { success: false, error: "Customer atau nama customer harus diisi" },
         { status: 400 }
       );
+    }
+
+    // Validasi sales
+    if (isPenjualanSales && salesId) {
+      const sales = await prisma.sales.findUnique({
+        where: { id: salesId },
+      });
+
+      if (!sales) {
+        return NextResponse.json(
+          { success: false, error: "Sales tidak ditemukan" },
+          { status: 404 }
+        );
+      }
     }
 
     // Cek stok sebelum checkout
@@ -281,8 +353,18 @@ export async function POST(
         });
       }
 
-      // Update piutang customer jika HUTANG
-      if (statusPembayaran === "HUTANG" && customerId) {
+      // Update hutang sales jika penjualan sales dengan HUTANG
+      if (statusPembayaran === "HUTANG" && salesId) {
+        await tx.sales.update({
+          where: { id: salesId },
+          data: {
+            hutang: { increment: BigInt(sisaHutang) },
+          },
+        });
+      }
+
+      // Update piutang customer jika penjualan toko dengan HUTANG
+      if (statusPembayaran === "HUTANG" && customerId && !salesId) {
         await tx.customer.update({
           where: { id: customerId },
           data: {
@@ -291,27 +373,51 @@ export async function POST(
         });
       }
 
+      // Prepare update data
+      const updateData: any = {
+        subtotal: BigInt(calculation.ringkasan.subtotal),
+        diskonNota: BigInt(diskonNota),
+        totalHarga: BigInt(totalHarga),
+        jumlahDibayar: BigInt(jumlahDibayar),
+        kembalian: BigInt(kembalian),
+        metodePembayaran,
+        statusPembayaran,
+        statusTransaksi: "SELESAI",
+        tanggalTransaksi: tanggalTransaksi
+          ? new Date(tanggalTransaksi)
+          : new Date(),
+        tanggalJatuhTempo: finalTanggalJatuhTempo,
+      };
+
+      // Untuk penjualan sales: set salesId, hapus customerId & namaCustomer
+      if (salesId) {
+        updateData.salesId = salesId;
+        updateData.namaSales = null;
+        updateData.customerId = null;
+        updateData.namaCustomer = null;
+      }
+      // Untuk penjualan sales manual (namaSales)
+      else if (namaSales) {
+        updateData.salesId = null;
+        updateData.namaSales = namaSales;
+        updateData.customerId = null;
+        updateData.namaCustomer = null;
+      }
+      // Untuk penjualan toko: set customerId, hapus salesId & namaSales
+      else {
+        updateData.customerId = customerId || null;
+        updateData.namaCustomer = customerId ? null : namaCustomer;
+        updateData.salesId = null;
+        updateData.namaSales = null;
+      }
+
       // Update penjualan header
       const updated = await tx.penjualanHeader.update({
         where: { id: penjualanId },
-        data: {
-          customerId: customerId || null,
-          namaCustomer: customerId ? null : namaCustomer,
-          subtotal: BigInt(calculation.ringkasan.subtotal),
-          diskonNota: BigInt(diskonNota),
-          totalHarga: BigInt(totalHarga),
-          jumlahDibayar: BigInt(jumlahDibayar),
-          kembalian: BigInt(kembalian),
-          metodePembayaran,
-          statusPembayaran,
-          statusTransaksi: "SELESAI",
-          tanggalTransaksi: tanggalTransaksi
-            ? new Date(tanggalTransaksi)
-            : new Date(),
-          tanggalJatuhTempo: finalTanggalJatuhTempo,
-        },
+        data: updateData,
         include: {
           customer: true,
+          sales: true,
           items: {
             include: { barang: true },
           },
@@ -333,6 +439,14 @@ export async function POST(
             limit_piutang: toNumber(result.customer.limit_piutang),
           }
         : { nama: result.namaCustomer, namaToko: null },
+      sales: result.sales
+        ? {
+            id: result.sales.id,
+            namaSales: result.sales.namaSales,
+          }
+        : result.namaSales
+        ? { nama: result.namaSales }
+        : null,
       items: result.items.map((item) => ({
         namaBarang: item.barang.namaBarang,
         jumlahDus: toNumber(item.jumlahDus),
@@ -352,6 +466,7 @@ export async function POST(
       sisaHutang,
       statusPembayaran: result.statusPembayaran,
       tanggalJatuhTempo: result.tanggalJatuhTempo,
+      tipePenjualan: result.salesId ? "sales" : "toko",
     };
 
     return NextResponse.json(

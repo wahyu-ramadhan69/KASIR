@@ -38,6 +38,14 @@ interface PenjualanItem {
   barang: Barang;
 }
 
+interface Sales {
+  id: number;
+  nik: string;
+  namaSales: string;
+  alamat: string;
+  noHp: string;
+}
+
 interface Customer {
   id: number;
   nama: string;
@@ -49,6 +57,7 @@ interface PenjualanHeader {
   kodePenjualan: string;
   customerId: number | null;
   namaCustomer: string | null;
+  namaSales?: string | null;
   subtotal: number;
   diskonNota: number;
   totalHarga: number;
@@ -57,6 +66,7 @@ interface PenjualanHeader {
   statusTransaksi: string;
   tanggalTransaksi: string;
   customer: Customer | null;
+  sales: Sales | null;
   items: PenjualanItem[];
 }
 
@@ -205,6 +215,12 @@ const LaporanPenjualanPage = () => {
   const handleViewDetail = (penjualan: PenjualanHeader) => {
     setSelectedPenjualan(penjualan);
     setShowDetailModal(true);
+  };
+
+  const getCustomerOrSalesName = (pj: PenjualanHeader): string => {
+    if (pj.customer) return pj.customer.nama;
+    if (pj.sales) return pj.sales.namaSales;
+    return pj.namaCustomer || pj.namaSales || "-";
   };
 
   const handleClearFilters = () => {
@@ -564,7 +580,7 @@ const LaporanPenjualanPage = () => {
                     Tanggal
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                    Customer
+                    Customer/Sales
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                     Penjualan
@@ -618,10 +634,26 @@ const LaporanPenjualanPage = () => {
                           {formatDate(pj.tanggalTransaksi)}
                         </td>
                         <td className="px-4 py-3">
+                          {/* Nama utama */}
                           <p className="text-sm font-medium text-gray-900">
-                            {pj.customer?.nama || pj.namaCustomer || "-"}
+                            {getCustomerOrSalesName(pj)}
                           </p>
+
+                          {/* Jika transaksi ke sales → badge biru “Sales” */}
+                          {pj.sales?.namaSales && (
+                            <span className="inline-flex mt-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-semibold">
+                              Sales
+                            </span>
+                          )}
+
+                          {/* Jika transaksi ke customer + punya namaToko → badge hijau nama toko */}
+                          {pj.customer?.namaToko && (
+                            <span className="inline-flex mt-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-medium">
+                              {pj.customer.namaToko}
+                            </span>
+                          )}
                         </td>
+
                         <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
                           {formatRupiah(pj.totalHarga)}
                         </td>

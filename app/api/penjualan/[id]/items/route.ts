@@ -84,6 +84,7 @@ export async function POST(
   }
   try {
     const { id } = await params;
+    console.log(id);
     const penjualanId = parseInt(id);
 
     const body = await request.json();

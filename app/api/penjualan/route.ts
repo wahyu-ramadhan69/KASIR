@@ -114,6 +114,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const pembayaran = searchParams.get("pembayaran");
     const customerId = searchParams.get("customerId");
+    const salesId = searchParams.get("salesId");
+    const tipePenjualan = searchParams.get("tipePenjualan"); // "toko" atau "sales"
     const search = searchParams.get("search");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -132,12 +134,26 @@ export async function GET(request: NextRequest) {
       where.customerId = parseInt(customerId);
     }
 
+    if (salesId) {
+      where.salesId = parseInt(salesId);
+    }
+
+    // Filter berdasarkan tipe penjualan
+    if (tipePenjualan === "toko") {
+      where.salesId = null; // Penjualan toko tidak memiliki sales sebagai customer
+    } else if (tipePenjualan === "sales") {
+      where.salesId = { not: null }; // Penjualan ke sales memiliki salesId
+      where.customerId = null; // Sales penjualan tidak punya customerId
+    }
+
     if (search) {
       where.OR = [
         { kodePenjualan: { contains: search, mode: "insensitive" } },
         { namaCustomer: { contains: search, mode: "insensitive" } },
+        { namaSales: { contains: search, mode: "insensitive" } },
         { customer: { nama: { contains: search, mode: "insensitive" } } },
         { customer: { namaToko: { contains: search, mode: "insensitive" } } },
+        { sales: { namaSales: { contains: search, mode: "insensitive" } } },
       ];
     }
 
@@ -166,6 +182,7 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         customer: true,
+        sales: true,
         items: {
           include: {
             barang: true,
@@ -218,7 +235,7 @@ export async function POST(request: NextRequest) {
   }
   try {
     const body = await request.json();
-    const { userId } = body;
+    const { userId, salesId } = body;
 
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
@@ -248,16 +265,25 @@ export async function POST(request: NextRequest) {
     const tanggalJatuhTempo = new Date();
     tanggalJatuhTempo.setDate(tanggalJatuhTempo.getDate() + 30);
 
+    // Prepare data untuk create
+    const createData: any = {
+      kodePenjualan,
+      statusTransaksi: "KERANJANG",
+      statusPembayaran: "HUTANG",
+      tanggalJatuhTempo,
+      userId,
+    };
+
+    // Tambahkan salesId jika ada
+    if (salesId) {
+      createData.salesId = salesId;
+    }
+
     const penjualan = await prisma.penjualanHeader.create({
-      data: {
-        kodePenjualan,
-        statusTransaksi: "KERANJANG",
-        statusPembayaran: "HUTANG",
-        tanggalJatuhTempo,
-        userId,
-      },
+      data: createData,
       include: {
         customer: true,
+        sales: true,
         items: true,
       },
     });

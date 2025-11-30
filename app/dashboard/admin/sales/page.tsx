@@ -1,12 +1,12 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Search,
   Users,
   RefreshCw,
   Phone,
   MapPin,
-  Store,
+  Building2,
   CreditCard,
   Plus,
   Edit,
@@ -16,42 +16,37 @@ import {
   TrendingUp,
   Loader2,
   Filter,
-  Download,
-  Upload,
   Eye,
   Calendar,
-  ChevronDown,
   AlertCircle,
   CheckCircle,
-  XCircle,
-  TrendingDown,
-  DollarSign,
   Activity,
   BarChart3,
+  TrendingDown,
+  ShoppingCart,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
-interface Customer {
+interface Sales {
   id: number;
+  namaSales: string;
   nik: string;
-  nama: string;
   alamat: string;
-  namaToko: string;
   noHp: string;
-  limit_piutang: number;
-  piutang: number;
+  limitHutang: number;
+  hutang: number;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-interface CustomerFormData {
+interface SalesFormData {
+  namaSales: string;
   nik: string;
-  nama: string;
   alamat: string;
-  namaToko: string;
   noHp: string;
-  limit_piutang: string;
-  piutang: string;
+  limitHutang: string;
+  hutang: string;
 }
 
 interface PaginationInfo {
@@ -62,25 +57,19 @@ interface PaginationInfo {
   hasMore: boolean;
 }
 
-const DataCustomerPage = () => {
-  const [customerList, setCustomerList] = useState<Customer[]>([]);
+const DataSalesPage = () => {
+  const [salesList, setSalesList] = useState<Sales[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
-  );
+  const [selectedSales, setSelectedSales] = useState<Sales | null>(null);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filterStatus, setFilterStatus] = useState<
     "all" | "high" | "medium" | "low"
   >("all");
-  const [sortBy, setSortBy] = useState<"name" | "piutang" | "limit" | "date">(
-    "name"
-  );
   const [pagination, setPagination] = useState<PaginationInfo>({
     currentPage: 1,
     totalPages: 1,
@@ -88,18 +77,17 @@ const DataCustomerPage = () => {
     limit: 12,
     hasMore: false,
   });
-  const [editingCustomer, setEditingCustomer] = useState<{
+  const [editingSales, setEditingSales] = useState<{
     id: number;
-    data: CustomerFormData;
+    data: SalesFormData;
   } | null>(null);
-  const [formData, setFormData] = useState<CustomerFormData>({
+  const [formData, setFormData] = useState<SalesFormData>({
+    namaSales: "",
     nik: "",
-    nama: "",
     alamat: "",
-    namaToko: "",
     noHp: "",
-    limit_piutang: "",
-    piutang: "",
+    limitHutang: "",
+    hutang: "",
   });
 
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -113,12 +101,12 @@ const DataCustomerPage = () => {
   }, [searchTerm]);
 
   useEffect(() => {
-    setCustomerList([]);
+    setSalesList([]);
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
-    fetchCustomer(1, true);
+    fetchSales(1, true);
   }, [debouncedSearchTerm]);
 
-  const fetchCustomer = async (page: number = 1, reset: boolean = false) => {
+  const fetchSales = async (page: number = 1, reset: boolean = false) => {
     if (reset) {
       setLoading(true);
     } else {
@@ -129,11 +117,11 @@ const DataCustomerPage = () => {
       let url: string;
 
       if (debouncedSearchTerm.trim()) {
-        url = `/api/customer/search/${encodeURIComponent(
+        url = `/api/sales/search/${encodeURIComponent(
           debouncedSearchTerm
         )}?page=${page}&limit=12`;
       } else {
-        url = `/api/customer?page=${page}&limit=12`;
+        url = `/api/sales?page=${page}&limit=12`;
       }
 
       const res = await fetch(url);
@@ -141,17 +129,17 @@ const DataCustomerPage = () => {
 
       if (data.success) {
         if (reset) {
-          setCustomerList(data.data);
+          setSalesList(data.data);
         } else {
-          setCustomerList((prev) => [...prev, ...data.data]);
+          setSalesList((prev) => [...prev, ...data.data]);
         }
         setPagination(data.pagination);
       } else {
         console.error("Failed to fetch data");
       }
     } catch (error) {
-      console.error("Error fetching customer:", error);
-      toast.error("Gagal mengambil data customer");
+      console.error("Error fetching sales:", error);
+      toast.error("Gagal mengambil data sales");
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -167,7 +155,7 @@ const DataCustomerPage = () => {
           !loading &&
           !loadingMore
         ) {
-          fetchCustomer(pagination.currentPage + 1, false);
+          fetchSales(pagination.currentPage + 1, false);
         }
       },
       { threshold: 0.1 }
@@ -217,7 +205,7 @@ const DataCustomerPage = () => {
   ) => {
     const { name, value } = e.target;
 
-    if (name === "limit_piutang" || name === "piutang") {
+    if (name === "limitHutang" || name === "hutang") {
       setFormData((prev) => ({
         ...prev,
         [name]: parseRupiahInput(value),
@@ -234,20 +222,20 @@ const DataCustomerPage = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    if (editingCustomer) {
-      if (name === "limit_piutang" || name === "piutang") {
-        setEditingCustomer({
-          ...editingCustomer,
+    if (editingSales) {
+      if (name === "limitHutang" || name === "hutang") {
+        setEditingSales({
+          ...editingSales,
           data: {
-            ...editingCustomer.data,
+            ...editingSales.data,
             [name]: parseRupiahInput(value),
           },
         });
       } else {
-        setEditingCustomer({
-          ...editingCustomer,
+        setEditingSales({
+          ...editingSales,
           data: {
-            ...editingCustomer.data,
+            ...editingSales.data,
             [name]: value,
           },
         });
@@ -262,11 +250,11 @@ const DataCustomerPage = () => {
     try {
       const submitData = {
         ...formData,
-        limit_piutang: formData.limit_piutang || "0",
-        piutang: formData.piutang || "0",
+        limitHutang: formData.limitHutang || "0",
+        hutang: formData.hutang || "0",
       };
 
-      const res = await fetch("/api/customer", {
+      const res = await fetch("/api/sales", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -277,42 +265,40 @@ const DataCustomerPage = () => {
       const data = await res.json();
 
       if (data.success) {
-        toast.success("Customer berhasil ditambahkan!");
+        toast.success("Sales berhasil ditambahkan!");
         setShowAddModal(false);
         setFormData({
+          namaSales: "",
           nik: "",
-          nama: "",
           alamat: "",
-          namaToko: "",
           noHp: "",
-          limit_piutang: "",
-          piutang: "",
+          limitHutang: "",
+          hutang: "",
         });
-        setCustomerList([]);
+        setSalesList([]);
         setPagination((prev) => ({ ...prev, currentPage: 1 }));
-        fetchCustomer(1, true);
+        fetchSales(1, true);
       } else {
-        toast.error(data.error || "Gagal menambahkan customer");
+        toast.error(data.error || "Gagal menambahkan sales");
       }
     } catch (error) {
-      console.error("Error adding customer:", error);
-      toast.error("Terjadi kesalahan saat menambahkan customer");
+      console.error("Error adding sales:", error);
+      toast.error("Terjadi kesalahan saat menambahkan sales");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEdit = (customer: Customer) => {
-    setEditingCustomer({
-      id: customer.id,
+  const handleEdit = (sales: Sales) => {
+    setEditingSales({
+      id: sales.id,
       data: {
-        nik: customer.nik,
-        nama: customer.nama,
-        alamat: customer.alamat,
-        namaToko: customer.namaToko,
-        noHp: customer.noHp,
-        limit_piutang: customer.limit_piutang.toString(),
-        piutang: customer.piutang.toString(),
+        namaSales: sales.namaSales,
+        nik: sales.nik,
+        alamat: sales.alamat,
+        noHp: sales.noHp,
+        limitHutang: sales.limitHutang.toString(),
+        hutang: sales.hutang.toString(),
       },
     });
     setShowEditModal(true);
@@ -320,18 +306,18 @@ const DataCustomerPage = () => {
 
   const handleSubmitEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!editingCustomer) return;
+    if (!editingSales) return;
 
     setIsSubmitting(true);
 
     try {
       const submitData = {
-        ...editingCustomer.data,
-        limit_piutang: editingCustomer.data.limit_piutang || "0",
-        piutang: editingCustomer.data.piutang || "0",
+        ...editingSales.data,
+        limitHutang: editingSales.data.limitHutang || "0",
+        hutang: editingSales.data.hutang || "0",
       };
 
-      const res = await fetch(`/api/customer/${editingCustomer.id}`, {
+      const res = await fetch(`/api/sales/${editingSales.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -342,57 +328,57 @@ const DataCustomerPage = () => {
       const data = await res.json();
 
       if (data.success) {
-        toast.success("Customer berhasil diupdate!");
+        toast.success("Sales berhasil diupdate!");
         setShowEditModal(false);
-        setEditingCustomer(null);
-        setCustomerList((prev) =>
-          prev.map((c) => (c.id === data.data.id ? data.data : c))
+        setEditingSales(null);
+        setSalesList((prev) =>
+          prev.map((s) => (s.id === data.data.id ? data.data : s))
         );
       } else {
-        toast.error(data.error || "Gagal mengupdate customer");
+        toast.error(data.error || "Gagal mengupdate sales");
       }
     } catch (error) {
-      console.error("Error updating customer:", error);
-      toast.error("Terjadi kesalahan saat mengupdate customer");
+      console.error("Error updating sales:", error);
+      toast.error("Terjadi kesalahan saat mengupdate sales");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: number, nama: string) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus customer "${nama}"?`)) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus sales "${nama}"?`)) {
       return;
     }
 
     try {
-      const res = await fetch(`/api/customer/${id}`, {
+      const res = await fetch(`/api/sales/${id}`, {
         method: "DELETE",
       });
 
       const data = await res.json();
 
       if (data.success) {
-        toast.success("Customer berhasil dihapus!");
-        setCustomerList((prev) => prev.filter((c) => c.id !== id));
+        toast.success("Sales berhasil dihapus!");
+        setSalesList((prev) => prev.filter((s) => s.id !== id));
         setPagination((prev) => ({
           ...prev,
           totalCount: prev.totalCount - 1,
         }));
       } else {
-        toast.error(data.error || "Gagal menghapus customer");
+        toast.error(data.error || "Gagal menghapus sales");
       }
     } catch (error) {
-      console.error("Error deleting customer:", error);
-      toast.error("Terjadi kesalahan saat menghapus customer");
+      console.error("Error deleting sales:", error);
+      toast.error("Terjadi kesalahan saat menghapus sales");
     }
   };
 
   const handleRefresh = () => {
     setSearchTerm("");
     setDebouncedSearchTerm("");
-    setCustomerList([]);
+    setSalesList([]);
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
-    fetchCustomer(1, true);
+    fetchSales(1, true);
   };
 
   const formatPhoneNumber = (phone: string): string => {
@@ -412,65 +398,40 @@ const DataCustomerPage = () => {
     }).format(date);
   };
 
-  const getPiutangPercentage = (piutang: number, limit: number): number => {
+  const getHutangPercentage = (hutang: number, limit: number): number => {
     if (limit === 0) return 0;
-    return Math.min((piutang / limit) * 100, 100);
+    return Math.min((hutang / limit) * 100, 100);
   };
 
-  const getPiutangColor = (piutang: number, limit: number): string => {
-    const percentage = getPiutangPercentage(piutang, limit);
+  const getHutangColor = (hutang: number, limit: number): string => {
+    const percentage = getHutangPercentage(hutang, limit);
     if (percentage >= 90) return "bg-red-500";
     if (percentage >= 70) return "bg-yellow-500";
     return "bg-green-500";
   };
 
-  const getPiutangStatus = (
-    piutang: number,
+  const getHutangStatus = (
+    hutang: number,
     limit: number
-  ): { icon: React.ReactNode; color: string; label: string } => {
-    const percentage = getPiutangPercentage(piutang, limit);
-    if (percentage >= 90)
-      return {
-        icon: <AlertCircle className="w-4 h-4" />,
-        color: "text-red-600",
-        label: "Kritis",
-      };
+  ): { color: string; label: string } => {
+    const percentage = getHutangPercentage(hutang, limit);
+    if (percentage >= 90) return { color: "text-red-600", label: "Kritis" };
     if (percentage >= 70)
-      return {
-        icon: <AlertCircle className="w-4 h-4" />,
-        color: "text-yellow-600",
-        label: "Peringatan",
-      };
-    return {
-      icon: <CheckCircle className="w-4 h-4" />,
-      color: "text-green-600",
-      label: "Aman",
-    };
+      return { color: "text-yellow-600", label: "Peringatan" };
+    return { color: "text-green-600", label: "Aman" };
   };
 
-  const getTotalPiutang = (): number => {
-    return customerList.reduce((sum, customer) => sum + customer.piutang, 0);
+  const getTotalHutang = (): number => {
+    return salesList.reduce((sum, sales) => sum + sales.hutang, 0);
   };
 
-  const getTotalLimitPiutang = (): number => {
-    return customerList.reduce(
-      (sum, customer) => sum + customer.limit_piutang,
-      0
-    );
+  const getTotalLimitHutang = (): number => {
+    return salesList.reduce((sum, sales) => sum + sales.limitHutang, 0);
   };
 
-  const getHighRiskCustomers = (): number => {
-    return customerList.filter(
-      (c) => getPiutangPercentage(c.piutang, c.limit_piutang) >= 90
-    ).length;
-  };
-
-  const filteredCustomers = customerList.filter((customer) => {
+  const filteredSales = salesList.filter((sales) => {
     if (filterStatus === "all") return true;
-    const percentage = getPiutangPercentage(
-      customer.piutang,
-      customer.limit_piutang
-    );
+    const percentage = getHutangPercentage(sales.hutang, sales.limitHutang);
     if (filterStatus === "high") return percentage >= 90;
     if (filterStatus === "medium") return percentage >= 70 && percentage < 90;
     if (filterStatus === "low") return percentage < 70;
@@ -498,14 +459,14 @@ const DataCustomerPage = () => {
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
-                <Users className="w-10 h-10 text-white" />
+                <ShoppingCart className="w-10 h-10 text-white" />
               </div>
               <div>
                 <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
-                  Data Customer
+                  Data Sales
                 </h1>
                 <p className="text-blue-100 text-lg">
-                  Kelola informasi pelanggan dan toko Anda
+                  Kelola informasi sales dan supplier Anda
                 </p>
               </div>
             </div>
@@ -515,7 +476,7 @@ const DataCustomerPage = () => {
                 className="group bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
               >
                 <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                Tambah Customer
+                Tambah Sales
               </button>
               <button
                 onClick={handleRefresh}
@@ -537,17 +498,15 @@ const DataCustomerPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Total Customer
+                  Total Sales
                 </p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">
                   {pagination.totalCount}
                 </p>
-                <p className="text-xs text-gray-400 mt-2">
-                  Pelanggan terdaftar
-                </p>
+                <p className="text-xs text-gray-400 mt-2">Sales terdaftar</p>
               </div>
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Users className="w-8 h-8 text-white" />
+                <ShoppingCart className="w-8 h-8 text-white" />
               </div>
             </div>
           </div>
@@ -556,15 +515,15 @@ const DataCustomerPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Total Toko
+                  Total Supplier
                 </p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">
                   {pagination.totalCount}
                 </p>
-                <p className="text-xs text-gray-400 mt-2">Toko aktif</p>
+                <p className="text-xs text-gray-400 mt-2">Supplier aktif</p>
               </div>
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Store className="w-8 h-8 text-white" />
+              <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <Building2 className="w-8 h-8 text-white" />
               </div>
             </div>
           </div>
@@ -573,18 +532,18 @@ const DataCustomerPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Total Piutang
+                  Total Hutang
                 </p>
                 <p
                   className="text-2xl font-bold text-red-600 mt-2 cursor-help"
-                  title={formatRupiah(getTotalPiutang())}
+                  title={formatRupiah(getTotalHutang())}
                 >
-                  {formatRupiahSimple(getTotalPiutang())}
+                  {formatRupiahSimple(getTotalHutang())}
                 </p>
-                <p className="text-xs text-red-400 mt-2">Piutang aktif</p>
+                <p className="text-xs text-red-400 mt-2">Hutang aktif</p>
               </div>
               <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Wallet className="w-8 h-8 text-white" />
+                <TrendingDown className="w-8 h-8 text-white" />
               </div>
             </div>
           </div>
@@ -593,13 +552,13 @@ const DataCustomerPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Limit Piutang
+                  Limit Hutang
                 </p>
                 <p
                   className="text-2xl font-bold text-green-600 mt-2 cursor-help"
-                  title={formatRupiah(getTotalLimitPiutang())}
+                  title={formatRupiah(getTotalLimitHutang())}
                 >
-                  {formatRupiahSimple(getTotalLimitPiutang())}
+                  {formatRupiahSimple(getTotalLimitHutang())}
                 </p>
                 <p className="text-xs text-green-400 mt-2">
                   Total limit tersedia
@@ -619,7 +578,7 @@ const DataCustomerPage = () => {
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Cari nama customer, NIK, nama toko, alamat, atau nomor HP..."
+                placeholder="Cari nama supplier, NIK, alamat, atau nomor HP..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
@@ -668,41 +627,38 @@ const DataCustomerPage = () => {
           )}
         </div>
 
-        {/* Customer Cards Grid - 4 columns */}
+        {/* Sales Cards Grid */}
         {loading ? (
           <div className="flex justify-center items-center py-32">
             <div className="text-center">
               <div className="relative">
                 <div className="w-24 h-24 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-                <Users className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                <ShoppingCart className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
               </div>
               <p className="text-gray-500 mt-6 text-lg font-medium">
-                Memuat data customer...
+                Memuat data sales...
               </p>
             </div>
           </div>
-        ) : filteredCustomers.length === 0 ? (
+        ) : filteredSales.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-16 text-center">
             <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Users className="w-12 h-12 text-gray-400" />
+              <ShoppingCart className="w-12 h-12 text-gray-400" />
             </div>
             <p className="text-gray-500 text-lg font-medium">
               {debouncedSearchTerm
-                ? `Tidak ada customer ditemukan untuk "${debouncedSearchTerm}"`
-                : "Tidak ada data customer"}
+                ? `Tidak ada sales ditemukan untuk "${debouncedSearchTerm}"`
+                : "Tidak ada data sales"}
             </p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {filteredCustomers.map((customer) => {
-                const status = getPiutangStatus(
-                  customer.piutang,
-                  customer.limit_piutang
-                );
+              {filteredSales.map((sales) => {
+                const status = getHutangStatus(sales.hutang, sales.limitHutang);
                 return (
                   <div
-                    key={customer.id}
+                    key={sales.id}
                     className="group bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
                   >
                     {/* Card Header */}
@@ -711,10 +667,10 @@ const DataCustomerPage = () => {
                       <div className="relative z-10">
                         <div className="flex items-start justify-between mb-2">
                           <h3 className="text-base font-bold text-white pr-2 line-clamp-1">
-                            {customer.nama}
+                            {sales.namaSales}
                           </h3>
                           <div
-                            className={`px-2 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1 flex-shrink-0 ${
+                            className={`px-2 py-1 rounded-full text-[10px] font-semibold flex-shrink-0 ${
                               status.color === "text-red-600"
                                 ? "bg-red-100 text-red-700"
                                 : status.color === "text-yellow-600"
@@ -722,14 +678,12 @@ const DataCustomerPage = () => {
                                 : "bg-green-100 text-green-700"
                             }`}
                           >
-                            <span className="w-3 h-3">{status.icon}</span>
+                            {status.label}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 text-blue-100 text-xs">
-                          <Store className="w-3 h-3 flex-shrink-0" />
-                          <span className="truncate font-medium">
-                            {customer.namaToko}
-                          </span>
+                          <Building2 className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate font-medium">Supplier</span>
                         </div>
                       </div>
                     </div>
@@ -747,27 +701,27 @@ const DataCustomerPage = () => {
                           </span>
                         </div>
                         <p className="text-xs text-gray-900 font-mono font-semibold pl-7">
-                          {formatNIK(customer.nik)}
+                          {formatNIK(sales.nik)}
                         </p>
                       </div>
 
-                      {/* Piutang Info */}
+                      {/* Hutang Info */}
                       <div className="mb-3 pb-3 border-b border-gray-200">
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-1.5">
                               <div className="bg-red-100 p-1.5 rounded-lg">
-                                <Wallet className="w-3 h-3 text-red-600" />
+                                <TrendingDown className="w-3 h-3 text-red-600" />
                               </div>
                               <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                                Piutang
+                                Hutang
                               </span>
                             </div>
                             <span
                               className="text-xs font-bold text-red-600 cursor-help"
-                              title={formatRupiah(customer.piutang)}
+                              title={formatRupiah(sales.hutang)}
                             >
-                              {formatRupiahSimple(customer.piutang)}
+                              {formatRupiahSimple(sales.hutang)}
                             </span>
                           </div>
 
@@ -782,9 +736,9 @@ const DataCustomerPage = () => {
                             </div>
                             <span
                               className="text-xs font-bold text-green-600 cursor-help"
-                              title={formatRupiah(customer.limit_piutang)}
+                              title={formatRupiah(sales.limitHutang)}
                             >
-                              {formatRupiahSimple(customer.limit_piutang)}
+                              {formatRupiahSimple(sales.limitHutang)}
                             </span>
                           </div>
                         </div>
@@ -794,23 +748,23 @@ const DataCustomerPage = () => {
                           <div className="flex justify-between text-[10px] text-gray-600 mb-1 font-semibold">
                             <span>Penggunaan</span>
                             <span className={status.color}>
-                              {getPiutangPercentage(
-                                customer.piutang,
-                                customer.limit_piutang
+                              {getHutangPercentage(
+                                sales.hutang,
+                                sales.limitHutang
                               ).toFixed(1)}
                               %
                             </span>
                           </div>
                           <div className="relative w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                             <div
-                              className={`h-2 rounded-full transition-all duration-500 ${getPiutangColor(
-                                customer.piutang,
-                                customer.limit_piutang
+                              className={`h-2 rounded-full transition-all duration-500 ${getHutangColor(
+                                sales.hutang,
+                                sales.limitHutang
                               )} relative overflow-hidden`}
                               style={{
-                                width: `${getPiutangPercentage(
-                                  customer.piutang,
-                                  customer.limit_piutang
+                                width: `${getHutangPercentage(
+                                  sales.hutang,
+                                  sales.limitHutang
                                 )}%`,
                               }}
                             >
@@ -827,7 +781,7 @@ const DataCustomerPage = () => {
                             <MapPin className="w-3 h-3 text-gray-600 group-hover/item:text-blue-600 transition-colors" />
                           </div>
                           <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
-                            {customer.alamat}
+                            {sales.alamat}
                           </p>
                         </div>
 
@@ -836,7 +790,7 @@ const DataCustomerPage = () => {
                             <Phone className="w-3 h-3 text-gray-600 group-hover/item:text-blue-600 transition-colors" />
                           </div>
                           <p className="text-xs text-gray-700 font-semibold">
-                            {formatPhoneNumber(customer.noHp)}
+                            {formatPhoneNumber(sales.noHp)}
                           </p>
                         </div>
                       </div>
@@ -849,7 +803,7 @@ const DataCustomerPage = () => {
                             <span>Terdaftar</span>
                           </div>
                           <span className="font-semibold text-gray-700">
-                            {formatDate(customer.createdAt)}
+                            {formatDate(sales.createdAt)}
                           </span>
                         </div>
                       </div>
@@ -857,7 +811,7 @@ const DataCustomerPage = () => {
                       {/* Action Buttons */}
                       <div className="grid grid-cols-2 gap-2">
                         <button
-                          onClick={() => handleEdit(customer)}
+                          onClick={() => handleEdit(sales)}
                           className="group/btn bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-2 py-2 rounded-lg transition-all font-semibold text-xs flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
                         >
                           <Edit className="w-3 h-3 group-hover/btn:rotate-12 transition-transform" />
@@ -865,7 +819,7 @@ const DataCustomerPage = () => {
                         </button>
                         <button
                           onClick={() =>
-                            handleDelete(customer.id, customer.nama)
+                            handleDelete(sales.id, sales.namaSales)
                           }
                           className="group/btn bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-2 py-2 rounded-lg transition-all font-semibold text-xs flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
                         >
@@ -875,7 +829,7 @@ const DataCustomerPage = () => {
                       </div>
 
                       <button
-                        onClick={() => setSelectedCustomer(customer)}
+                        onClick={() => setSelectedSales(sales)}
                         className="w-full mt-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-3 py-2 rounded-lg transition-all font-semibold text-xs shadow-md hover:shadow-lg flex items-center justify-center gap-1"
                       >
                         <Eye className="w-3 h-3" />
@@ -901,7 +855,7 @@ const DataCustomerPage = () => {
                   </div>
                 </div>
               )}
-              {!pagination.hasMore && customerList.length > 0 && (
+              {!pagination.hasMore && salesList.length > 0 && (
                 <div className="text-center py-12">
                   <div className="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 rounded-full">
                     <CheckCircle className="w-5 h-5 text-green-600" />
@@ -922,13 +876,13 @@ const DataCustomerPage = () => {
             <span className="text-sm text-gray-600">
               Menampilkan{" "}
               <span className="font-bold text-gray-900">
-                {filteredCustomers.length}
+                {filteredSales.length}
               </span>{" "}
               dari{" "}
               <span className="font-bold text-gray-900">
                 {pagination.totalCount}
               </span>{" "}
-              customer
+              sales
               {debouncedSearchTerm && (
                 <span className="text-blue-600 font-semibold">
                   {" "}
@@ -940,10 +894,10 @@ const DataCustomerPage = () => {
         </div>
 
         {/* Detail Modal */}
-        {selectedCustomer && (
+        {selectedSales && (
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
-            onClick={() => setSelectedCustomer(null)}
+            onClick={() => setSelectedSales(null)}
           >
             <div
               className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200"
@@ -956,11 +910,11 @@ const DataCustomerPage = () => {
                       <Eye className="w-8 h-8 text-white" />
                     </div>
                     <h2 className="text-3xl font-bold text-white">
-                      Detail Customer
+                      Detail Sales
                     </h2>
                   </div>
                   <button
-                    onClick={() => setSelectedCustomer(null)}
+                    onClick={() => setSelectedSales(null)}
                     className="text-white hover:bg-white/20 p-3 rounded-xl transition-all"
                   >
                     <X className="w-6 h-6" />
@@ -972,20 +926,27 @@ const DataCustomerPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5">
                     <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-2">
-                      Nama Customer
+                      Nama Supplier
                     </p>
                     <p className="text-gray-900 text-xl font-bold">
-                      {selectedCustomer.nama}
+                      {selectedSales.namaSales}
                     </p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5">
-                    <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-2">
-                      Nama Toko
+                  <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-5">
+                    <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider mb-2">
+                      Status
                     </p>
-                    <p className="text-gray-900 text-xl font-bold">
-                      {selectedCustomer.namaToko}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-3 h-3 rounded-full ${
+                          selectedSales.isActive ? "bg-green-500" : "bg-red-500"
+                        }`}
+                      ></div>
+                      <p className="text-gray-900 text-xl font-bold">
+                        {selectedSales.isActive ? "Aktif" : "Tidak Aktif"}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -999,7 +960,7 @@ const DataCustomerPage = () => {
                     </p>
                   </div>
                   <p className="text-gray-900 font-mono font-bold text-lg pl-11">
-                    {formatNIK(selectedCustomer.nik)}
+                    {formatNIK(selectedSales.nik)}
                   </p>
                 </div>
 
@@ -1013,7 +974,7 @@ const DataCustomerPage = () => {
                     </p>
                   </div>
                   <p className="text-gray-900 leading-relaxed pl-11">
-                    {selectedCustomer.alamat}
+                    {selectedSales.alamat}
                   </p>
                 </div>
 
@@ -1027,33 +988,34 @@ const DataCustomerPage = () => {
                     </p>
                   </div>
                   <p className="text-gray-900 font-semibold text-lg pl-11">
-                    {formatPhoneNumber(selectedCustomer.noHp)}
+                    {formatPhoneNumber(selectedSales.noHp)}
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 rounded-2xl p-6 border-2 border-blue-200">
+                {/* Hutang Section */}
+                <div className="bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 rounded-2xl p-6 border-2 border-blue-200">
                   <div className="flex items-center gap-3 mb-5">
                     <div className="bg-blue-600 p-3 rounded-xl">
                       <BarChart3 className="w-6 h-6 text-white" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-800">
-                      Informasi Piutang
+                      Informasi Hutang
                     </h3>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-5">
                     <div className="bg-white rounded-xl p-4 shadow-md">
                       <div className="flex items-center gap-2 mb-2">
-                        <Wallet className="w-4 h-4 text-red-600" />
+                        <TrendingDown className="w-4 h-4 text-red-600" />
                         <p className="text-xs text-gray-500 font-semibold uppercase">
-                          Piutang
+                          Hutang
                         </p>
                       </div>
                       <p className="text-2xl font-bold text-red-600">
-                        {formatRupiah(selectedCustomer.piutang)}
+                        {formatRupiah(selectedSales.hutang)}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {formatRupiahSimple(selectedCustomer.piutang)}
+                        {formatRupiahSimple(selectedSales.hutang)}
                       </p>
                     </div>
 
@@ -1065,10 +1027,10 @@ const DataCustomerPage = () => {
                         </p>
                       </div>
                       <p className="text-2xl font-bold text-green-600">
-                        {formatRupiah(selectedCustomer.limit_piutang)}
+                        {formatRupiah(selectedSales.limitHutang)}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {formatRupiahSimple(selectedCustomer.limit_piutang)}
+                        {formatRupiahSimple(selectedSales.limitHutang)}
                       </p>
                     </div>
                   </div>
@@ -1080,29 +1042,29 @@ const DataCustomerPage = () => {
                       </span>
                       <span
                         className={`text-lg font-bold ${
-                          getPiutangStatus(
-                            selectedCustomer.piutang,
-                            selectedCustomer.limit_piutang
+                          getHutangStatus(
+                            selectedSales.hutang,
+                            selectedSales.limitHutang
                           ).color
                         }`}
                       >
-                        {getPiutangPercentage(
-                          selectedCustomer.piutang,
-                          selectedCustomer.limit_piutang
+                        {getHutangPercentage(
+                          selectedSales.hutang,
+                          selectedSales.limitHutang
                         ).toFixed(1)}
                         %
                       </span>
                     </div>
                     <div className="relative w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                       <div
-                        className={`h-4 rounded-full transition-all duration-500 ${getPiutangColor(
-                          selectedCustomer.piutang,
-                          selectedCustomer.limit_piutang
+                        className={`h-4 rounded-full transition-all duration-500 ${getHutangColor(
+                          selectedSales.hutang,
+                          selectedSales.limitHutang
                         )} relative overflow-hidden`}
                         style={{
-                          width: `${getPiutangPercentage(
-                            selectedCustomer.piutang,
-                            selectedCustomer.limit_piutang
+                          width: `${getHutangPercentage(
+                            selectedSales.hutang,
+                            selectedSales.limitHutang
                           )}%`,
                         }}
                       >
@@ -1113,8 +1075,7 @@ const DataCustomerPage = () => {
                       <span className="text-sm text-gray-600">Sisa Limit:</span>
                       <span className="text-lg font-bold text-blue-600">
                         {formatRupiah(
-                          selectedCustomer.limit_piutang -
-                            selectedCustomer.piutang
+                          selectedSales.limitHutang - selectedSales.hutang
                         )}
                       </span>
                     </div>
@@ -1130,7 +1091,7 @@ const DataCustomerPage = () => {
                       </p>
                     </div>
                     <p className="text-gray-900 font-semibold">
-                      {formatDate(selectedCustomer.createdAt)}
+                      {formatDate(selectedSales.createdAt)}
                     </p>
                   </div>
 
@@ -1142,13 +1103,13 @@ const DataCustomerPage = () => {
                       </p>
                     </div>
                     <p className="text-gray-900 font-semibold">
-                      {formatDate(selectedCustomer.updatedAt)}
+                      {formatDate(selectedSales.updatedAt)}
                     </p>
                   </div>
                 </div>
 
                 <button
-                  onClick={() => setSelectedCustomer(null)}
+                  onClick={() => setSelectedSales(null)}
                   className="w-full mt-4 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-6 py-4 rounded-xl transition-all font-bold text-base shadow-lg hover:shadow-xl"
                 >
                   Tutup
@@ -1158,7 +1119,7 @@ const DataCustomerPage = () => {
           </div>
         )}
 
-        {/* Add Customer Modal */}
+        {/* Add Sales Modal */}
         {showAddModal && (
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
@@ -1175,7 +1136,7 @@ const DataCustomerPage = () => {
                       <Plus className="w-8 h-8 text-white" />
                     </div>
                     <h2 className="text-3xl font-bold text-white">
-                      Tambah Customer Baru
+                      Tambah Sales Baru
                     </h2>
                   </div>
                   <button
@@ -1206,38 +1167,20 @@ const DataCustomerPage = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Users className="w-4 h-4 text-blue-600" />
-                        Nama Customer <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="nama"
-                        value={formData.nama}
-                        onChange={handleInputChange}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Masukkan nama lengkap"
-                        required
-                      />
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Store className="w-4 h-4 text-blue-600" />
-                        Nama Toko <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="namaToko"
-                        value={formData.namaToko}
-                        onChange={handleInputChange}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Masukkan nama toko"
-                        required
-                      />
-                    </div>
+                  <div className="group">
+                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                      <Building2 className="w-4 h-4 text-blue-600" />
+                      Nama Supplier <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="namaSales"
+                      value={formData.namaSales}
+                      onChange={handleInputChange}
+                      className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
+                      placeholder="Masukkan nama supplier"
+                      required
+                    />
                   </div>
 
                   <div className="group">
@@ -1276,7 +1219,7 @@ const DataCustomerPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <TrendingUp className="w-4 h-4 text-green-600" />
-                        Limit Piutang
+                        Limit Hutang
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
@@ -1284,10 +1227,10 @@ const DataCustomerPage = () => {
                         </span>
                         <input
                           type="text"
-                          name="limit_piutang"
+                          name="limitHutang"
                           value={
-                            formData.limit_piutang
-                              ? parseInt(formData.limit_piutang).toLocaleString(
+                            formData.limitHutang
+                              ? parseInt(formData.limitHutang).toLocaleString(
                                   "id-ID"
                                 )
                               : ""
@@ -1301,8 +1244,8 @@ const DataCustomerPage = () => {
 
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Wallet className="w-4 h-4 text-red-600" />
-                        Piutang Awal
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                        Hutang Awal
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
@@ -1310,10 +1253,10 @@ const DataCustomerPage = () => {
                         </span>
                         <input
                           type="text"
-                          name="piutang"
+                          name="hutang"
                           value={
-                            formData.piutang
-                              ? parseInt(formData.piutang).toLocaleString(
+                            formData.hutang
+                              ? parseInt(formData.hutang).toLocaleString(
                                   "id-ID"
                                 )
                               : ""
@@ -1348,7 +1291,7 @@ const DataCustomerPage = () => {
                     ) : (
                       <>
                         <CheckCircle className="w-5 h-5" />
-                        Simpan Customer
+                        Simpan Sales
                       </>
                     )}
                   </button>
@@ -1358,8 +1301,8 @@ const DataCustomerPage = () => {
           </div>
         )}
 
-        {/* Edit Customer Modal */}
-        {showEditModal && editingCustomer && (
+        {/* Edit Sales Modal */}
+        {showEditModal && editingSales && (
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
             onClick={() => setShowEditModal(false)}
@@ -1375,7 +1318,7 @@ const DataCustomerPage = () => {
                       <Edit className="w-8 h-8 text-white" />
                     </div>
                     <h2 className="text-3xl font-bold text-white">
-                      Edit Customer
+                      Edit Sales
                     </h2>
                   </div>
                   <button
@@ -1397,7 +1340,7 @@ const DataCustomerPage = () => {
                     <input
                       type="text"
                       name="nik"
-                      value={editingCustomer.data.nik}
+                      value={editingSales.data.nik}
                       onChange={handleEditInputChange}
                       className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
                       placeholder="Masukkan NIK (16 digit)"
@@ -1406,38 +1349,20 @@ const DataCustomerPage = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Users className="w-4 h-4 text-yellow-600" />
-                        Nama Customer <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="nama"
-                        value={editingCustomer.data.nama}
-                        onChange={handleEditInputChange}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Masukkan nama lengkap"
-                        required
-                      />
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Store className="w-4 h-4 text-yellow-600" />
-                        Nama Toko <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="namaToko"
-                        value={editingCustomer.data.namaToko}
-                        onChange={handleEditInputChange}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Masukkan nama toko"
-                        required
-                      />
-                    </div>
+                  <div className="group">
+                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                      <Building2 className="w-4 h-4 text-yellow-600" />
+                      Nama Supplier <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="namaSales"
+                      value={editingSales.data.namaSales}
+                      onChange={handleEditInputChange}
+                      className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
+                      placeholder="Masukkan nama supplier"
+                      required
+                    />
                   </div>
 
                   <div className="group">
@@ -1447,7 +1372,7 @@ const DataCustomerPage = () => {
                     </label>
                     <textarea
                       name="alamat"
-                      value={editingCustomer.data.alamat}
+                      value={editingSales.data.alamat}
                       onChange={handleEditInputChange}
                       rows={3}
                       className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none resize-none transition-all group-hover:border-gray-300"
@@ -1464,7 +1389,7 @@ const DataCustomerPage = () => {
                     <input
                       type="text"
                       name="noHp"
-                      value={editingCustomer.data.noHp}
+                      value={editingSales.data.noHp}
                       onChange={handleEditInputChange}
                       className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
                       placeholder="Contoh: 081234567890"
@@ -1476,7 +1401,7 @@ const DataCustomerPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <TrendingUp className="w-4 h-4 text-green-600" />
-                        Limit Piutang
+                        Limit Hutang
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
@@ -1484,11 +1409,11 @@ const DataCustomerPage = () => {
                         </span>
                         <input
                           type="text"
-                          name="limit_piutang"
+                          name="limitHutang"
                           value={
-                            editingCustomer.data.limit_piutang
+                            editingSales.data.limitHutang
                               ? parseInt(
-                                  editingCustomer.data.limit_piutang
+                                  editingSales.data.limitHutang
                                 ).toLocaleString("id-ID")
                               : ""
                           }
@@ -1501,8 +1426,8 @@ const DataCustomerPage = () => {
 
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Wallet className="w-4 h-4 text-red-600" />
-                        Piutang
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                        Hutang
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
@@ -1510,11 +1435,11 @@ const DataCustomerPage = () => {
                         </span>
                         <input
                           type="text"
-                          name="piutang"
+                          name="hutang"
                           value={
-                            editingCustomer.data.piutang
+                            editingSales.data.hutang
                               ? parseInt(
-                                  editingCustomer.data.piutang
+                                  editingSales.data.hutang
                                 ).toLocaleString("id-ID")
                               : ""
                           }
@@ -1548,7 +1473,7 @@ const DataCustomerPage = () => {
                     ) : (
                       <>
                         <CheckCircle className="w-5 h-5" />
-                        Update Customer
+                        Update Sales
                       </>
                     )}
                   </button>
@@ -1562,4 +1487,4 @@ const DataCustomerPage = () => {
   );
 };
 
-export default DataCustomerPage;
+export default DataSalesPage;

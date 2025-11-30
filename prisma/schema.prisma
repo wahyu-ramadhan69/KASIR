@@ -4,8 +4,7 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  // directUrl = env("DIRECT_URL")
+  url = env("DATABASE_URL")
 }
 
 model User {
@@ -47,8 +46,22 @@ model Supplier {
   hutang          BigInt      @default(0)
   barang          Barang[]
   pembelian       PembelianHeader[]
-  isActive       Boolean  @default(true)
+  isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
+}
+
+model Sales {
+  id              Int      @id @default(autoincrement())
+  namaSales       String
+  nik             String   @unique
+  alamat          String
+  noHp            String
+  limitHutang     BigInt
+  hutang          BigInt      @default(0)
+  penjualan       PenjualanHeader[]
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Customer {
@@ -59,29 +72,29 @@ model Customer {
   namaToko      String
   noHp          String
   limit_piutang BigInt       @default(0)
-  piutang       BigInt       @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  penjualan PenjualanHeader[]
-  isActive     Boolean   @default(true)
+  piutang       BigInt               @default(0)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  penjualan     PenjualanHeader[]
+  isActive      Boolean               @default(true)
 }
 
 model PembelianHeader {
-  id               Int              @id @default(autoincrement())
-  kodePembelian    String           @unique
-  supplier         Supplier         @relation(fields: [supplierId], references: [id])
+  id               Int                 @id @default(autoincrement())
+  kodePembelian    String              @unique
+  supplier         Supplier            @relation(fields: [supplierId], references: [id])
   supplierId       Int
   subtotal         BigInt              @default(0)
   diskonNota       BigInt              @default(0)
   totalHarga       BigInt              @default(0)
   jumlahDibayar    BigInt              @default(0)
   kembalian        BigInt              @default(0)
-  statusPembayaran StatusPembayaran @default(HUTANG)
-  statusTransaksi  StatusTransaksi  @default(KERANJANG)
+  statusPembayaran StatusPembayaran    @default(HUTANG)
+  statusTransaksi  StatusTransaksi     @default(KERANJANG)
   items            PembelianItem[]
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  tanggalJatuhTempo DateTime        @default(now())
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  tanggalJatuhTempo DateTime           @default(now())
 }
 
 model PembelianItem {
@@ -98,43 +111,44 @@ model PembelianItem {
 }
 
 model PenjualanHeader {
-  id                Int              @id @default(autoincrement())
-  kodePenjualan     String           @unique
-  customer          Customer?        @relation(fields: [customerId], references: [id])
+  id                Int                 @id @default(autoincrement())
+  kodePenjualan     String              @unique
+  customer          Customer?           @relation(fields: [customerId], references: [id])
   customerId        Int?
-  namaCustomer      String?         
-  subtotal          BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  diskonNota        BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  totalHarga        BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  jumlahDibayar     BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  kembalian         BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  metodePembayaran  MetodePembayaran @default(CASH)
-  statusPembayaran  StatusPembayaran @default(HUTANG)
-  statusTransaksi   StatusTransaksi  @default(KERANJANG)
-  tanggalTransaksi  DateTime         @default(now())
+  namaCustomer      String?
+  sales             Sales?              @relation(fields: [salesId], references: [id])
+  salesId           Int?
+  namaSales         String?         
+  subtotal          BigInt              @default(0)
+  diskonNota        BigInt              @default(0)
+  totalHarga        BigInt              @default(0)
+  jumlahDibayar     BigInt              @default(0)
+  kembalian         BigInt              @default(0)
+  metodePembayaran  MetodePembayaran    @default(CASH)
+  statusPembayaran  StatusPembayaran    @default(HUTANG)
+  statusTransaksi   StatusTransaksi     @default(KERANJANG)
+  tanggalTransaksi  DateTime            @default(now())
   tanggalJatuhTempo DateTime?
   userId            Int?             
   items             PenjualanItem[]
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 }
 
 model PenjualanItem {
-  id             Int              @id @default(autoincrement())
+  id             Int                @id @default(autoincrement())
   penjualanId    Int
   barangId       Int
-  jumlahDus      BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  jumlahPcs      BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  hargaJual      BigInt              // ✅ Changed from Int to BigInt
-  hargaBeli      BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  diskonPerItem  BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  laba           BigInt              @default(0)  // ✅ Changed from Int to BigInt
-  
-  penjualan      PenjualanHeader  @relation(fields: [penjualanId], references: [id], onDelete: Cascade)
-  barang         Barang           @relation(fields: [barangId], references: [id])
-  
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  jumlahDus      BigInt               @default(0)
+  jumlahPcs      BigInt               @default(0)
+  hargaJual      BigInt
+  hargaBeli      BigInt               @default(0)
+  diskonPerItem  BigInt               @default(0)
+  laba           BigInt               @default(0)
+  penjualan      PenjualanHeader      @relation(fields: [penjualanId], references: [id], onDelete: Cascade)
+  barang         Barang               @relation(fields: [barangId], references: [id])
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
   @@index([penjualanId])
   @@index([barangId])
