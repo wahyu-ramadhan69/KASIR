@@ -29,6 +29,70 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+// Helper function untuk mengecek total penjualan barang hari ini
+async function getTotalPenjualanHariIni(barangId: number, excludePenjualanId?: number): Promise<number> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const items = await prisma.penjualanItem.findMany({
+    where: {
+      barangId,
+      penjualan: {
+        statusTransaksi: "SELESAI",
+        tanggalTransaksi: {
+          gte: today,
+          lt: tomorrow,
+        },
+        ...(excludePenjualanId ? { NOT: { id: excludePenjualanId } } : {}),
+      },
+    },
+    include: {
+      barang: {
+        select: {
+          jumlahPerKemasan: true,
+        },
+      },
+    },
+  });
+
+  const manifestData = await prisma.manifestBarang.findMany({
+    where: {
+      barangId,
+      perjalanan: {
+        tanggalBerangkat: {
+          gte: today,
+          lt: tomorrow,
+        },
+        statusPerjalanan: { not: "DIBATALKAN" },
+      },
+      updatedAt: {
+        gte: today,
+        lt: tomorrow,
+      },
+    },
+    include: {
+      perjalanan: true,
+    },
+  });
+
+  let totalPcs = 0;
+  for (const item of items) {
+    const jumlahDus = toNumber(item.jumlahDus);
+    const jumlahPcs = toNumber(item.jumlahPcs);
+    const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+    totalPcs += jumlahDus * jumlahPerKemasan + jumlahPcs;
+  }
+
+  for (const manifest of manifestData) {
+    // totalItem menyimpan stok tersisa; jumlahTerjual stok yang sudah dijual
+    totalPcs += toNumber(manifest.jumlahTerjual) + toNumber(manifest.totalItem);
+  }
+
+  return totalPcs;
+}
+
 // Helper function untuk menghitung total penjualan
 const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let subtotal = 0;
@@ -39,12 +103,12 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
     const jumlahPcs = toNumber(item.jumlahPcs);
     const hargaJual = toNumber(item.hargaJual);
     const diskonPerItem = toNumber(item.diskonPerItem);
-    const jumlahPerkardus = toNumber(item.barang?.jumlahPerkardus || 1);
+    const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan || 1);
 
-    const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+    const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
     const diskon = diskonPerItem * jumlahDus;
 
@@ -128,9 +192,9 @@ export async function POST(
     }
 
     // Cek stok
-    const jumlahPerkardus = toNumber(barang.jumlahPerkardus);
+    const jumlahPerKemasan = toNumber(barang.jumlahPerKemasan);
     const stokTersedia = toNumber(barang.stok);
-    const totalPcsNeeded = jumlahDus * jumlahPerkardus + jumlahPcs;
+    const totalPcsNeeded = jumlahDus * jumlahPerKemasan + jumlahPcs;
 
     if (stokTersedia < totalPcsNeeded) {
       return NextResponse.json(
@@ -140,6 +204,24 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    // Cek limit pembelian per hari (jika ada)
+    const limitPenjualan = toNumber(barang.limitPenjualan);
+    if (limitPenjualan > 0) {
+      const totalTerjualHariIni = await getTotalPenjualanHariIni(barangId);
+      const totalSetelahDitambah = totalTerjualHariIni + totalPcsNeeded;
+
+      if (totalSetelahDitambah > limitPenjualan) {
+        const sisaLimit = Math.max(0, limitPenjualan - totalTerjualHariIni);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `LIMIT PEMBELIAN TERLAMPAUI!\n\n📦 ${barang.namaBarang}\n⚠️ Limit: ${limitPenjualan} unit/hari\n✅ Terjual: ${totalTerjualHariIni} unit\n🔸 Sisa: ${sisaLimit} unit\n❌ Ditambah: ${totalPcsNeeded} unit\n\nSilakan kurangi jumlah!`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Cek apakah barang sudah ada di keranjang
@@ -161,8 +243,8 @@ export async function POST(
     const hargaBeliBarang = toNumber(barang.hargaBeli);
     const hargaJualFinal = hargaJual || toNumber(barang.hargaJual);
 
-    const hargaBeliPerPcs = Math.round(hargaBeliBarang / jumlahPerkardus);
-    const hargaJualPerPcs = Math.round(hargaJualFinal / jumlahPerkardus);
+    const hargaBeliPerPcs = Math.round(hargaBeliBarang / jumlahPerKemasan);
+    const hargaJualPerPcs = Math.round(hargaJualFinal / jumlahPerKemasan);
 
     const labaPerDus = hargaJualFinal - diskonPerItem - hargaBeliBarang;
     const labaFromDus = labaPerDus * jumlahDus;

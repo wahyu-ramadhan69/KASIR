@@ -24,8 +24,9 @@ function serializeBarang(barang: any) {
     hargaBeli: bigIntToNumber(barang.hargaBeli),
     hargaJual: bigIntToNumber(barang.hargaJual),
     stok: bigIntToNumber(barang.stok),
-    jumlahPerkardus: bigIntToNumber(barang.jumlahPerkardus),
+    jumlahPerKemasan: bigIntToNumber(barang.jumlahPerKemasan),
     ukuran: bigIntToNumber(barang.ukuran),
+    limitPenjualan: bigIntToNumber(barang.limitPenjualan),
     supplier: barang.supplier
       ? {
           ...barang.supplier,
@@ -109,17 +110,20 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       hargaBeli,
       hargaJual,
       stok,
-      jumlahPerkardus,
+      jenisKemasan,
+      jumlahPerKemasan,
       ukuran,
       satuan,
       supplierId,
+      limitPenjualan,
     } = body;
 
     if (
       !namaBarang ||
       hargaBeli == null ||
       hargaJual == null ||
-      jumlahPerkardus == null ||
+      !jenisKemasan ||
+      jumlahPerKemasan == null ||
       ukuran == null ||
       !satuan ||
       supplierId == null
@@ -131,18 +135,30 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
     }
 
     // Convert to BigInt for database
+    const updateData: any = {
+      namaBarang: String(namaBarang).trim(),
+      hargaBeli: BigInt(hargaBeli),
+      hargaJual: BigInt(hargaJual),
+      jenisKemasan: String(jenisKemasan).trim(),
+      jumlahPerKemasan: BigInt(jumlahPerKemasan),
+      ukuran: BigInt(ukuran),
+      satuan: String(satuan).trim(),
+      supplierId: Number(supplierId),
+    };
+
+    // Hanya update stok jika dikirim; kalau tidak, biarkan nilai sebelumnya
+    if (stok != null) {
+      updateData.stok = BigInt(stok);
+    }
+
+    // Update limitPenjualan jika dikirim
+    if (limitPenjualan != null) {
+      updateData.limitPenjualan = BigInt(limitPenjualan);
+    }
+
     const barang = await prisma.barang.update({
       where: { id: idNum },
-      data: {
-        namaBarang: String(namaBarang).trim(),
-        hargaBeli: BigInt(hargaBeli),
-        hargaJual: BigInt(hargaJual),
-        stok: stok != null ? BigInt(stok) : BigInt(0),
-        jumlahPerkardus: BigInt(jumlahPerkardus),
-        ukuran: BigInt(ukuran),
-        satuan: String(satuan).trim(),
-        supplierId: Number(supplierId),
-      },
+      data: updateData,
       include: {
         supplier: true,
       },

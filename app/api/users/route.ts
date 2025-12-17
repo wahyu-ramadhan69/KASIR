@@ -9,9 +9,9 @@ const JWT_SECRET = process.env.JWT_SECRET as string;
 
 export async function GET() {
   const auth = await isAuthenticated();
-  if (!auth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // if (!auth) {
+  //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // }
   try {
     // ✅ Await cookies() untuk Next.js 15+
     const cookieStore = await cookies();

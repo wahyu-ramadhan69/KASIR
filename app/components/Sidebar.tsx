@@ -23,6 +23,10 @@ import {
   User2,
   Database,
   Truck,
+  ReceiptText,
+  PackageOpen,
+  Wallet2,
+  Wallet,
 } from "lucide-react";
 
 const navLinks = [
@@ -55,8 +59,8 @@ const masterDataLinks = [
         icon: <UserCheck className="w-4 h-4" />,
       },
       {
-        label: "Sales",
-        href: "/dashboard/admin/sales",
+        label: "Karyawan",
+        href: "/dashboard/admin/karyawan",
         icon: <Truck className="w-4 h-4" />,
       },
       {
@@ -97,14 +101,63 @@ const transactionLinks = [
         icon: <ShoppingBag className="w-4 h-4" />,
       },
       {
-        label: "Penjualan Sales",
-        href: "/dashboard/admin/penjualan/sales",
-        icon: <Truck className="w-4 h-4" />,
-      },
-      {
         label: "Riwayat Penjualan",
         href: "/dashboard/admin/penjualan/riwayat",
         icon: <History className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Penjualan Sales",
+    href: "/dashboard/admin/penjualan-sales",
+    icon: <Truck className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Dalam Kota",
+        href: "/dashboard/admin/penjualan-sales",
+        icon: <PackageOpen className="w-4 h-4" />,
+      },
+      {
+        label: "Luar Kota",
+        href: "/dashboard/admin/penjualan-sales/luar-kota",
+        icon: <Truck className="w-4 h-4" />,
+      },
+      {
+        label: "Kanvas Sales",
+        href: "/dashboard/admin/penjualan-sales/kanvas",
+        icon: <Truck className="w-4 h-4" />,
+      },
+      {
+        label: "Riwayat Kanvas Sales",
+        href: "/dashboard/admin/penjualan-sales/luar-kota/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+      {
+        label: "Riwayat Penjualan",
+        href: "/dashboard/admin/penjualan-sales/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Hutang-Piutang",
+    href: "/dashboard/admin/hutang-piutang/hutang-pembelian",
+    icon: <Wallet2 className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Hutang Pembelian",
+        href: "/dashboard/admin/hutang-piutang/hutang-pembelian",
+        icon: <Wallet className="w-4 h-4" />,
+      },
+      {
+        label: "Piutang Customer",
+        href: "/dashboard/admin/hutang-piutang/piutang-customer",
+        icon: <ReceiptText className="w-4 h-4" />,
+      },
+      {
+        label: "Piutang Kanvas",
+        href: "/dashboard/admin/hutang-piutang/piutang-kanvas",
+        icon: <ReceiptText className="w-4 h-4" />,
       },
     ],
   },

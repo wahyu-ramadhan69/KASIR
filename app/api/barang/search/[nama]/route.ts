@@ -20,8 +20,9 @@ function serializeBarang(barang: any) {
     hargaBeli: bigIntToNumber(barang.hargaBeli),
     hargaJual: bigIntToNumber(barang.hargaJual),
     stok: bigIntToNumber(barang.stok),
-    jumlahPerkardus: bigIntToNumber(barang.jumlahPerkardus),
+    jumlahPerKemasan: bigIntToNumber(barang.jumlahPerKemasan),
     ukuran: bigIntToNumber(barang.ukuran),
+    limitPenjualan: bigIntToNumber(barang.limitPenjualan),
     supplier: barang.supplier
       ? {
           ...barang.supplier,

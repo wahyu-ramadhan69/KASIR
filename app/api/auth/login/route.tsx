@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       source: "database",
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "12h" });
 
     const response = NextResponse.json({
       success: true,
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       httpOnly: true,
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60, // 1 jam
+      maxAge: 12 * 60 * 60,
       secure: process.env.NODE_ENV === "production", // HTTPS di production
     });
 

@@ -205,8 +205,8 @@ export async function POST(
       // Update stok barang
       for (const item of pembelian.items) {
         const jumlahDus = bigIntToNumber(item.jumlahDus);
-        const jumlahPerkardus = bigIntToNumber(item.barang.jumlahPerkardus);
-        const totalUnit = jumlahDus * jumlahPerkardus;
+        const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+        const totalUnit = jumlahDus * jumlahPerKemasan;
         const hargaPokok = bigIntToNumber(item.hargaPokok);
 
         await tx.barang.update({
@@ -264,12 +264,12 @@ export async function POST(
         const hargaPokok = bigIntToNumber(item.hargaPokok);
         const jumlahDus = bigIntToNumber(item.jumlahDus);
         const diskonPerItem = bigIntToNumber(item.diskonPerItem);
-        const jumlahPerkardus = bigIntToNumber(item.barang.jumlahPerkardus);
+        const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
 
         return {
           namaBarang: item.barang.namaBarang,
           jumlahDus,
-          totalUnit: jumlahDus * jumlahPerkardus,
+          totalUnit: jumlahDus * jumlahPerKemasan,
           hargaPokok,
           diskonPerItem,
           totalHarga: hargaPokok * jumlahDus,

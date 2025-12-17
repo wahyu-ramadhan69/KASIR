@@ -56,7 +56,7 @@ export async function POST(
       where: { id: penjualanId },
       include: {
         customer: true,
-        sales: true,
+        karyawan: true,
       },
     });
 
@@ -120,7 +120,7 @@ export async function POST(
         },
         include: {
           customer: true,
-          sales: true,
+          karyawan: true,
         },
       });
 
@@ -152,7 +152,7 @@ export async function POST(
             statusPembayaran: result.statusPembayaran,
             piutangCustomer: result.customer?.piutang || 0,
           },
-          tipePenjualan: result.salesId ? "sales" : "toko",
+          tipePenjualan: result.karyawanId ? "sales" : "toko",
         },
       })
     );

@@ -99,12 +99,6 @@ export async function GET(request: NextRequest) {
             namaToko: true,
           },
         },
-        sales: {
-          select: {
-            id: true,
-            namaSales: true,
-          },
-        },
         items: {
           include: {
             barang: {
@@ -113,7 +107,7 @@ export async function GET(request: NextRequest) {
                 namaBarang: true,
                 ukuran: true,
                 satuan: true,
-                jumlahPerkardus: true,
+                jumlahPerKemasan: true,
               },
             },
           },
@@ -137,13 +131,13 @@ export async function GET(request: NextRequest) {
         const jumlahPcs = toNumber(item.jumlahPcs);
         const hargaBeli = toNumber(item.hargaBeli);
         const laba = toNumber(item.laba);
-        const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+        const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
 
         // Calculate modal
         const modalDus = hargaBeli * jumlahDus;
         const modalPcs =
           jumlahPcs > 0
-            ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+            ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
             : 0;
         totalModal += modalDus + modalPcs;
 
@@ -153,7 +147,7 @@ export async function GET(request: NextRequest) {
         // Count items
         jumlahItem++;
         totalDus += jumlahDus;
-        totalPcs += jumlahDus * jumlahPerkardus + jumlahPcs;
+        totalPcs += jumlahDus * jumlahPerKemasan + jumlahPcs;
       });
     });
 
@@ -165,15 +159,9 @@ export async function GET(request: NextRequest) {
           include: {
             barang: {
               select: {
-                jumlahPerkardus: true,
+                jumlahPerKemasan: true,
               },
             },
-          },
-        },
-        sales: {
-          select: {
-            id: true,
-            namaSales: true,
           },
         },
         customer: {
@@ -201,12 +189,12 @@ export async function GET(request: NextRequest) {
         const jumlahPcs = toNumber(item.jumlahPcs);
         const hargaBeli = toNumber(item.hargaBeli);
         const laba = toNumber(item.laba);
-        const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+        const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
 
         const modalDus = hargaBeli * jumlahDus;
         const modalPcs =
           jumlahPcs > 0
-            ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+            ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
             : 0;
         totalModalAll += modalDus + modalPcs;
 
@@ -214,7 +202,7 @@ export async function GET(request: NextRequest) {
 
         jumlahItemAll++;
         totalDusAll += jumlahDus;
-        totalPcsAll += jumlahDus * jumlahPerkardus + jumlahPcs;
+        totalPcsAll += jumlahDus * jumlahPerKemasan + jumlahPcs;
       });
     });
 

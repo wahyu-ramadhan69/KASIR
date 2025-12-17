@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         };
       }
 
-      // Hitung total pcs terjual (dus * jumlahPerkardus + pcs)
+      // Hitung total pcs terjual (dus * jumlahPerKemasan + pcs)
       const totalPcs = Number(item.jumlahDus) + Number(item.jumlahPcs);
       groupedData[barangKey].totalTerjual += totalPcs;
 

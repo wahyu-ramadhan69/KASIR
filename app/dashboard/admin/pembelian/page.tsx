@@ -11,11 +11,17 @@ import {
   Package,
   Truck,
   CreditCard,
-  ChevronRight,
   Receipt,
   AlertCircle,
   Percent,
   DollarSign,
+  Store,
+  RefreshCw,
+  Phone,
+  Building2,
+  Calendar,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -26,8 +32,7 @@ interface Supplier {
   alamat: string;
   noHp: string;
   limitHutang: number;
-  limitPembelian: number;
-  barang: Barang[];
+  hutang: number;
 }
 
 interface Barang {
@@ -36,53 +41,22 @@ interface Barang {
   hargaBeli: number;
   hargaJual: number;
   stok: number;
-  jumlahPerkardus: number;
+  jumlahPerKemasan: number;
   ukuran: number;
   satuan: string;
   supplierId: number;
+  jenisKemasan: string;
+  supplier: Supplier;
 }
 
-interface PembelianItem {
-  id: number;
+// Local cart item (tidak perlu id karena belum di database)
+interface CartItem {
+  tempId: string; // temporary ID untuk tracking di UI
   barangId: number;
   jumlahDus: number;
   hargaPokok: number;
   diskonPerItem: number;
   barang: Barang;
-  totalHarga?: number;
-  totalDiskon?: number;
-  subtotal?: number;
-}
-
-interface PembelianHeader {
-  id: number;
-  kodePembelian: string;
-  supplierId: number;
-  subtotal: number;
-  diskonNota: number;
-  totalHarga: number;
-  jumlahDibayar: number;
-  kembalian: number;
-  statusPembayaran: "LUNAS" | "HUTANG";
-  statusTransaksi: "KERANJANG" | "SELESAI" | "DIBATALKAN";
-  supplier: Supplier;
-  items: PembelianItem[];
-  createdAt: string;
-  updatedAt: string;
-  calculation?: {
-    items: any[];
-    ringkasan: {
-      totalSebelumDiskon: number;
-      totalDiskonItem: number;
-      subtotal: number;
-      diskonNota: number;
-      totalHarga: number;
-      jumlahDibayar: number;
-      kembalian: number;
-      sisaHutang: number;
-      statusPembayaran: string;
-    };
-  };
 }
 
 // Helper untuk format angka ke rupiah
@@ -99,16 +73,20 @@ const parseRupiahToNumber = (value: string): number => {
 
 const PembelianPage = () => {
   // State management
-  const [step, setStep] = useState<number>(1);
   const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
+  const [barangList, setBarangList] = useState<Barang[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(
     null
   );
-  const [currentPembelian, setCurrentPembelian] =
-    useState<PembelianHeader | null>(null);
+
+  // Ubah dari currentPembelian menjadi cartItems (lokal state)
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [searchBarang, setSearchBarang] = useState<string>("");
   const [searchSupplier, setSearchSupplier] = useState<string>("");
+  const [expandSupplierSearch, setExpandSupplierSearch] = useState(false);
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [searchingSupplier, setSearchingSupplier] = useState(false);
 
   // Checkout state
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
@@ -118,243 +96,132 @@ const PembelianPage = () => {
   );
   const [jumlahDibayar, setJumlahDibayar] = useState<string>("");
   const [tanggalJatuhTempo, setTanggalJatuhTempo] = useState<string>("");
+  const [tanggalPembelian, setTanggalPembelian] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const [keterangan, setKeterangan] = useState<string>("");
 
   // Diskon per item state
   const [itemDiskonTypes, setItemDiskonTypes] = useState<{
-    [key: number]: "rupiah" | "persen";
+    [key: string]: "rupiah" | "persen";
   }>({});
   const [itemDiskonValues, setItemDiskonValues] = useState<{
-    [key: number]: string;
+    [key: string]: string;
   }>({});
 
   // Receipt state
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [receiptData, setReceiptData] = useState<any>(null);
 
-  // History state
-  const [pembelianList, setPembelianList] = useState<PembelianHeader[]>([]);
-  const [showKeranjangModal, setShowKeranjangModal] = useState<boolean>(false);
-
   useEffect(() => {
-    fetchSuppliers();
-    fetchPembelianHistory();
+    // Tidak fetch suppliers di awal, hanya saat user search
   }, []);
 
-  const fetchSuppliers = async () => {
+  // Debounce untuk search supplier
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchSupplier.trim().length >= 2) {
+        searchSuppliersByName(searchSupplier);
+      } else if (searchSupplier.trim().length === 0) {
+        setSuppliersList([]);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchSupplier]);
+
+  const searchSuppliersByName = async (keyword: string) => {
+    setSearchingSupplier(true);
     try {
-      const res = await fetch("/api/supplier");
+      const res = await fetch(
+        `/api/supplier/search/${encodeURIComponent(keyword)}`
+      );
       const data = await res.json();
       if (data.success) {
         setSuppliersList(data.data);
       }
     } catch (error) {
-      console.error("Error fetching suppliers:", error);
-      toast.error("Gagal mengambil data supplier");
-    }
-  };
-
-  const fetchPembelianHistory = async () => {
-    try {
-      const res = await fetch("/api/pembelian");
-      const data = await res.json();
-      if (data.success) {
-        setPembelianList(data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching pembelian:", error);
-    }
-  };
-
-  const fetchPembelianDetail = async (
-    id: number,
-    preserveDiskonState: boolean = true
-  ) => {
-    try {
-      const res = await fetch(`/api/pembelian/${id}`);
-      const data = await res.json();
-      if (data.success) {
-        setCurrentPembelian(data.data);
-
-        // Hanya set diskon state untuk item BARU (yang belum ada di state)
-        if (preserveDiskonState) {
-          const newTypes: { [key: number]: "rupiah" | "persen" } = {
-            ...itemDiskonTypes,
-          };
-          const newValues: { [key: number]: string } = { ...itemDiskonValues };
-
-          data.data.items?.forEach((item: PembelianItem) => {
-            if (newTypes[item.id] === undefined) {
-              newTypes[item.id] = "rupiah";
-              newValues[item.id] =
-                item.diskonPerItem === 0
-                  ? "0"
-                  : item.diskonPerItem.toLocaleString("id-ID");
-            } else {
-              // Item sudah ada, update nilai sesuai tipe yang dipilih
-              const currentType = newTypes[item.id];
-              if (currentType === "persen") {
-                const persen =
-                  item.hargaPokok > 0
-                    ? Math.round((item.diskonPerItem / item.hargaPokok) * 100)
-                    : 0;
-                newValues[item.id] = persen.toString();
-              } else {
-                newValues[item.id] =
-                  item.diskonPerItem === 0
-                    ? "0"
-                    : item.diskonPerItem.toLocaleString("id-ID");
-              }
-            }
-          });
-
-          setItemDiskonTypes(newTypes);
-          setItemDiskonValues(newValues);
-        } else {
-          // Reset semua ke rupiah (untuk load awal)
-          const types: { [key: number]: "rupiah" | "persen" } = {};
-          const values: { [key: number]: string } = {};
-          data.data.items?.forEach((item: PembelianItem) => {
-            types[item.id] = "rupiah";
-            values[item.id] =
-              item.diskonPerItem === 0
-                ? "0"
-                : item.diskonPerItem.toLocaleString("id-ID");
-          });
-          setItemDiskonTypes(types);
-          setItemDiskonValues(values);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching pembelian detail:", error);
-    }
-  };
-
-  // Step 1: Pilih Supplier dan Buat Keranjang
-  const handleSelectSupplier = async (supplier: Supplier) => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/pembelian", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ supplierId: supplier.id }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setSelectedSupplier(supplier);
-        setCurrentPembelian(data.data);
-        setStep(2);
-        toast.success("Keranjang pembelian berhasil dibuat");
-      } else {
-        toast.error(data.error || "Gagal membuat keranjang");
-      }
-    } catch (error) {
-      console.error("Error creating pembelian:", error);
-      toast.error("Terjadi kesalahan");
+      console.error("Error searching suppliers:", error);
+      toast.error("Gagal mencari supplier");
     } finally {
-      setLoading(false);
+      setSearchingSupplier(false);
     }
   };
 
-  // Step 2: Tambah Item ke Keranjang (Quick Add)
-  const handleQuickAddItem = async (barang: Barang) => {
-    if (!currentPembelian) return;
+  const fetchBarangBySupplier = async (supplierId: number) => {
+    try {
+      const res = await fetch("/api/barang");
+      const data = await res.json();
+      if (data.success) {
+        let filtered = data.data.filter(
+          (b: Barang) => b.supplierId === supplierId
+        );
+        setBarangList(filtered);
+      }
+    } catch (error) {
+      console.error("Error fetching barang:", error);
+      toast.error("Gagal mengambil data barang");
+    }
+  };
 
-    // Cek apakah barang sudah ada di keranjang
-    const existingItem = currentPembelian.items?.find(
-      (item) => item.barangId === barang.id
-    );
+  // Pilih Supplier
+  const handleSelectSupplier = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setShowSupplierDropdown(false);
+    setSearchSupplier("");
+    setExpandSupplierSearch(false);
+    fetchBarangBySupplier(supplier.id);
+    toast.success(`Supplier dipilih: ${supplier.namaSupplier}`);
+  };
+
+  // Fungsi untuk menambahkan item ke keranjang lokal
+  const handleQuickAddItem = (barang: Barang) => {
+    const existingItem = cartItems.find((item) => item.barangId === barang.id);
+
     if (existingItem) {
-      handleUpdateItem(
-        existingItem.id,
-        "jumlahDus",
-        existingItem.jumlahDus + 1
+      // Update jumlah dus jika item sudah ada
+      setCartItems((prevItems) =>
+        prevItems.map((item) =>
+          item.tempId === existingItem.tempId
+            ? { ...item, jumlahDus: item.jumlahDus + 1 }
+            : item
+        )
       );
       toast.success(`${barang.namaBarang} +1 dus`);
       return;
     }
 
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/pembelian/${currentPembelian.id}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          barangId: barang.id,
-          jumlahDus: 1,
-          hargaPokok: barang.hargaBeli,
-          diskonPerItem: 0,
-        }),
-      });
-      const data = await res.json();
+    // Tambah item baru ke keranjang
+    const newItem: CartItem = {
+      tempId: `temp-${Date.now()}-${Math.random()}`,
+      barangId: barang.id,
+      jumlahDus: 1,
+      hargaPokok: barang.hargaBeli,
+      diskonPerItem: 0,
+      barang: barang,
+    };
 
-      if (data.success) {
-        await fetchPembelianDetail(currentPembelian.id);
-        toast.success(`${barang.namaBarang} ditambahkan ke keranjang`);
-      } else {
-        toast.error(data.error || "Gagal menambahkan barang");
-      }
-    } catch (error) {
-      console.error("Error adding item:", error);
-      toast.error("Terjadi kesalahan");
-    } finally {
-      setLoading(false);
-    }
+    setCartItems((prev) => [...prev, newItem]);
+
+    // Initialize diskon state untuk item baru
+    setItemDiskonTypes((prev) => ({ ...prev, [newItem.tempId]: "rupiah" }));
+    setItemDiskonValues((prev) => ({ ...prev, [newItem.tempId]: "0" }));
+
+    toast.success(`${barang.namaBarang} ditambahkan ke keranjang`);
   };
 
-  const handleUpdateItem = async (
-    itemId: number,
-    field: string,
-    value: number
-  ) => {
-    if (!currentPembelian) return;
-
-    const oldItems = [...currentPembelian.items];
-
-    // Optimistic update
-    setCurrentPembelian((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        items: prev.items.map((item) =>
-          item.id === itemId ? { ...item, [field]: value } : item
-        ),
-      };
-    });
-
-    try {
-      const res = await fetch(
-        `/api/pembelian/${currentPembelian.id}/items/${itemId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [field]: value }),
-        }
-      );
-      const data = await res.json();
-
-      if (data.success) {
-        await fetchPembelianDetail(currentPembelian.id);
-      } else {
-        setCurrentPembelian((prev) => {
-          if (!prev) return prev;
-          return { ...prev, items: oldItems };
-        });
-        toast.error(data.error || "Gagal mengupdate item");
-      }
-    } catch (error) {
-      console.error("Error updating item:", error);
-      setCurrentPembelian((prev) => {
-        if (!prev) return prev;
-        return { ...prev, items: oldItems };
-      });
-      toast.error("Terjadi kesalahan saat mengupdate item");
-    }
+  // Update item di keranjang lokal
+  const handleUpdateItem = (tempId: string, field: string, value: number) => {
+    setCartItems((prevItems) =>
+      prevItems.map((item) =>
+        item.tempId === tempId ? { ...item, [field]: value } : item
+      )
+    );
   };
 
   // Handle perubahan diskon item dengan tipe
   const handleItemDiskonChange = (
-    item: PembelianItem,
+    item: CartItem,
     value: string,
     type: "rupiah" | "persen"
   ) => {
@@ -372,16 +239,24 @@ const PembelianPage = () => {
       displayValue = formatRupiahInput(value);
     }
 
-    setItemDiskonValues((prev) => ({ ...prev, [item.id]: displayValue }));
-    handleUpdateItem(item.id, "diskonPerItem", diskonRupiah);
+    setItemDiskonValues((prev) => ({ ...prev, [item.tempId]: displayValue }));
+
+    // Update diskonPerItem di cart
+    setCartItems((prevItems) =>
+      prevItems.map((cartItem) =>
+        cartItem.tempId === item.tempId
+          ? { ...cartItem, diskonPerItem: diskonRupiah }
+          : cartItem
+      )
+    );
   };
 
   // Toggle tipe diskon item
-  const toggleItemDiskonType = (item: PembelianItem) => {
-    const currentType = itemDiskonTypes[item.id] || "rupiah";
+  const toggleItemDiskonType = (item: CartItem) => {
+    const currentType = itemDiskonTypes[item.tempId] || "rupiah";
     const newType = currentType === "rupiah" ? "persen" : "rupiah";
 
-    setItemDiskonTypes((prev) => ({ ...prev, [item.id]: newType }));
+    setItemDiskonTypes((prev) => ({ ...prev, [item.tempId]: newType }));
 
     if (newType === "persen") {
       const persen =
@@ -390,12 +265,12 @@ const PembelianPage = () => {
           : 0;
       setItemDiskonValues((prev) => ({
         ...prev,
-        [item.id]: persen.toString(),
+        [item.tempId]: persen.toString(),
       }));
     } else {
       setItemDiskonValues((prev) => ({
         ...prev,
-        [item.id]:
+        [item.tempId]:
           item.diskonPerItem === 0
             ? "0"
             : item.diskonPerItem.toLocaleString("id-ID"),
@@ -404,9 +279,9 @@ const PembelianPage = () => {
   };
 
   // Fungsi untuk mendapatkan display value diskon item
-  const getItemDiskonDisplayValue = (item: PembelianItem): string => {
-    const type = itemDiskonTypes[item.id] || "rupiah";
-    const storedValue = itemDiskonValues[item.id];
+  const getItemDiskonDisplayValue = (item: CartItem): string => {
+    const type = itemDiskonTypes[item.tempId] || "rupiah";
+    const storedValue = itemDiskonValues[item.tempId];
 
     if (storedValue !== undefined && storedValue !== "") {
       return storedValue;
@@ -426,61 +301,55 @@ const PembelianPage = () => {
     }
   };
 
-  const handleDeleteItem = async (itemId: number) => {
-    if (!currentPembelian) return;
-    if (!confirm("Apakah Anda yakin ingin menghapus item ini?")) return;
+  const handleDeleteItem = (tempId: string) => {
+    setCartItems((prevItems) =>
+      prevItems.filter((item) => item.tempId !== tempId)
+    );
 
-    try {
-      const res = await fetch(
-        `/api/pembelian/${currentPembelian.id}/items/${itemId}`,
-        { method: "DELETE" }
-      );
-      const data = await res.json();
+    // Hapus juga diskon state
+    setItemDiskonTypes((prev) => {
+      const newTypes = { ...prev };
+      delete newTypes[tempId];
+      return newTypes;
+    });
+    setItemDiskonValues((prev) => {
+      const newValues = { ...prev };
+      delete newValues[tempId];
+      return newValues;
+    });
 
-      if (data.success) {
-        await fetchPembelianDetail(currentPembelian.id);
-        toast.success("Item berhasil dihapus");
-      } else {
-        toast.error(data.error || "Gagal menghapus item");
-      }
-    } catch (error) {
-      console.error("Error deleting item:", error);
-    }
+    toast.success("Item berhasil dihapus");
+  };
+
+  // Kalkulasi lokal untuk cart
+  const calculateCartSummary = () => {
+    let subtotal = 0;
+    let totalDiskonItem = 0;
+
+    cartItems.forEach((item) => {
+      const hargaTotal = item.hargaPokok * item.jumlahDus;
+      const diskon = item.diskonPerItem * item.jumlahDus;
+
+      subtotal += hargaTotal;
+      totalDiskonItem += diskon;
+    });
+
+    return {
+      subtotal,
+      totalDiskonItem,
+    };
   };
 
   // Hitung diskon nota dalam rupiah
   const calculateDiskonNotaRupiah = (): number => {
-    if (!currentPembelian?.calculation) return 0;
-
-    const subtotal = currentPembelian.calculation.ringkasan.subtotal;
+    const { subtotal, totalDiskonItem } = calculateCartSummary();
+    const subtotalAfterItemDiskon = subtotal - totalDiskonItem;
 
     if (diskonNotaType === "persen") {
       const persen = parseInt(diskonNota) || 0;
-      return Math.round((subtotal * persen) / 100);
+      return Math.round((subtotalAfterItemDiskon * persen) / 100);
     } else {
       return parseRupiahToNumber(diskonNota);
-    }
-  };
-
-  // Update Diskon Nota
-  const handleUpdateDiskonNota = async () => {
-    if (!currentPembelian) return;
-
-    const diskonNotaRupiah = calculateDiskonNotaRupiah();
-
-    try {
-      const res = await fetch(`/api/pembelian/${currentPembelian.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ diskonNota: diskonNotaRupiah }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setCurrentPembelian(data.data);
-      }
-    } catch (error) {
-      console.error("Error updating diskon nota:", error);
     }
   };
 
@@ -499,34 +368,66 @@ const PembelianPage = () => {
     const newType = diskonNotaType === "rupiah" ? "persen" : "rupiah";
     setDiskonNotaType(newType);
 
-    if (!currentPembelian?.calculation) return;
-
-    const subtotal = currentPembelian.calculation.ringkasan.subtotal;
+    const { subtotal, totalDiskonItem } = calculateCartSummary();
+    const subtotalAfterItemDiskon = subtotal - totalDiskonItem;
 
     if (newType === "persen") {
       const currentRupiah = parseRupiahToNumber(diskonNota);
       const persen =
-        subtotal > 0 ? Math.round((currentRupiah / subtotal) * 100) : 0;
+        subtotalAfterItemDiskon > 0
+          ? Math.round((currentRupiah / subtotalAfterItemDiskon) * 100)
+          : 0;
       setDiskonNota(persen.toString());
     } else {
       const currentPersen = parseInt(diskonNota) || 0;
-      const rupiah = Math.round((subtotal * currentPersen) / 100);
+      const rupiah = Math.round(
+        (subtotalAfterItemDiskon * currentPersen) / 100
+      );
       setDiskonNota(rupiah === 0 ? "0" : rupiah.toLocaleString("id-ID"));
     }
   };
 
   // Hitung total dengan diskon nota yang baru
-  const calculatedTotal = currentPembelian?.calculation?.ringkasan
-    ? currentPembelian.calculation.ringkasan.subtotal -
-      calculateDiskonNotaRupiah()
-    : 0;
+  const cartSummary = calculateCartSummary();
+  const calculatedTotal =
+    cartSummary.subtotal -
+    cartSummary.totalDiskonItem -
+    calculateDiskonNotaRupiah();
 
-  // Step 3: Checkout
+  const handleOpenCheckoutModal = async () => {
+    if (cartItems.length === 0) {
+      toast.error("Keranjang masih kosong");
+      return;
+    }
+
+    if (!selectedSupplier) {
+      toast.error("Supplier wajib dipilih");
+      return;
+    }
+
+    // Set default tanggal jatuh tempo 30 hari dari sekarang
+    const today = new Date();
+    const defaultDueDate = new Date(today);
+    defaultDueDate.setDate(today.getDate() + 30);
+    setTanggalJatuhTempo(defaultDueDate.toISOString().split("T")[0]);
+
+    setShowCheckoutModal(true);
+  };
+
+  // Checkout
   const handleCheckout = async () => {
-    if (!currentPembelian) return;
+    if (cartItems.length === 0) {
+      toast.error("Keranjang masih kosong");
+      return;
+    }
 
     if (!jumlahDibayar) {
       toast.error("Jumlah pembayaran wajib diisi");
+      return;
+    }
+
+    if (!selectedSupplier) {
+      toast.error("Supplier wajib dipilih");
       return;
     }
 
@@ -534,32 +435,74 @@ const PembelianPage = () => {
 
     setLoading(true);
     try {
+      // Step 1: Create pembelian header
+      const createData: any = {
+        supplierId: selectedSupplier.id,
+      };
+
+      const createRes = await fetch("/api/pembelian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createData),
+      });
+      const createResult = await createRes.json();
+
+      if (!createResult.success) {
+        toast.error(createResult.error || "Gagal membuat pembelian");
+        return;
+      }
+
+      const pembelianId = createResult.data.id;
+
+      // Step 2: Add items to pembelian
+      for (const item of cartItems) {
+        const itemData = {
+          barangId: item.barangId,
+          jumlahDus: item.jumlahDus,
+          hargaPokok: item.hargaPokok,
+          diskonPerItem: item.diskonPerItem,
+        };
+
+        const itemRes = await fetch(`/api/pembelian/${pembelianId}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(itemData),
+        });
+        const itemResult = await itemRes.json();
+
+        if (!itemResult.success) {
+          toast.error(`Gagal menambah ${item.barang.namaBarang}`);
+          return;
+        }
+      }
+
+      // Step 3: Checkout
       const checkoutData: any = {
         diskonNota: diskonNotaRupiah,
         jumlahDibayar: parseRupiahToNumber(jumlahDibayar),
+        tanggalPembelian: tanggalPembelian,
       };
+
+      if (keterangan.trim()) {
+        checkoutData.keterangan = keterangan;
+      }
 
       if (tanggalJatuhTempo) {
         checkoutData.tanggalJatuhTempo = tanggalJatuhTempo;
       }
 
-      const res = await fetch(
-        `/api/pembelian/${currentPembelian.id}/checkout`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(checkoutData),
-        }
-      );
+      const res = await fetch(`/api/pembelian/${pembelianId}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutData),
+      });
       const data = await res.json();
 
       if (data.success) {
         setReceiptData(data.data.receipt);
         setShowCheckoutModal(false);
         setShowReceiptModal(true);
-        setTanggalJatuhTempo("");
         toast.success(data.message);
-        fetchPembelianHistory();
       } else {
         toast.error(data.error || "Gagal checkout");
       }
@@ -571,121 +514,22 @@ const PembelianPage = () => {
     }
   };
 
-  // Cancel Pembelian
-  const handleCancelPembelian = async () => {
-    if (!currentPembelian) return;
-    if (!confirm("Apakah Anda yakin ingin membatalkan pembelian ini?")) return;
-
-    try {
-      const res = await fetch(`/api/pembelian/${currentPembelian.id}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success("Pembelian dibatalkan");
-        resetAll();
-      } else {
-        toast.error(data.error || "Gagal membatalkan pembelian");
-      }
-    } catch (error) {
-      console.error("Error canceling pembelian:", error);
-    }
-  };
-
-  // Lanjutkan transaksi yang masih KERANJANG
-  const handleContinueTransaction = async (pembelian: PembelianHeader) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/pembelian/${pembelian.id}`);
-      const data = await res.json();
-
-      if (data.success) {
-        const supplier = suppliersList.find(
-          (s) => s.id === pembelian.supplierId
-        );
-        if (supplier) {
-          setSelectedSupplier(supplier);
-        } else {
-          setSelectedSupplier(pembelian.supplier as Supplier);
-        }
-
-        setCurrentPembelian(data.data);
-
-        // Format diskonNota
-        const diskonNotaValue = data.data.diskonNota || 0;
-        setDiskonNota(
-          diskonNotaValue === 0 ? "0" : diskonNotaValue.toLocaleString("id-ID")
-        );
-        setDiskonNotaType("rupiah");
-
-        // Reset diskon types untuk items
-        const types: { [key: number]: "rupiah" | "persen" } = {};
-        const values: { [key: number]: string } = {};
-        data.data.items?.forEach((item: PembelianItem) => {
-          types[item.id] = "rupiah";
-          values[item.id] =
-            item.diskonPerItem === 0
-              ? "0"
-              : item.diskonPerItem.toLocaleString("id-ID");
-        });
-        setItemDiskonTypes(types);
-        setItemDiskonValues(values);
-
-        setStep(2);
-        setShowKeranjangModal(false);
-        toast.success("Melanjutkan transaksi " + pembelian.kodePembelian);
-      } else {
-        toast.error(data.error || "Gagal mengambil data pembelian");
-      }
-    } catch (error) {
-      console.error("Error continuing transaction:", error);
-      toast.error("Terjadi kesalahan");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Batalkan transaksi dari history
-  const handleCancelFromHistory = async (
-    pembelianId: number,
-    kodePembelian: string
-  ) => {
-    if (
-      !confirm(
-        `Apakah Anda yakin ingin membatalkan transaksi ${kodePembelian}?`
-      )
-    )
-      return;
-
-    try {
-      const res = await fetch(`/api/pembelian/${pembelianId}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success(`Transaksi ${kodePembelian} berhasil dibatalkan`);
-        fetchPembelianHistory();
-      } else {
-        toast.error(data.error || "Gagal membatalkan transaksi");
-      }
-    } catch (error) {
-      console.error("Error canceling transaction:", error);
-      toast.error("Terjadi kesalahan");
-    }
-  };
-
-  const resetAll = () => {
-    setStep(1);
+  const handleReset = () => {
     setSelectedSupplier(null);
-    setCurrentPembelian(null);
+    setCartItems([]);
+    setBarangList([]);
     setDiskonNota("0");
     setDiskonNotaType("rupiah");
     setJumlahDibayar("");
+    setTanggalJatuhTempo("");
+    setTanggalPembelian(new Date().toISOString().split("T")[0]);
+    setKeterangan("");
     setItemDiskonTypes({});
     setItemDiskonValues({});
-    fetchPembelianHistory();
+    setSearchBarang("");
+    setSearchSupplier("");
+    setExpandSupplierSearch(false);
+    toast.success("Transaksi direset");
   };
 
   const formatRupiah = (number: number): string => {
@@ -696,550 +540,711 @@ const PembelianPage = () => {
     }).format(number);
   };
 
-  const filteredSuppliers = suppliersList.filter((s) =>
-    s.namaSupplier.toLowerCase().includes(searchSupplier.toLowerCase())
+  const getPaymentStatus = () => {
+    const bayar = parseRupiahToNumber(jumlahDibayar);
+    const total = Math.max(0, calculatedTotal);
+
+    if (bayar >= total) {
+      return {
+        status: "LUNAS",
+        kembalian: bayar - total,
+        sisaHutang: 0,
+        canCheckout: true,
+        message: null,
+      };
+    } else {
+      const sisaHutang = total - bayar;
+
+      if (!selectedSupplier) {
+        return {
+          status: "HUTANG",
+          kembalian: 0,
+          sisaHutang,
+          canCheckout: false,
+          message: "Supplier belum dipilih",
+        };
+      }
+
+      const sisaLimit = Math.max(
+        0,
+        selectedSupplier.limitHutang - selectedSupplier.hutang
+      );
+      if (selectedSupplier.limitHutang > 0 && sisaHutang > sisaLimit) {
+        return {
+          status: "HUTANG",
+          kembalian: 0,
+          sisaHutang,
+          canCheckout: false,
+          message: `Hutang melebihi limit! Sisa limit: ${formatRupiah(
+            sisaLimit
+          )}`,
+        };
+      }
+
+      return {
+        status: "HUTANG",
+        kembalian: 0,
+        sisaHutang,
+        canCheckout: true,
+        message: null,
+      };
+    }
+  };
+
+  const paymentStatus = jumlahDibayar ? getPaymentStatus() : null;
+
+  const filteredBarang = barangList.filter((b) =>
+    b.namaBarang.toLowerCase().includes(searchBarang.toLowerCase())
   );
 
-  const filteredBarang =
-    selectedSupplier?.barang?.filter((b) =>
-      b.namaBarang.toLowerCase().includes(searchBarang.toLowerCase())
-    ) || [];
-
-  const calculation = currentPembelian?.calculation?.ringkasan;
-
   return (
-    <div className="w-full max-w-7xl mx-auto">
+    <div className="w-full min-h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] overflow-x-hidden overflow-y-auto flex flex-col bg-gradient-to-br from-slate-50 via-emerald-50/30 to-slate-100">
       <Toaster
         position="top-right"
         toastOptions={{
           duration: 3000,
-          style: { background: "#333", color: "#fff" },
-          success: { style: { background: "#22c55e" } },
-          error: { style: { background: "#ef4444" } },
+          style: {
+            background: "#363636",
+            color: "#fff",
+            borderRadius: "12px",
+            padding: "12px 16px",
+          },
+          success: { iconTheme: { primary: "#10b981", secondary: "#fff" } },
+          error: { iconTheme: { primary: "#ef4444", secondary: "#fff" } },
         }}
       />
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-xl p-6 mb-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Pembelian Barang
-            </h1>
-            <p className="text-emerald-100">
-              Kelola transaksi pembelian dari supplier
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowKeranjangModal(true)}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              Keranjang
-              {pembelianList.filter((p) => p.statusTransaksi === "KERANJANG")
-                .length > 0 && (
-                <span className="bg-white text-yellow-600 text-xs font-bold px-2 py-0.5 rounded-full">
-                  {
-                    pembelianList.filter(
-                      (p) => p.statusTransaksi === "KERANJANG"
-                    ).length
-                  }
-                </span>
-              )}
-            </button>
-            <Link
-              href="/dashboard/admin/pembelian/riwayat"
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
-            >
-              <Receipt className="w-4 h-4" />
-              Riwayat
-            </Link>
-            {step == 2 && (
-              <button
-                onClick={resetAll}
-                className="bg-white hover:bg-emerald-50 text-emerald-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
-              >
-                <Plus className="w-4 h-4" />
-                Transaksi Baru
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      <div className="mx-3 mb-4">
+        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-800 rounded-xl p-5 shadow-xl">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-5 rounded-full -mr-24 -mt-24"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-5 rounded-full -ml-16 -mb-16"></div>
 
-      {/* Step Indicator */}
-      <div className="bg-white rounded-lg p-4 mb-6 shadow-md border border-gray-100">
-        <div className="flex items-center justify-between">
-          {[
-            { num: 1, label: "Pilih Supplier", icon: Truck },
-            { num: 2, label: "Tambah Barang", icon: Package },
-            { num: 3, label: "Pembayaran", icon: CreditCard },
-          ].map((s, idx) => (
-            <React.Fragment key={s.num}>
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    step >= s.num
-                      ? "bg-emerald-600 text-white"
-                      : "bg-gray-200 text-gray-500"
-                  }`}
-                >
-                  <s.icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <p
-                    className={`font-medium ${
-                      step >= s.num ? "text-emerald-600" : "text-gray-500"
-                    }`}
-                  >
-                    Step {s.num}
-                  </p>
-                  <p className="text-sm text-gray-500">{s.label}</p>
-                </div>
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 backdrop-blur-sm p-2.5 rounded-lg shadow-lg">
+                <ShoppingCart className="w-6 h-6 text-white" />
               </div>
-              {idx < 2 && (
-                <ChevronRight
-                  className={`w-6 h-6 ${
-                    step > s.num ? "text-emerald-600" : "text-gray-300"
-                  }`}
-                />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-
-      {/* Step 1: Pilih Supplier */}
-      {step === 1 && (
-        <div className="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Pilih Supplier
-          </h2>
-
-          {/* Search */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Cari supplier..."
-              value={searchSupplier}
-              onChange={(e) => setSearchSupplier(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none"
-            />
-          </div>
-
-          {/* Supplier List */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredSuppliers.map((supplier) => (
-              <div
-                key={supplier.id}
-                onClick={() => handleSelectSupplier(supplier)}
-                className="border border-gray-200 rounded-lg p-4 hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer transition-all"
-              >
-                <h3 className="font-semibold text-gray-900">
-                  {supplier.namaSupplier}
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">{supplier.alamat}</p>
-                <p className="text-sm text-gray-500">{supplier.noHp}</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">
-                    {supplier.barang?.length || 0} Barang
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Limit: {formatRupiah(supplier.limitHutang)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {filteredSuppliers.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              Tidak ada supplier ditemukan
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Step 2: Keranjang Pembelian */}
-      {step === 2 && currentPembelian && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Daftar Barang Supplier */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  Daftar Barang
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Supplier: {selectedSupplier?.namaSupplier}
+                <h1 className="text-2xl font-bold text-white tracking-tight">
+                  Pembelian Barang
+                </h1>
+                <p className="text-emerald-100 text-sm">
+                  Kelola transaksi pembelian dari supplier
                 </p>
               </div>
-              <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-lg text-sm font-medium">
-                {currentPembelian.kodePembelian}
-              </span>
             </div>
-
-            {/* Search Barang */}
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Cari barang..."
-                value={searchBarang}
-                onChange={(e) => setSearchBarang(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none"
-              />
-            </div>
-
-            {/* Barang List */}
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {filteredBarang.length > 0 ? (
-                filteredBarang.map((barang) => (
-                  <div
-                    key={barang.id}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    <div>
-                      <h4 className="font-medium text-gray-900">
-                        {barang.namaBarang}
-                      </h4>
-                      <p className="text-sm text-gray-500">
-                        {barang.ukuran} {barang.satuan} •{" "}
-                        {barang.jumlahPerkardus} pcs/dus
-                      </p>
-                      <p className="text-sm text-emerald-600 font-medium">
-                        {formatRupiah(barang.hargaBeli)}/dus
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleQuickAddItem(barang)}
-                      disabled={loading}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-lg transition-all disabled:opacity-50"
-                      title="Tambah ke keranjang"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p>Tidak ada barang dari supplier ini</p>
-                </div>
-              )}
+            <div className="flex gap-2">
+              <Link
+                href="/dashboard/admin/pembelian/riwayat"
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-semibold shadow-lg text-sm"
+              >
+                <Receipt className="w-4 h-4" />
+                Riwayat
+              </Link>
+              <button
+                onClick={handleReset}
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-semibold shadow-lg text-sm"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reset Transaksi
+              </button>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Keranjang */}
-          <div className="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <ShoppingCart className="w-5 h-5 text-emerald-600" />
-              <h2 className="text-xl font-bold text-gray-900">Keranjang</h2>
-              <span className="bg-emerald-600 text-white text-xs px-2 py-1 rounded-full">
-                {currentPembelian.items?.length || 0}
-              </span>
-            </div>
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto p-3 min-h-0">
+        <div className="h-full min-h-0 flex gap-3">
+          {/* Left Side - 68% */}
+          <div className="w-[68%] flex flex-col gap-3 h-full min-h-0">
+            {/* Supplier Selection */}
+            <div className="bg-white rounded-lg shadow-md border border-gray-200 p-2">
+              <label className="text-xs font-extrabold text-gray-800 mb-3 uppercase tracking-wider flex items-center gap-2">
+                <div className="bg-emerald-100 p-1.5 rounded-lg">
+                  <Store className="w-4 h-4 text-emerald-600" />
+                </div>
+                <span>
+                  Supplier <span className="text-red-500">*</span>
+                </span>
+              </label>
 
-            {/* Cart Items */}
-            <div className="space-y-3 max-h-96 overflow-y-auto mb-4">
-              {currentPembelian.items?.length > 0 ? (
-                currentPembelian.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="border border-gray-200 rounded-lg p-3 bg-gray-50"
-                  >
-                    {/* Header: Nama Barang & Delete */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">
-                          {item.barang.namaBarang}
-                        </h4>
-                        <p className="text-xs text-gray-500">
-                          {item.barang.ukuran} {item.barang.satuan} •{" "}
-                          {item.barang.jumlahPerkardus} pcs/dus
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                        title="Hapus item"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Row 1: Quantity */}
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">Jumlah:</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            handleUpdateItem(
-                              item.id,
-                              "jumlahDus",
-                              Math.max(1, item.jumlahDus - 1)
-                            )
-                          }
-                          className="w-7 h-7 rounded bg-gray-200 hover:bg-gray-300 flex items-center justify-center"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <input
-                          type="number"
-                          value={item.jumlahDus}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 1;
-                            handleUpdateItem(
-                              item.id,
-                              "jumlahDus",
-                              Math.max(1, val)
-                            );
-                          }}
-                          className="w-14 text-center font-medium border border-gray-300 rounded px-1 py-1 text-sm"
-                          min="1"
-                        />
-                        <button
-                          onClick={() =>
-                            handleUpdateItem(
-                              item.id,
-                              "jumlahDus",
-                              item.jumlahDus + 1
-                            )
-                          }
-                          className="w-7 h-7 rounded bg-gray-200 hover:bg-gray-300 flex items-center justify-center"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                        <span className="text-xs text-gray-500">dus</span>
-                      </div>
-                    </div>
-
-                    {/* Row 2: Harga Pokok - Display only, tidak bisa diubah */}
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">Harga/dus:</span>
-                      <span className="text-sm font-medium text-gray-900">
-                        {formatRupiah(item.hargaPokok)}
-                      </span>
-                    </div>
-
-                    {/* Row 3: Diskon per Item dengan toggle Rupiah/Persen */}
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">Diskon/dus:</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => toggleItemDiskonType(item)}
-                          className={`px-2 py-0.5 rounded text-xs font-medium transition-all ${
-                            (itemDiskonTypes[item.id] || "rupiah") === "rupiah"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-purple-100 text-purple-700"
-                          }`}
-                          title="Klik untuk toggle Rupiah/Persen"
-                        >
-                          {(itemDiskonTypes[item.id] || "rupiah") ===
-                          "rupiah" ? (
-                            <DollarSign className="w-3 h-3" />
-                          ) : (
-                            <Percent className="w-3 h-3" />
-                          )}
-                        </button>
-                        <input
-                          type="text"
-                          value={getItemDiskonDisplayValue(item)}
-                          onChange={(e) =>
-                            handleItemDiskonChange(
-                              item,
-                              e.target.value,
-                              itemDiskonTypes[item.id] || "rupiah"
-                            )
-                          }
-                          className="w-20 text-right text-sm border border-gray-300 rounded px-1 py-0.5"
-                          placeholder="0"
-                        />
-                        <span className="text-xs text-gray-400 w-4">
-                          {(itemDiskonTypes[item.id] || "rupiah") === "persen"
-                            ? "%"
-                            : ""}
+              {selectedSupplier ? (
+                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-lg shadow-md text-white border border-emerald-400 relative overflow-hidden group hover:shadow-lg transition-all">
+                  <div className="relative flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm truncate mb-1">
+                        {selectedSupplier.namaSupplier}
+                      </p>
+                      <div className="flex items-center gap-2.5 text-xs text-emerald-50">
+                        <span className="truncate flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 shrink-0" />
+                          {selectedSupplier.alamat.length > 25
+                            ? selectedSupplier.alamat.substring(0, 25) + "..."
+                            : selectedSupplier.alamat}
+                        </span>
+                        <span className="text-emerald-300">•</span>
+                        <span className="truncate flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 shrink-0" />
+                          {selectedSupplier.noHp}
                         </span>
                       </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        setSelectedSupplier(null);
+                        setBarangList([]);
+                        setCartItems([]);
+                        setSearchSupplier("");
+                        setExpandSupplierSearch(false);
+                      }}
+                      className="text-white hover:bg-white/20 p-1.5 rounded transition-all shrink-0 hover:scale-110 active:scale-95"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Tampilkan placeholder jika belum expand search */}
+                  {!expandSupplierSearch && (
+                    <button
+                      onClick={() => setExpandSupplierSearch(true)}
+                      className="w-full text-center py-3 px-4 bg-gray-50 hover:bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 hover:border-emerald-100 transition-all duration-200 group"
+                    >
+                      <p className="text-sm text-gray-600 group-hover:text-emerald-100 font-semibold flex items-center justify-center gap-2 transition-colors">
+                        <Search className="w-4 h-4" />
+                        Cari supplier untuk memulai
+                      </p>
+                    </button>
+                  )}
 
-                    {/* Tampilkan nilai rupiah jika mode persen */}
-                    {(itemDiskonTypes[item.id] || "rupiah") === "persen" &&
-                      item.diskonPerItem > 0 && (
-                        <div className="flex justify-end mb-2">
-                          <span className="text-xs text-gray-500">
-                            = {formatRupiah(item.diskonPerItem)}/dus
-                          </span>
+                  {expandSupplierSearch && (
+                    <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 z-10" />
+                      <input
+                        type="text"
+                        placeholder="Ketik nama supplier..."
+                        value={searchSupplier}
+                        onChange={(e) => {
+                          setSearchSupplier(e.target.value);
+                          setShowSupplierDropdown(true);
+                        }}
+                        className="w-full pl-10 pr-4 py-2.5 border-2 border-emerald-300 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm font-medium shadow-sm transition-all duration-200"
+                        autoFocus
+                      />
+
+                      {showSupplierDropdown && searchSupplier.length >= 2 && (
+                        <div className="absolute z-50 mt-2 w-full bg-white border-2 border-emerald-300 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                          {searchingSupplier ? (
+                            <div className="p-6 text-center">
+                              <div className="animate-spin w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full mx-auto mb-3" />
+                              <p className="text-sm text-gray-600 font-medium">
+                                Mencari supplier...
+                              </p>
+                            </div>
+                          ) : suppliersList.length > 0 ? (
+                            suppliersList.map((s) => (
+                              <button
+                                key={s.id}
+                                onClick={() => handleSelectSupplier(s)}
+                                className="w-full p-3 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-emerald-100 border-b last:border-b-0 transition-all duration-200 text-left group"
+                              >
+                                <p className="font-bold text-sm text-gray-900 group-hover:text-emerald-700 flex items-center gap-2">
+                                  <Store className="w-3.5 h-3.5" />
+                                  {s.namaSupplier}
+                                </p>
+                                <p className="text-xs text-gray-600 ml-5 mt-0.5">
+                                  {s.alamat} • {s.noHp}
+                                </p>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-6 text-center">
+                              <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                              <p className="text-sm text-gray-500 font-medium">
+                                Tidak ada hasil
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
-
-                    {/* Subtotal */}
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                      <span className="text-sm font-medium text-gray-700">
-                        Subtotal:
-                      </span>
-                      <p className="font-bold text-emerald-600">
-                        {formatRupiah(
-                          item.hargaPokok * item.jumlahDus -
-                            item.diskonPerItem * item.jumlahDus
-                        )}
-                      </p>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <ShoppingCart className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p>Keranjang kosong</p>
-                  <p className="text-xs mt-1">
-                    Klik tombol + pada barang untuk menambahkan
-                  </p>
+                  )}
+
+                  <button
+                    onClick={() =>
+                      setExpandSupplierSearch(!expandSupplierSearch)
+                    }
+                    className="w-full bg-white hover:bg-gray-50 text-emerald-700 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 border-2 border-emerald-400 hover:border-emerald-500 hover:shadow-md active:scale-98"
+                  >
+                    <Search className="w-4 h-4" />
+                    {expandSupplierSearch ? "Tutup" : "Cari Supplier"}
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* Summary */}
-            {currentPembelian.items?.length > 0 && calculation && (
-              <div className="border-t border-gray-200 pt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Subtotal</span>
-                  <span>{formatRupiah(calculation.subtotal)}</span>
-                </div>
-                {calculation.totalDiskonItem > 0 && (
-                  <div className="flex justify-between text-sm text-red-500">
-                    <span>Diskon Item</span>
-                    <span>-{formatRupiah(calculation.totalDiskonItem)}</span>
+            {/* Daftar Barang */}
+            <div className="flex-1 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
+              <div className="p-4 border-b bg-white flex-shrink-0">
+                <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <div className="bg-emerald-600 p-1.5 rounded-lg shadow-md">
+                    <Package className="w-5 h-5 text-white" />
                   </div>
-                )}
-                <div className="flex justify-between text-sm items-center">
-                  <span className="text-gray-500">Diskon Nota</span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={toggleDiskonNotaType}
-                      className={`px-2 py-0.5 rounded text-xs font-medium transition-all ${
-                        diskonNotaType === "rupiah"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-purple-100 text-purple-700"
-                      }`}
-                      title="Klik untuk toggle Rupiah/Persen"
-                    >
-                      {diskonNotaType === "rupiah" ? (
-                        <DollarSign className="w-3 h-3" />
-                      ) : (
-                        <Percent className="w-3 h-3" />
-                      )}
-                    </button>
-                    <input
-                      type="text"
-                      value={diskonNota}
-                      onChange={(e) => handleDiskonNotaChange(e.target.value)}
-                      onBlur={handleUpdateDiskonNota}
-                      className="w-20 text-right border border-gray-300 rounded px-2 py-1 text-sm"
-                      placeholder="0"
-                    />
-                    {diskonNotaType === "persen" && (
-                      <span className="text-xs text-gray-400">%</span>
-                    )}
-                  </div>
-                </div>
-                {diskonNotaType === "persen" &&
-                  calculateDiskonNotaRupiah() > 0 && (
-                    <div className="flex justify-end text-xs text-gray-500">
-                      = {formatRupiah(calculateDiskonNotaRupiah())}
-                    </div>
-                  )}
-                <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Total</span>
-                  <span className="text-emerald-600">
-                    {formatRupiah(Math.max(0, calculatedTotal))}
+                  Daftar Produk
+                  <span className="ml-auto text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-full font-bold">
+                    {filteredBarang.length} produk
                   </span>
+                </h2>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 z-10" />
+                  <input
+                    type="text"
+                    placeholder="Cari produk..."
+                    value={searchBarang}
+                    onChange={(e) => setSearchBarang(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm font-medium shadow-sm transition-all duration-200"
+                  />
                 </div>
               </div>
-            )}
 
-            {/* Actions */}
-            <div className="mt-4 space-y-2">
-              <button
-                onClick={() => {
-                  if (currentPembelian.items?.length > 0) {
-                    setShowCheckoutModal(true);
-                  } else {
-                    toast.error("Keranjang masih kosong");
-                  }
-                }}
-                disabled={!currentPembelian.items?.length}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-              >
-                <CreditCard className="w-5 h-5" />
-                Proses Pembayaran
-              </button>
-              <button
-                onClick={handleCancelPembelian}
-                className="w-full bg-red-100 hover:bg-red-200 text-red-600 py-2 rounded-lg font-medium transition-all"
-              >
-                Batalkan Pembelian
-              </button>
+              <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-white">
+                {!selectedSupplier ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="bg-gray-100 p-6 rounded-full mb-4 mx-auto w-fit">
+                        <Store className="w-16 h-16 text-gray-400" />
+                      </div>
+                      <p className="text-gray-600 font-bold text-lg mb-1">
+                        Pilih Supplier Terlebih Dahulu
+                      </p>
+                      <p className="text-gray-500 text-sm">
+                        Cari dan pilih supplier untuk melihat produk
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {filteredBarang.map((barang) => {
+                      const isInCart = cartItems.some(
+                        (item) => item.barangId === barang.id
+                      );
+
+                      return (
+                        <div
+                          key={barang.id}
+                          className="group relative overflow-hidden rounded-2xl border-2 border-gray-200 bg-white hover:border-emerald-400 hover:shadow-xl hover:shadow-emerald-100/50 transition-all duration-300 transform hover:scale-[1.02]"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-emerald-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+
+                          {isInCart && (
+                            <div className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-lg z-10 animate-in fade-in zoom-in duration-300">
+                              <ShoppingCart className="w-2.5 h-2.5" />
+                              Di Keranjang
+                            </div>
+                          )}
+
+                          <div className="relative flex items-center justify-between p-3">
+                            <div className="flex-1 min-w-0 pr-2">
+                              <div className="flex items-start gap-1.5 mb-1.5">
+                                <div className="bg-emerald-100 p-1 rounded-lg mt-0.5 group-hover:bg-emerald-200 transition-colors">
+                                  <Package className="w-3 h-3 text-emerald-600" />
+                                </div>
+                                <h4 className="font-extrabold text-gray-900 text-xs leading-tight group-hover:text-emerald-700 transition-colors">
+                                  {barang.namaBarang}
+                                </h4>
+                              </div>
+
+                              <div className="ml-6 space-y-1">
+                                <p className="text-[10px] text-gray-600 font-semibold flex items-center gap-1">
+                                  <span className="bg-gray-200 px-1.5 py-0.5 rounded-md">
+                                    {barang.ukuran} {barang.satuan}
+                                  </span>
+                                  <span className="text-gray-400">•</span>
+                                  <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md">
+                                    {barang.jumlahPerKemasan}/
+                                    {barang.jenisKemasan}
+                                  </span>
+                                </p>
+
+                                <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-2 py-0.5 rounded-lg shadow-md group-hover:shadow-lg transition-shadow inline-block">
+                                  <p className="text-[11px] font-extrabold">
+                                    {formatRupiah(barang.hargaBeli)}
+                                    <span className="text-[9px] font-medium opacity-90 ml-0.5">
+                                      /{barang.jenisKemasan}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex-shrink-0">
+                              <button
+                                onClick={() => handleQuickAddItem(barang)}
+                                disabled={loading}
+                                className="relative overflow-hidden p-2 rounded-xl transition-all duration-300 transform bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg hover:shadow-xl active:scale-95 group-hover:scale-110"
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+
+                                <Plus
+                                  className="w-6 h-6 relative z-10 text-white"
+                                  strokeWidth={3}
+                                />
+
+                                <div className="absolute inset-0 rounded-xl overflow-hidden">
+                                  <div className="absolute inset-0 bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-500 rounded-full"></div>
+                                </div>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        </div>
+                      );
+                    })}
+
+                    {filteredBarang.length === 0 && selectedSupplier && (
+                      <div className="col-span-2 py-12 text-center">
+                        <div className="bg-gray-100 p-6 rounded-full mb-4 mx-auto w-fit">
+                          <Package className="w-16 h-16 text-gray-400" />
+                        </div>
+                        <p className="text-gray-600 font-bold text-lg mb-1">
+                          Produk Tidak Ditemukan
+                        </p>
+                        <p className="text-gray-500 text-sm">
+                          Coba gunakan kata kunci lain
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Right Side - 32% Keranjang */}
+          <div className="w-[32%] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
+            <div className="p-4 bg-gray-50 border-b flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-emerald-600" />
+                  <h2 className="text-sm font-bold text-gray-700">Keranjang</h2>
+                </div>
+                <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-md font-bold">
+                  {cartItems.length} item
+                </span>
+              </div>
+            </div>
+
+            {/* Cart Items */}
+            <div className="flex-1 overflow-y-auto p-3 min-h-0 bg-gray-50">
+              {cartItems.length > 0 ? (
+                <div className="space-y-2">
+                  {cartItems.map((item) => (
+                    <div
+                      key={item.tempId}
+                      className="border border-gray-200 rounded-lg p-3 bg-white"
+                    >
+                      {/* Item Header */}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-extrabold text-gray-900 text-sm truncate mb-1">
+                            {item.barang.namaBarang}
+                          </h4>
+                          <p className="text-xs text-gray-600 font-semibold truncate bg-gray-100 px-2 py-0.5 rounded-md inline-block">
+                            {formatRupiah(item.hargaPokok)}/dus
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteItem(item.tempId)}
+                          className="text-red-500 hover:bg-red-100 p-1.5 rounded-lg transition-all flex-shrink-0 ml-2 hover:scale-110 active:scale-95 shadow-sm hover:shadow-md"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Quantity Controls */}
+                      <div className="space-y-2">
+                        {/* Dus */}
+                        <div className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 p-2 rounded-xl">
+                          <span className="text-xs font-bold text-gray-700 uppercase">
+                            Dus:
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() =>
+                                handleUpdateItem(
+                                  item.tempId,
+                                  "jumlahDus",
+                                  Math.max(1, item.jumlahDus - 1)
+                                )
+                              }
+                              className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+                            >
+                              <Minus className="w-3.5 h-3.5" strokeWidth={3} />
+                            </button>
+                            <input
+                              type="number"
+                              value={item.jumlahDus}
+                              onChange={(e) =>
+                                handleUpdateItem(
+                                  item.tempId,
+                                  "jumlahDus",
+                                  Math.max(1, parseInt(e.target.value) || 1)
+                                )
+                              }
+                              className="w-12 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                              min="1"
+                            />
+                            <button
+                              onClick={() =>
+                                handleUpdateItem(
+                                  item.tempId,
+                                  "jumlahDus",
+                                  item.jumlahDus + 1
+                                )
+                              }
+                              className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+                            >
+                              <Plus className="w-3.5 h-3.5" strokeWidth={3} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Diskon */}
+                        <div className="flex items-center justify-between bg-gradient-to-r from-yellow-50 to-amber-50 p-2.5 rounded-xl border-2 border-yellow-200">
+                          <span className="text-xs font-bold text-gray-700 uppercase">
+                            Diskon:
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => toggleItemDiskonType(item)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-extrabold shadow-md transition-all hover:scale-105 active:scale-95 ${
+                                (itemDiskonTypes[item.tempId] || "rupiah") ===
+                                "rupiah"
+                                  ? "bg-green-500 text-white"
+                                  : "bg-purple-500 text-white"
+                              }`}
+                            >
+                              {(itemDiskonTypes[item.tempId] || "rupiah") ===
+                              "rupiah"
+                                ? "Rp"
+                                : "%"}
+                            </button>
+                            <input
+                              type="text"
+                              value={getItemDiskonDisplayValue(item)}
+                              onChange={(e) =>
+                                handleItemDiskonChange(
+                                  item,
+                                  e.target.value,
+                                  itemDiskonTypes[item.tempId] || "rupiah"
+                                )
+                              }
+                              className="w-20 text-right text-xs border-2 border-yellow-300 rounded-lg px-2 py-1 font-bold bg-white focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Subtotal */}
+                      <div className="flex items-center justify-between pt-2.5 border-t-2 border-emerald-300 mt-2.5 bg-emerald-50 -mx-3 -mb-3 px-3 py-2.5 rounded-b-lg">
+                        <span className="text-sm font-extrabold text-gray-800 uppercase">
+                          Total:
+                        </span>
+                        <p className="font-extrabold text-emerald-600 text-base">
+                          {formatRupiah(
+                            item.hargaPokok * item.jumlahDus -
+                              item.diskonPerItem * item.jumlahDus
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="bg-gray-100 p-4 rounded-full mb-3 mx-auto w-fit">
+                      <ShoppingCart className="w-12 h-12 text-gray-400" />
+                    </div>
+                    <p className="text-gray-500 font-medium">
+                      Keranjang masih kosong
+                    </p>
+                    <p className="text-gray-400 text-xs mt-1">
+                      Tambahkan produk untuk memulai
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Summary & Checkout */}
+            {cartItems.length > 0 && (
+              <div className="border-t border-gray-200 bg-white p-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-bold text-gray-900">
+                      {formatRupiah(cartSummary.subtotal)}
+                    </span>
+                  </div>
+
+                  {cartSummary.totalDiskonItem > 0 && (
+                    <div className="flex justify-between text-sm text-red-600">
+                      <span>Diskon Item</span>
+                      <span className="font-bold">
+                        -{formatRupiah(cartSummary.totalDiskonItem)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center text-sm border-t border-gray-100 pt-2">
+                    <span className="text-gray-700 font-medium">
+                      Diskon Nota
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={toggleDiskonNotaType}
+                        className={`px-2 py-1 rounded text-xs font-bold ${
+                          diskonNotaType === "rupiah"
+                            ? "bg-green-500 text-white"
+                            : "bg-purple-500 text-white"
+                        }`}
+                      >
+                        {diskonNotaType === "rupiah" ? "Rp" : "%"}
+                      </button>
+                      <input
+                        type="text"
+                        value={diskonNota}
+                        onChange={(e) => handleDiskonNotaChange(e.target.value)}
+                        className="w-16 text-right border border-gray-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center font-bold text-base border-t-2 border-gray-200 pt-2 mt-2">
+                    <span className="text-gray-900">TOTAL</span>
+                    <span className="text-emerald-600 text-lg">
+                      {formatRupiah(Math.max(0, calculatedTotal))}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleOpenCheckoutModal}
+                  disabled={
+                    loading || cartItems.length === 0 || !selectedSupplier
+                  }
+                  className="w-full mt-4 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98"
+                >
+                  <CreditCard className="w-5 h-5" />
+                  {loading ? "Memproses..." : "Proses Pembayaran"}
+                </button>
+
+                {/* Peringatan jika supplier belum dipilih */}
+                {cartItems.length > 0 && !selectedSupplier && (
+                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-yellow-700">
+                      Pilih supplier terlebih dahulu untuk melanjutkan
+                      pembayaran
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Modal Checkout */}
-      {showCheckoutModal && currentPembelian && calculation && (
+      {showCheckoutModal && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setShowCheckoutModal(false)}
         >
           <div
-            className="bg-white rounded-xl max-w-lg w-full"
+            className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 rounded-t-xl flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Pembayaran</h2>
+            <div className="bg-gradient-to-r from-emerald-700 to-emerald-800 p-5 rounded-t-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/10 p-2 rounded-lg">
+                  <Receipt className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-white">
+                  Konfirmasi Pembayaran
+                </h2>
+              </div>
               <button
                 onClick={() => setShowCheckoutModal(false)}
-                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
+                className="text-white hover:bg-white/10 p-2 rounded-lg transition-all"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6">
-              {/* Summary */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Kode Pembelian</span>
-                  <span className="font-medium">
-                    {currentPembelian.kodePembelian}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Supplier</span>
-                  <span>{selectedSupplier?.namaSupplier}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Total Item</span>
-                  <span>{currentPembelian.items?.length} barang</span>
-                </div>
-                <div className="border-t pt-2 mt-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Subtotal</span>
-                    <span>{formatRupiah(calculation.subtotal)}</span>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+              {/* Info Supplier */}
+              <div className="bg-white rounded-xl p-4 mb-4 border-2 border-gray-200">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1">
+                      <Store className="w-3.5 h-3.5" />
+                      Supplier
+                    </div>
+                    <p className="text-sm font-bold text-gray-900">
+                      {selectedSupplier?.namaSupplier || "-"}
+                    </p>
                   </div>
-                  {calculation.totalDiskonItem > 0 && (
-                    <div className="flex justify-between text-sm text-red-500">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1">
+                      <Phone className="w-3.5 h-3.5" />
+                      Telepon
+                    </div>
+                    <p className="text-sm font-bold text-gray-900">
+                      {selectedSupplier?.noHp || "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ringkasan Transaksi */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Receipt className="w-4 h-4 text-gray-700" />
+                  <h3 className="font-bold text-gray-900 uppercase text-xs tracking-wider">
+                    Ringkasan Transaksi
+                  </h3>
+                </div>
+                <div className="bg-white rounded-lg p-4 border-2 border-gray-200">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-semibold">
+                      {formatRupiah(cartSummary.subtotal)}
+                    </span>
+                  </div>
+                  {cartSummary.totalDiskonItem > 0 && (
+                    <div className="flex justify-between text-sm mb-2 text-red-600">
                       <span>Diskon Item</span>
-                      <span>-{formatRupiah(calculation.totalDiskonItem)}</span>
+                      <span className="font-semibold">
+                        -{formatRupiah(cartSummary.totalDiskonItem)}
+                      </span>
                     </div>
                   )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Diskon Nota</span>
-                    <span>-{formatRupiah(calculateDiskonNotaRupiah())}</span>
+                  <div className="flex justify-between text-sm mb-3">
+                    <span className="text-gray-600">Diskon Nota</span>
+                    <span className="font-semibold">
+                      -{formatRupiah(calculateDiskonNotaRupiah())}
+                    </span>
                   </div>
-                  <div className="flex justify-between font-bold text-lg mt-2">
-                    <span>Total Bayar</span>
+                  <div className="flex justify-between font-bold text-lg pt-3 border-t-2 border-gray-200">
+                    <span className="text-gray-900">Total Bayar</span>
                     <span className="text-emerald-600">
                       {formatRupiah(Math.max(0, calculatedTotal))}
                     </span>
@@ -1247,139 +1252,195 @@ const PembelianPage = () => {
                 </div>
               </div>
 
+              {/* Tanggal Pembelian */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-4 h-4 text-gray-700" />
+                  <label className="font-bold text-gray-900 uppercase text-xs tracking-wider">
+                    Tanggal Pembelian <span className="text-red-500">*</span>
+                  </label>
+                </div>
+                <input
+                  type="date"
+                  value={tanggalPembelian}
+                  onChange={(e) => setTanggalPembelian(e.target.value)}
+                  max={new Date().toISOString().split("T")[0]}
+                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none text-sm"
+                />
+              </div>
+
+              {/* Keterangan */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-4 h-4 text-gray-700" />
+                  <label className="font-bold text-gray-900 uppercase text-xs tracking-wider">
+                    Keterangan
+                    <span className="text-gray-500 font-normal ml-1 normal-case">
+                      (Opsional)
+                    </span>
+                  </label>
+                </div>
+                <textarea
+                  value={keterangan}
+                  onChange={(e) => setKeterangan(e.target.value)}
+                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none text-sm resize-none"
+                  placeholder="Catatan tambahan untuk pembelian ini..."
+                  rows={2}
+                />
+              </div>
+
               {/* Payment Input */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="w-4 h-4 text-gray-700" />
+                  <label className="font-bold text-gray-900 uppercase text-xs tracking-wider">
                     Jumlah Dibayar <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                      Rp
-                    </span>
-                    <input
-                      type="text"
-                      value={jumlahDibayar}
-                      onChange={(e) =>
-                        setJumlahDibayar(formatRupiahInput(e.target.value))
-                      }
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-lg"
-                      placeholder="0"
-                    />
-                  </div>
                 </div>
-
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-emerald-600 font-semibold">
+                    Rp
+                  </span>
+                  <input
+                    type="text"
+                    value={jumlahDibayar}
+                    onChange={(e) =>
+                      setJumlahDibayar(formatRupiahInput(e.target.value))
+                    }
+                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none text-base font-semibold"
+                    placeholder="0"
+                  />
+                </div>
                 {/* Quick Amount Buttons */}
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap mt-2">
                   <button
                     onClick={() =>
                       setJumlahDibayar(
                         Math.max(0, calculatedTotal).toLocaleString("id-ID")
                       )
                     }
-                    className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded text-sm hover:bg-emerald-200"
+                    className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold hover:bg-emerald-200 transition-colors"
                   >
                     Pas
                   </button>
-                  {[50000, 100000, 200000, 500000].map((amount) => (
+                  {[50000, 100000, 500000].map((amount) => (
                     <button
                       key={amount}
                       onClick={() =>
                         setJumlahDibayar(amount.toLocaleString("id-ID"))
                       }
-                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+                      className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold hover:bg-emerald-200 transition-colors"
                     >
                       {formatRupiah(amount)}
                     </button>
                   ))}
                 </div>
+              </div>
 
-                {/* Payment Status Preview */}
-                {jumlahDibayar && (
-                  <div
-                    className={`rounded-lg p-4 ${
-                      parseRupiahToNumber(jumlahDibayar) >= calculatedTotal
-                        ? "bg-green-50 border border-green-200"
-                        : "bg-yellow-50 border border-yellow-200"
-                    }`}
-                  >
-                    {parseRupiahToNumber(jumlahDibayar) >= calculatedTotal ? (
-                      <>
-                        <div className="flex items-center gap-2 text-green-700 font-medium">
-                          <Check className="w-5 h-5" />
-                          Status: LUNAS
-                        </div>
-                        {parseRupiahToNumber(jumlahDibayar) >
-                          calculatedTotal && (
-                          <p className="text-green-600 mt-1">
-                            Kembalian:{" "}
-                            {formatRupiah(
-                              parseRupiahToNumber(jumlahDibayar) -
-                                calculatedTotal
-                            )}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 text-yellow-700 font-medium">
-                          <AlertCircle className="w-5 h-5" />
-                          Status: HUTANG
-                        </div>
-                        <p className="text-yellow-600 mt-1">
-                          Sisa Hutang:{" "}
-                          {formatRupiah(
-                            calculatedTotal - parseRupiahToNumber(jumlahDibayar)
-                          )}
+              {/* Payment Preview */}
+              {paymentStatus && (
+                <div
+                  className={`rounded-lg p-4 mb-4 ${
+                    paymentStatus.status === "LUNAS"
+                      ? "bg-green-50 border border-green-200"
+                      : paymentStatus.canCheckout
+                      ? "bg-yellow-50 border border-yellow-200"
+                      : "bg-red-50 border border-red-200"
+                  }`}
+                >
+                  {paymentStatus.status === "LUNAS" ? (
+                    <>
+                      <div className="flex items-center gap-2 text-green-700 font-medium">
+                        <Check className="w-5 h-5" />
+                        Status: LUNAS
+                      </div>
+                      {paymentStatus.kembalian > 0 && (
+                        <p className="text-green-600 mt-1">
+                          Kembalian: {formatRupiah(paymentStatus.kembalian)}
                         </p>
-                      </>
-                    )}
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className={`flex items-center gap-2 font-medium ${
+                          paymentStatus.canCheckout
+                            ? "text-yellow-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {paymentStatus.canCheckout ? (
+                          <AlertCircle className="w-5 h-5" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5" />
+                        )}
+                        Status: HUTANG
+                      </div>
+                      <p
+                        className={`mt-1 ${
+                          paymentStatus.canCheckout
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        Sisa Hutang: {formatRupiah(paymentStatus.sisaHutang)}
+                      </p>
+                      {paymentStatus.message && (
+                        <p className="text-red-600 mt-2 text-sm font-medium">
+                          ⚠️ {paymentStatus.message}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Tanggal Jatuh Tempo - untuk Hutang */}
+              {paymentStatus?.status === "HUTANG" &&
+                paymentStatus.canCheckout && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calendar className="w-4 h-4 text-gray-700" />
+                      <label className="font-bold text-gray-900 uppercase text-xs tracking-wider">
+                        Tanggal Jatuh Tempo
+                        <span className="text-gray-500 font-normal ml-1 normal-case">
+                          (Default 30 hari)
+                        </span>
+                      </label>
+                    </div>
+                    <input
+                      type="date"
+                      value={tanggalJatuhTempo}
+                      onChange={(e) => setTanggalJatuhTempo(e.target.value)}
+                      min={new Date().toISOString().split("T")[0]}
+                      className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none text-sm"
+                    />
                   </div>
                 )}
 
-                {/* Tanggal Jatuh Tempo - Hanya tampil jika status HUTANG */}
-                {jumlahDibayar &&
-                  parseRupiahToNumber(jumlahDibayar) < calculatedTotal && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Tanggal Jatuh Tempo
-                        <span className="text-gray-400 font-normal ml-1">
-                          (Opsional, default 30 hari)
-                        </span>
-                      </label>
-                      <input
-                        type="date"
-                        value={tanggalJatuhTempo}
-                        onChange={(e) => setTanggalJatuhTempo(e.target.value)}
-                        min={new Date().toISOString().split("T")[0]}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Jika tidak diisi, jatuh tempo akan ditetapkan 30 hari
-                        dari sekarang
-                      </p>
-                    </div>
-                  )}
-              </div>
-
-              <div className="flex gap-3 mt-6">
+              {/* Buttons */}
+              <div className="flex gap-3">
                 <button
                   onClick={() => setShowCheckoutModal(false)}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
+                  className="flex-1 bg-white hover:bg-gray-100 text-gray-700 px-4 py-3 rounded-lg transition-all font-semibold border-2 border-gray-300"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleCheckout}
-                  disabled={loading || !jumlahDibayar}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                  disabled={
+                    loading ||
+                    !jumlahDibayar ||
+                    (paymentStatus !== null && !paymentStatus.canCheckout)
+                  }
+                  className="flex-1 bg-gradient-to-r from-emerald-700 to-emerald-800 hover:from-emerald-800 hover:to-emerald-900 text-white px-4 py-3 rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
                 >
                   {loading ? (
                     "Memproses..."
                   ) : (
                     <>
                       <Check className="w-5 h-5" />
-                      Selesaikan
+                      Selesaikan Pembayaran
                     </>
                   )}
                 </button>
@@ -1391,13 +1452,7 @@ const PembelianPage = () => {
 
       {/* Modal Receipt */}
       {showReceiptModal && receiptData && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => {
-            setShowReceiptModal(false);
-            resetAll();
-          }}
-        >
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div
             className="bg-white rounded-xl max-w-md w-full"
             onClick={(e) => e.stopPropagation()}
@@ -1476,114 +1531,13 @@ const PembelianPage = () => {
               <button
                 onClick={() => {
                   setShowReceiptModal(false);
-                  resetAll();
+                  handleReset();
                 }}
-                className="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-all"
+                className="w-full mt-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98"
               >
-                Selesai
+                <Plus className="w-5 h-5" strokeWidth={3} />
+                Transaksi Baru
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Keranjang */}
-      {showKeranjangModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowKeranjangModal(false)}
-        >
-          <div
-            className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-6 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <ShoppingCart className="w-6 h-6 text-white" />
-                <h2 className="text-xl font-bold text-white">
-                  Transaksi Belum Selesai
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowKeranjangModal(false)}
-                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
-              {pembelianList.filter((p) => p.statusTransaksi === "KERANJANG")
-                .length > 0 ? (
-                <div className="space-y-3">
-                  {pembelianList
-                    .filter((p) => p.statusTransaksi === "KERANJANG")
-                    .map((pb) => (
-                      <div
-                        key={pb.id}
-                        className="border border-yellow-300 bg-yellow-50 rounded-lg p-4"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-gray-900">
-                              {pb.kodePembelian}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {pb.supplier?.namaSupplier}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {new Date(pb.createdAt).toLocaleString("id-ID")}
-                            </p>
-                            <p className="text-sm text-yellow-700 mt-1">
-                              {pb.items?.length || 0} item di keranjang
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-emerald-600">
-                              {formatRupiah(pb.totalHarga)}
-                            </p>
-                            <div className="flex gap-2 mt-1">
-                              <span className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700">
-                                KERANJANG
-                              </span>
-                            </div>
-                            <div className="flex gap-2 mt-3">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleContinueTransaction(pb);
-                                  setShowKeranjangModal(false);
-                                }}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-all flex items-center gap-1"
-                              >
-                                <ChevronRight className="w-4 h-4" />
-                                Lanjutkan
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCancelFromHistory(
-                                    pb.id,
-                                    pb.kodePembelian
-                                  );
-                                }}
-                                className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-all flex items-center gap-1"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                Batalkan
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  <ShoppingCart className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p>Tidak ada transaksi yang belum selesai</p>
-                </div>
-              )}
             </div>
           </div>
         </div>

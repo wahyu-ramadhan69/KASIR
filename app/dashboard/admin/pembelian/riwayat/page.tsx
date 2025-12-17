@@ -1,21 +1,18 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search,
   Receipt,
   RefreshCw,
   X,
   Check,
-  CreditCard,
   AlertCircle,
   ArrowLeft,
   Eye,
-  Banknote,
   Calendar,
   Loader2,
   Clock,
   AlertTriangle,
-  CalendarClock,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -35,7 +32,7 @@ interface Barang {
   hargaBeli: number;
   hargaJual: number;
   stok: number;
-  jumlahPerkardus: number;
+  jumlahPerKemasan: number;
   ukuran: number;
   satuan: string;
 }
@@ -132,9 +129,6 @@ const RiwayatPembelianPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
 
-  // User role state
-  const [userRole, setUserRole] = useState<string>("");
-
   // Filter state
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("SELESAI");
@@ -155,21 +149,6 @@ const RiwayatPembelianPage = () => {
   const [selectedPembelian, setSelectedPembelian] =
     useState<PembelianHeader | null>(null);
 
-  // Pelunasan modal
-  const [showPelunasanModal, setShowPelunasanModal] = useState<boolean>(false);
-  const [pelunasanPembelian, setPelunasanPembelian] =
-    useState<PembelianHeader | null>(null);
-  const [jumlahBayar, setJumlahBayar] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  // Ubah Jatuh Tempo modal
-  const [showUbahJatuhTempoModal, setShowUbahJatuhTempoModal] =
-    useState<boolean>(false);
-  const [jatuhTempoPembelian, setJatuhTempoPembelian] =
-    useState<PembelianHeader | null>(null);
-  const [tanggalJatuhTempoBaru, setTanggalJatuhTempoBaru] =
-    useState<string>("");
-
   // Statistik
   const [stats, setStats] = useState({
     totalTransaksi: 0,
@@ -178,23 +157,6 @@ const RiwayatPembelianPage = () => {
     totalDibatalkan: 0,
     hutangJatuhTempo: 0, // Hutang yang akan jatuh tempo dalam 7 hari
   });
-
-  // Check user role on mount
-  useEffect(() => {
-    checkUserRole();
-  }, []);
-
-  const checkUserRole = async () => {
-    try {
-      const res = await fetch("/api/auth/me");
-      const data = await res.json();
-      if (data.success) {
-        setUserRole(data.data.role);
-      }
-    } catch (error) {
-      console.error("Error checking user role:", error);
-    }
-  };
 
   // Debounce search input
   useEffect(() => {
@@ -398,88 +360,6 @@ const RiwayatPembelianPage = () => {
     setShowDetailModal(true);
   };
 
-  const handleOpenPelunasan = (pembelian: PembelianHeader) => {
-    setPelunasanPembelian(pembelian);
-    const sisaHutang = pembelian.totalHarga - pembelian.jumlahDibayar;
-    setJumlahBayar(sisaHutang.toString());
-    setShowPelunasanModal(true);
-  };
-
-  const handlePelunasan = async () => {
-    if (!pelunasanPembelian || !jumlahBayar) return;
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(
-        `/api/pembelian/${pelunasanPembelian.id}/bayar-hutang`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jumlahBayar: parseInt(jumlahBayar) }),
-        }
-      );
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success(data.message);
-        setShowPelunasanModal(false);
-        setPelunasanPembelian(null);
-        setJumlahBayar("");
-        handleRefresh();
-      } else {
-        toast.error(data.error || "Gagal melakukan pembayaran");
-      }
-    } catch (error) {
-      console.error("Error paying debt:", error);
-      toast.error("Terjadi kesalahan");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleOpenUbahJatuhTempo = (pembelian: PembelianHeader) => {
-    setJatuhTempoPembelian(pembelian);
-    // Format tanggal untuk input date (YYYY-MM-DD)
-    const currentDate = new Date(pembelian.tanggalJatuhTempo);
-    const formattedDate = currentDate.toISOString().split("T")[0];
-    setTanggalJatuhTempoBaru(formattedDate);
-    setShowUbahJatuhTempoModal(true);
-  };
-
-  const handleUbahJatuhTempo = async () => {
-    if (!jatuhTempoPembelian || !tanggalJatuhTempoBaru) return;
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(
-        `/api/pembelian/${jatuhTempoPembelian.id}/ubah-jatuh-tempo`, // ← Ubah URL ini
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tanggalJatuhTempo: tanggalJatuhTempoBaru,
-          }),
-        }
-      );
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success(data.message);
-        setShowUbahJatuhTempoModal(false);
-        setJatuhTempoPembelian(null);
-        setTanggalJatuhTempoBaru("");
-        handleRefresh();
-      } else {
-        toast.error(data.error || "Gagal mengubah tanggal jatuh tempo");
-      }
-    } catch (error) {
-      console.error("Error updating jatuh tempo:", error);
-      toast.error("Terjadi kesalahan");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const formatRupiah = (number: number): string => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -506,8 +386,6 @@ const RiwayatPembelianPage = () => {
     startDate ||
     endDate ||
     debouncedSearch;
-
-  const isAdmin = userRole === "ADMIN";
 
   return (
     <div className="w-full max-w-7xl mx-auto">
@@ -743,12 +621,6 @@ const RiwayatPembelianPage = () => {
                     Total
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Sisa Hutang
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Jatuh Tempo
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -760,7 +632,7 @@ const RiwayatPembelianPage = () => {
                 {pembelianList.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={6}
                       className="px-6 py-12 text-center text-gray-500"
                     >
                       <Receipt className="w-12 h-12 mx-auto mb-2 text-gray-300" />
@@ -769,21 +641,14 @@ const RiwayatPembelianPage = () => {
                   </tr>
                 ) : (
                   pembelianList.map((pb) => {
-                    const sisaHutang = getSisaHutang(pb);
-                    const jatuhTempoStatus =
-                      pb.statusPembayaran === "HUTANG" && pb.tanggalJatuhTempo
-                        ? getJatuhTempoStatus(pb.tanggalJatuhTempo)
-                        : null;
+                    const sisaLimit =
+                      (pb.supplier?.limitHutang || 0) -
+                      (pb.supplier?.hutang || 0);
 
                     return (
                       <tr
                         key={pb.id}
-                        className={`hover:bg-gray-50 transition-colors ${
-                          jatuhTempoStatus?.status === "overdue" ||
-                          jatuhTempoStatus?.status === "critical"
-                            ? "bg-red-50/50"
-                            : ""
-                        }`}
+                        className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <p className="font-medium text-gray-900">
@@ -791,7 +656,27 @@ const RiwayatPembelianPage = () => {
                           </p>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {pb.supplier?.namaSupplier || "-"}
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-800">
+                              {pb.supplier?.namaSupplier || "-"}
+                            </span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {pb.supplier?.noHp && (
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                  {pb.supplier.noHp}
+                                </span>
+                              )}
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                  sisaLimit > 0
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-red-50 text-red-700 border-red-200"
+                                }`}
+                              >
+                                Sisa Limit: {formatRupiah(sisaLimit)}
+                              </span>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(pb.createdAt).toLocaleDateString("id-ID", {
@@ -804,47 +689,7 @@ const RiwayatPembelianPage = () => {
                           {formatRupiah(pb.totalHarga)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {pb.statusTransaksi === "SELESAI" &&
-                          sisaHutang > 0 ? (
-                            <span className="text-sm font-medium text-red-600">
-                              {formatRupiah(sisaHutang)}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {pb.statusTransaksi === "SELESAI" &&
-                          pb.statusPembayaran === "HUTANG" &&
-                          pb.tanggalJatuhTempo ? (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-sm text-gray-600">
-                                {formatDate(pb.tanggalJatuhTempo)}
-                              </span>
-                              {jatuhTempoStatus && (
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${jatuhTempoStatus.color}`}
-                                >
-                                  <jatuhTempoStatus.icon className="w-3 h-3" />
-                                  {jatuhTempoStatus.label}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex gap-1">
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${
-                                pb.statusTransaksi === "SELESAI"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-red-100 text-red-700"
-                              }`}
-                            >
-                              {pb.statusTransaksi}
-                            </span>
                             {pb.statusTransaksi === "SELESAI" && (
                               <span
                                 className={`px-2 py-1 rounded text-xs font-medium ${
@@ -867,30 +712,6 @@ const RiwayatPembelianPage = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            {pb.statusTransaksi === "SELESAI" &&
-                              pb.statusPembayaran === "HUTANG" && (
-                                <>
-                                  <button
-                                    onClick={() => handleOpenPelunasan(pb)}
-                                    className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all"
-                                    title="Bayar Hutang"
-                                  >
-                                    <Banknote className="w-4 h-4" />
-                                  </button>
-                                  {/* Tombol Ubah Jatuh Tempo - hanya untuk ADMIN */}
-                                  {isAdmin && (
-                                    <button
-                                      onClick={() =>
-                                        handleOpenUbahJatuhTempo(pb)
-                                      }
-                                      className="p-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all"
-                                      title="Ubah Jatuh Tempo"
-                                    >
-                                      <CalendarClock className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </>
-                              )}
                           </div>
                         </td>
                       </tr>
@@ -1102,370 +923,6 @@ const RiwayatPembelianPage = () => {
                     </span>
                   </div>
                 )}
-              </div>
-
-              {/* Action Buttons */}
-              {selectedPembelian.statusTransaksi === "SELESAI" &&
-                selectedPembelian.statusPembayaran === "HUTANG" && (
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => {
-                        setShowDetailModal(false);
-                        handleOpenPelunasan(selectedPembelian);
-                      }}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-                    >
-                      <Banknote className="w-5 h-5" />
-                      Bayar Hutang
-                    </button>
-                    {isAdmin && (
-                      <button
-                        onClick={() => {
-                          setShowDetailModal(false);
-                          handleOpenUbahJatuhTempo(selectedPembelian);
-                        }}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-                      >
-                        <CalendarClock className="w-5 h-5" />
-                        Ubah Jatuh Tempo
-                      </button>
-                    )}
-                  </div>
-                )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Pelunasan */}
-      {showPelunasanModal && pelunasanPembelian && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowPelunasanModal(false)}
-        >
-          <div
-            className="bg-white rounded-xl max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 rounded-t-xl flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">
-                Pembayaran Hutang
-              </h2>
-              <button
-                onClick={() => setShowPelunasanModal(false)}
-                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              {/* Info */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Kode</span>
-                    <span className="font-medium">
-                      {pelunasanPembelian.kodePembelian}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Supplier</span>
-                    <span>{pelunasanPembelian.supplier?.namaSupplier}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Total</span>
-                    <span>{formatRupiah(pelunasanPembelian.totalHarga)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Sudah Dibayar</span>
-                    <span>
-                      {formatRupiah(pelunasanPembelian.jumlahDibayar)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-bold text-red-600 border-t pt-2">
-                    <span>Sisa Hutang</span>
-                    <span>
-                      {formatRupiah(getSisaHutang(pelunasanPembelian))}
-                    </span>
-                  </div>
-                  {/* Tanggal Jatuh Tempo di modal */}
-                  {pelunasanPembelian.tanggalJatuhTempo && (
-                    <div className="flex justify-between items-center text-sm border-t pt-2">
-                      <span className="text-gray-500">Jatuh Tempo</span>
-                      <div className="flex items-center gap-2">
-                        <span>
-                          {formatDate(pelunasanPembelian.tanggalJatuhTempo)}
-                        </span>
-                        {(() => {
-                          const status = getJatuhTempoStatus(
-                            pelunasanPembelian.tanggalJatuhTempo
-                          );
-                          return (
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${status.color}`}
-                            >
-                              <status.icon className="w-3 h-3" />
-                              {status.label}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Input */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Jumlah Pembayaran <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={jumlahBayar}
-                  onChange={(e) => setJumlahBayar(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-lg"
-                  placeholder="Masukkan jumlah pembayaran"
-                />
-              </div>
-
-              {/* Quick Amount */}
-              <div className="flex gap-2 flex-wrap mb-4">
-                <button
-                  onClick={() =>
-                    setJumlahBayar(getSisaHutang(pelunasanPembelian).toString())
-                  }
-                  className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded text-sm hover:bg-emerald-200"
-                >
-                  Lunasi Semua
-                </button>
-                {[50000, 100000, 200000, 500000].map((amount) => (
-                  <button
-                    key={amount}
-                    onClick={() => setJumlahBayar(amount.toString())}
-                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
-                  >
-                    {formatRupiah(amount)}
-                  </button>
-                ))}
-              </div>
-
-              {/* Preview */}
-              {jumlahBayar && parseInt(jumlahBayar) > 0 && (
-                <div
-                  className={`rounded-lg p-4 mb-4 ${
-                    parseInt(jumlahBayar) >= getSisaHutang(pelunasanPembelian)
-                      ? "bg-green-50 border border-green-200"
-                      : "bg-yellow-50 border border-yellow-200"
-                  }`}
-                >
-                  {parseInt(jumlahBayar) >=
-                  getSisaHutang(pelunasanPembelian) ? (
-                    <>
-                      <div className="flex items-center gap-2 text-green-700 font-medium">
-                        <Check className="w-5 h-5" />
-                        Hutang akan LUNAS
-                      </div>
-                      {parseInt(jumlahBayar) >
-                        getSisaHutang(pelunasanPembelian) && (
-                        <p className="text-green-600 mt-1">
-                          Kembalian:{" "}
-                          {formatRupiah(
-                            parseInt(jumlahBayar) -
-                              getSisaHutang(pelunasanPembelian)
-                          )}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2 text-yellow-700 font-medium">
-                        <AlertCircle className="w-5 h-5" />
-                        Pembayaran Sebagian
-                      </div>
-                      <p className="text-yellow-600 mt-1">
-                        Sisa Hutang:{" "}
-                        {formatRupiah(
-                          getSisaHutang(pelunasanPembelian) -
-                            parseInt(jumlahBayar)
-                        )}
-                      </p>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowPelunasanModal(false)}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handlePelunasan}
-                  disabled={
-                    isSubmitting || !jumlahBayar || parseInt(jumlahBayar) <= 0
-                  }
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    "Memproses..."
-                  ) : (
-                    <>
-                      <CreditCard className="w-5 h-5" />
-                      Bayar
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Ubah Jatuh Tempo */}
-      {showUbahJatuhTempoModal && jatuhTempoPembelian && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowUbahJatuhTempoModal(false)}
-        >
-          <div
-            className="bg-white rounded-xl max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 rounded-t-xl flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">
-                Ubah Tanggal Jatuh Tempo
-              </h2>
-              <button
-                onClick={() => setShowUbahJatuhTempoModal(false)}
-                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              {/* Info */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Kode</span>
-                    <span className="font-medium">
-                      {jatuhTempoPembelian.kodePembelian}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Supplier</span>
-                    <span>{jatuhTempoPembelian.supplier?.namaSupplier}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Sisa Hutang</span>
-                    <span className="font-bold text-red-600">
-                      {formatRupiah(getSisaHutang(jatuhTempoPembelian))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm border-t pt-2">
-                    <span className="text-gray-500">Jatuh Tempo Saat Ini</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">
-                        {formatDate(jatuhTempoPembelian.tanggalJatuhTempo)}
-                      </span>
-                      {(() => {
-                        const status = getJatuhTempoStatus(
-                          jatuhTempoPembelian.tanggalJatuhTempo
-                        );
-                        return (
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${status.color}`}
-                          >
-                            <status.icon className="w-3 h-3" />
-                            {status.label}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Input Tanggal Baru */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tanggal Jatuh Tempo Baru{" "}
-                  <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={tanggalJatuhTempoBaru}
-                  onChange={(e) => setTanggalJatuhTempoBaru(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none text-lg"
-                />
-              </div>
-
-              {/* Preview Tanggal Baru */}
-              {tanggalJatuhTempoBaru && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-center gap-2 text-purple-700 font-medium mb-2">
-                    <CalendarClock className="w-5 h-5" />
-                    Preview Jatuh Tempo Baru
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-700">
-                      {formatDate(tanggalJatuhTempoBaru)}
-                    </span>
-                    {(() => {
-                      const status = getJatuhTempoStatus(tanggalJatuhTempoBaru);
-                      return (
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${status.color}`}
-                        >
-                          <status.icon className="w-3 h-3" />
-                          {status.label}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {/* Warning */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-yellow-700">
-                  Perubahan tanggal jatuh tempo akan langsung disimpan dan tidak
-                  dapat dibatalkan.
-                </p>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowUbahJatuhTempoModal(false)}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleUbahJatuhTempo}
-                  disabled={isSubmitting || !tanggalJatuhTempoBaru}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Menyimpan...
-                    </>
-                  ) : (
-                    <>
-                      <CalendarClock className="w-5 h-5" />
-                      Simpan Perubahan
-                    </>
-                  )}
-                </button>
               </div>
             </div>
           </div>

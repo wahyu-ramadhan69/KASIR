@@ -23,7 +23,7 @@ interface Barang {
   namaBarang: string;
   ukuran: number;
   satuan: string;
-  jumlahPerkardus: number;
+  jumlahPerKemasan: number;
 }
 
 interface PenjualanItem {
@@ -359,7 +359,7 @@ const LaporanPenjualanPage = () => {
         const modalPcs =
           item.jumlahPcs > 0
             ? Math.round(
-                (item.hargaBeli / item.barang.jumlahPerkardus) * item.jumlahPcs
+                (item.hargaBeli / item.barang.jumlahPerKemasan) * item.jumlahPcs
               )
             : 0;
         return sum + modalDus + modalPcs;
@@ -800,7 +800,7 @@ const LaporanPenjualanPage = () => {
                       const modalPcs =
                         item.jumlahPcs > 0
                           ? Math.round(
-                              (item.hargaBeli / item.barang.jumlahPerkardus) *
+                              (item.hargaBeli / item.barang.jumlahPerKemasan) *
                                 item.jumlahPcs
                             )
                           : 0;

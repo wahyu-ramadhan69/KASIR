@@ -114,13 +114,14 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const pembayaran = searchParams.get("pembayaran");
     const customerId = searchParams.get("customerId");
-    const salesId = searchParams.get("salesId");
     const tipePenjualan = searchParams.get("tipePenjualan"); // "toko" atau "sales"
     const search = searchParams.get("search");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
-    const where: any = {};
+    const where: any = {
+      karyawanId: null, // hanya penjualan header tanpa karyawan
+    };
 
     if (status && status !== "all") {
       where.statusTransaksi = status;
@@ -134,16 +135,12 @@ export async function GET(request: NextRequest) {
       where.customerId = parseInt(customerId);
     }
 
-    if (salesId) {
-      where.salesId = parseInt(salesId);
-    }
-
     // Filter berdasarkan tipe penjualan
     if (tipePenjualan === "toko") {
-      where.salesId = null; // Penjualan toko tidak memiliki sales sebagai customer
+      where.perjalananSalesId = null; // Penjualan toko tidak terkait perjalanan sales
     } else if (tipePenjualan === "sales") {
-      where.salesId = { not: null }; // Penjualan ke sales memiliki salesId
-      where.customerId = null; // Sales penjualan tidak punya customerId
+      where.perjalananSalesId = { not: null }; // Penjualan sales luar kota punya perjalanan
+      where.customerId = null;
     }
 
     if (search) {
@@ -153,7 +150,6 @@ export async function GET(request: NextRequest) {
         { namaSales: { contains: search, mode: "insensitive" } },
         { customer: { nama: { contains: search, mode: "insensitive" } } },
         { customer: { namaToko: { contains: search, mode: "insensitive" } } },
-        { sales: { namaSales: { contains: search, mode: "insensitive" } } },
       ];
     }
 
@@ -182,7 +178,6 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         customer: true,
-        sales: true,
         items: {
           include: {
             barang: true,
@@ -283,7 +278,6 @@ export async function POST(request: NextRequest) {
       data: createData,
       include: {
         customer: true,
-        sales: true,
         items: true,
       },
     });

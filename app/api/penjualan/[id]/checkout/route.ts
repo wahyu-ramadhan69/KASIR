@@ -29,6 +29,69 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+// Helper untuk total penjualan harian termasuk manifest terjual
+async function getTotalPenjualanHariIni(barangId: number, excludePenjualanId?: number): Promise<number> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const items = await prisma.penjualanItem.findMany({
+    where: {
+      barangId,
+      penjualan: {
+        statusTransaksi: "SELESAI",
+        tanggalTransaksi: {
+          gte: today,
+          lt: tomorrow,
+        },
+        ...(excludePenjualanId ? { NOT: { id: excludePenjualanId } } : {}),
+      },
+    },
+    include: {
+      barang: {
+        select: {
+          jumlahPerKemasan: true,
+        },
+      },
+    },
+  });
+
+  const manifestData = await prisma.manifestBarang.findMany({
+    where: {
+      barangId,
+      perjalanan: {
+        tanggalBerangkat: {
+          gte: today,
+          lt: tomorrow,
+        },
+        statusPerjalanan: { not: "DIBATALKAN" },
+      },
+      updatedAt: {
+        gte: today,
+        lt: tomorrow,
+      },
+    },
+    include: {
+      perjalanan: true,
+    },
+  });
+
+  let totalPcs = 0;
+  for (const item of items) {
+    const jumlahDus = toNumber(item.jumlahDus);
+    const jumlahPcs = toNumber(item.jumlahPcs);
+    const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+    totalPcs += jumlahDus * jumlahPerKemasan + jumlahPcs;
+  }
+
+  for (const manifest of manifestData) {
+    totalPcs += toNumber(manifest.jumlahTerjual) + toNumber(manifest.totalItem);
+  }
+
+  return totalPcs;
+}
+
 // Helper function untuk menghitung total penjualan
 const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let subtotal = 0;
@@ -39,12 +102,12 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
     const jumlahPcs = toNumber(item.jumlahPcs);
     const hargaJual = toNumber(item.hargaJual);
     const diskonPerItem = toNumber(item.diskonPerItem);
-    const jumlahPerkardus = toNumber(item.barang?.jumlahPerkardus || 1);
+    const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan || 1);
 
-    const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+    const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
     const diskon = diskonPerItem * jumlahDus;
 
@@ -103,7 +166,7 @@ export async function POST(
       where: { id: penjualanId },
       include: {
         customer: true,
-        sales: true,
+        karyawan: true,
         items: {
           include: { barang: true },
         },
@@ -131,6 +194,32 @@ export async function POST(
       );
     }
 
+    // Validasi limit pembelian per hari untuk setiap item
+    for (const item of penjualan.items) {
+      const limitPenjualan = toNumber(item.barang.limitPenjualan);
+
+      if (limitPenjualan > 0) {
+        const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+        const jumlahDus = toNumber(item.jumlahDus);
+        const jumlahPcs = toNumber(item.jumlahPcs);
+        const totalPcsItem = (jumlahDus * jumlahPerKemasan) + jumlahPcs;
+
+        const totalTerjualHariIni = await getTotalPenjualanHariIni(item.barangId, penjualanId);
+        const totalSetelahCheckout = totalTerjualHariIni + totalPcsItem;
+
+        if (totalSetelahCheckout > limitPenjualan) {
+          const sisaLimit = Math.max(0, limitPenjualan - totalTerjualHariIni);
+          return NextResponse.json(
+            {
+              success: false,
+              error: `CHECKOUT DITOLAK - LIMIT TERLAMPAUI!\n\n📦 ${item.barang.namaBarang}\n⚠️ Limit: ${limitPenjualan} unit/hari\n✅ Terjual: ${totalTerjualHariIni} unit\n🔸 Sisa: ${sisaLimit} unit\n🛒 Keranjang: ${totalPcsItem} unit\n\nKurangi jumlah atau hubungi admin!`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Calculate totals
     const calculation = calculatePenjualan(penjualan.items, diskonNota);
     const totalHarga = calculation.ringkasan.totalHarga;
@@ -143,12 +232,11 @@ export async function POST(
       statusPembayaran === "HUTANG" ? totalHarga - jumlahDibayar : 0;
 
     // Deteksi tipe penjualan berdasarkan data yang ada
-    const isPenjualanSales =
-      salesId !== undefined || penjualan.salesId !== null;
+    const isPenjualanSales = penjualan.karyawanId !== null;
 
     // Validasi hutang untuk sales
     if (statusPembayaran === "HUTANG" && isPenjualanSales) {
-      if (!salesId) {
+      if (!penjualan.karyawanId) {
         return NextResponse.json(
           {
             success: false,
@@ -158,38 +246,18 @@ export async function POST(
         );
       }
 
-      const sales = await prisma.sales.findUnique({
-        where: { id: salesId },
+      const karyawan = await prisma.karyawan.findUnique({
+        where: { id: penjualan.karyawanId },
       });
 
-      if (!sales) {
+      if (!karyawan || karyawan.jenis !== "SALES") {
         return NextResponse.json(
-          { success: false, error: "Sales tidak ditemukan" },
+          { success: false, error: "Sales tidak ditemukan atau bukan jenis SALES" },
           { status: 404 }
         );
       }
 
-      // Cek limit hutang sales
-      const hutangSekarang = toNumber(sales.hutang);
-      const limitHutang = toNumber(sales.limitHutang);
-      const hutangBaru = hutangSekarang + sisaHutang;
-
-      if (limitHutang > 0 && hutangBaru > limitHutang) {
-        const sisaLimit = limitHutang - hutangSekarang;
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Hutang melebihi limit! Limit: Rp ${limitHutang.toLocaleString(
-              "id-ID"
-            )}, Hutang saat ini: Rp ${hutangSekarang.toLocaleString(
-              "id-ID"
-            )}, Sisa limit: Rp ${sisaLimit.toLocaleString(
-              "id-ID"
-            )}, Hutang baru: Rp ${sisaHutang.toLocaleString("id-ID")}`,
-          },
-          { status: 400 }
-        );
-      }
+      // Note: Karyawan tidak memiliki limit hutang, jadi skip validasi limit
     }
 
     // Validasi piutang customer untuk penjualan toko dengan hutang
@@ -252,13 +320,13 @@ export async function POST(
       );
     }
 
-    // Validasi sales
+    // Validasi sales/karyawan
     if (isPenjualanSales && salesId) {
-      const sales = await prisma.sales.findUnique({
+      const karyawan = await prisma.karyawan.findUnique({
         where: { id: salesId },
       });
 
-      if (!sales) {
+      if (!karyawan || karyawan.jenis !== "SALES") {
         return NextResponse.json(
           { success: false, error: "Sales tidak ditemukan" },
           { status: 404 }
@@ -270,10 +338,10 @@ export async function POST(
     for (const item of penjualan.items) {
       const jumlahDus = toNumber(item.jumlahDus);
       const jumlahPcs = toNumber(item.jumlahPcs);
-      const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       const stokTersedia = toNumber(item.barang.stok);
 
-      const totalPcsNeeded = jumlahDus * jumlahPerkardus + jumlahPcs;
+      const totalPcsNeeded = jumlahDus * jumlahPerKemasan + jumlahPcs;
 
       if (stokTersedia < totalPcsNeeded) {
         return NextResponse.json(
@@ -305,12 +373,12 @@ export async function POST(
         const jumlahDus = toNumber(item.jumlahDus);
         const jumlahPcs = toNumber(item.jumlahPcs);
         const hargaBeli = toNumber(item.hargaBeli);
-        const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+        const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
 
         const modalDus = hargaBeli * jumlahDus;
         const modalPcs =
           jumlahPcs > 0
-            ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+            ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
             : 0;
         totalModal += modalDus + modalPcs;
       }
@@ -342,8 +410,8 @@ export async function POST(
       for (const item of penjualan.items) {
         const jumlahDus = toNumber(item.jumlahDus);
         const jumlahPcs = toNumber(item.jumlahPcs);
-        const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
-        const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+        const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+        const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
 
         await tx.barang.update({
           where: { id: item.barangId },
@@ -353,15 +421,8 @@ export async function POST(
         });
       }
 
-      // Update hutang sales jika penjualan sales dengan HUTANG
-      if (statusPembayaran === "HUTANG" && salesId) {
-        await tx.sales.update({
-          where: { id: salesId },
-          data: {
-            hutang: { increment: BigInt(sisaHutang) },
-          },
-        });
-      }
+      // Note: Karyawan tidak memiliki field hutang, jadi tidak perlu update
+      // Jika perlu tracking hutang sales, harus dihandle di tempat lain
 
       // Update piutang customer jika penjualan toko dengan HUTANG
       if (statusPembayaran === "HUTANG" && customerId && !salesId) {
@@ -389,26 +450,20 @@ export async function POST(
         tanggalJatuhTempo: finalTanggalJatuhTempo,
       };
 
-      // Untuk penjualan sales: set salesId, hapus customerId & namaCustomer
-      if (salesId) {
-        updateData.salesId = salesId;
-        updateData.namaSales = null;
-        updateData.customerId = null;
-        updateData.namaCustomer = null;
+      // Deteksi tipe penjualan dari data yang sudah ada di penjualan
+      // Jika ada karyawanId (sudah di-set via PATCH), berarti penjualan sales
+      if (penjualan.karyawanId) {
+        // Penjualan sales - pertahankan karyawanId dan customerId yang sudah ada
+        // Tidak perlu update karena sudah di-set via PATCH sebelumnya
       }
-      // Untuk penjualan sales manual (namaSales)
-      else if (namaSales) {
-        updateData.salesId = null;
-        updateData.namaSales = namaSales;
-        updateData.customerId = null;
-        updateData.namaCustomer = null;
-      }
-      // Untuk penjualan toko: set customerId, hapus salesId & namaSales
-      else {
-        updateData.customerId = customerId || null;
+      // Jika ada customerId tapi tidak ada karyawanId, berarti penjualan toko
+      else if (penjualan.customerId || customerId) {
+        updateData.customerId = customerId || penjualan.customerId;
         updateData.namaCustomer = customerId ? null : namaCustomer;
-        updateData.salesId = null;
-        updateData.namaSales = null;
+      }
+      // Penjualan cash tanpa customer terdaftar
+      else if (namaCustomer) {
+        updateData.namaCustomer = namaCustomer;
       }
 
       // Update penjualan header
@@ -417,7 +472,7 @@ export async function POST(
         data: updateData,
         include: {
           customer: true,
-          sales: true,
+          karyawan: true,
           items: {
             include: { barang: true },
           },
@@ -439,10 +494,10 @@ export async function POST(
             limit_piutang: toNumber(result.customer.limit_piutang),
           }
         : { nama: result.namaCustomer, namaToko: null },
-      sales: result.sales
+      karyawan: result.karyawan
         ? {
-            id: result.sales.id,
-            namaSales: result.sales.namaSales,
+            id: result.karyawan.id,
+            nama: result.karyawan.nama,
           }
         : result.namaSales
         ? { nama: result.namaSales }
@@ -466,7 +521,7 @@ export async function POST(
       sisaHutang,
       statusPembayaran: result.statusPembayaran,
       tanggalJatuhTempo: result.tanggalJatuhTempo,
-      tipePenjualan: result.salesId ? "sales" : "toko",
+      tipePenjualan: result.karyawanId ? "sales" : "toko",
     };
 
     return NextResponse.json(

@@ -19,7 +19,7 @@ interface Barang {
   namaBarang: string;
   ukuran: number;
   satuan: string;
-  jumlahPerkardus: number;
+  jumlahPerKemasan: number;
 }
 
 interface PembelianItem {

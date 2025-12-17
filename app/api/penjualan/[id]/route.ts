@@ -39,12 +39,12 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
     const jumlahPcs = toNumber(item.jumlahPcs);
     const hargaJual = toNumber(item.hargaJual);
     const diskonPerItem = toNumber(item.diskonPerItem);
-    const jumlahPerkardus = toNumber(item.barang?.jumlahPerkardus || 1);
+    const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan || 1);
 
-    const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+    const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
     const diskon = diskonPerItem * jumlahDus;
 
@@ -90,7 +90,6 @@ export async function GET(
       where: { id: penjualanId },
       include: {
         customer: true,
-        sales: true,
         items: {
           include: {
             barang: true,
@@ -178,7 +177,6 @@ export async function PUT(
       data: updateData,
       include: {
         customer: true,
-        sales: true,
         items: {
           include: { barang: true },
         },
@@ -207,7 +205,6 @@ export async function PUT(
       where: { id: penjualanId },
       include: {
         customer: true,
-        sales: true,
         items: {
           include: { barang: true },
         },
@@ -225,6 +222,96 @@ export async function PUT(
     console.error("Error updating penjualan:", err);
     return NextResponse.json(
       { success: false, error: "Gagal mengupdate penjualan" },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// PATCH: Update customer dan karyawan
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    const { id } = await params;
+    const penjualanId = parseInt(id);
+    const body = await request.json();
+
+    const penjualan = await prisma.penjualanHeader.findUnique({
+      where: { id: penjualanId },
+    });
+
+    if (!penjualan) {
+      return NextResponse.json(
+        { success: false, error: "Penjualan tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    if (penjualan.statusTransaksi !== "KERANJANG") {
+      return NextResponse.json(
+        { success: false, error: "Penjualan sudah selesai" },
+        { status: 400 }
+      );
+    }
+
+    // Build update data
+    const updateData: any = {};
+
+    if (body.customerId !== undefined && body.customerId !== null) {
+      updateData.customerId = parseInt(body.customerId);
+    }
+
+    if (body.karyawanId !== undefined && body.karyawanId !== null) {
+      updateData.karyawanId = parseInt(body.karyawanId);
+    }
+
+    if (body.namaCustomer !== undefined) {
+      updateData.namaCustomer = body.namaCustomer;
+    }
+
+    if (body.namaSales !== undefined) {
+      updateData.namaSales = body.namaSales;
+    }
+
+    // Validasi minimal ada data yang di-update
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Tidak ada data yang di-update" },
+        { status: 400 }
+      );
+    }
+
+    // Update penjualan
+    const updated = await prisma.penjualanHeader.update({
+      where: { id: penjualanId },
+      data: updateData,
+      include: {
+        customer: true,
+        karyawan: true,
+        items: {
+          include: { barang: true },
+        },
+      },
+    });
+
+    return NextResponse.json(
+      deepSerialize({
+        success: true,
+        message: "Customer dan karyawan berhasil diupdate",
+        data: updated,
+      })
+    );
+  } catch (err) {
+    console.error("Error updating customer/karyawan:", err);
+    return NextResponse.json(
+      { success: false, error: "Gagal mengupdate customer/karyawan" },
       { status: 500 }
     );
   } finally {

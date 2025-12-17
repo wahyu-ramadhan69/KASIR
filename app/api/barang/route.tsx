@@ -20,8 +20,9 @@ function serializeBarang(barang: any) {
     hargaBeli: bigIntToNumber(barang.hargaBeli),
     hargaJual: bigIntToNumber(barang.hargaJual),
     stok: bigIntToNumber(barang.stok),
-    jumlahPerkardus: bigIntToNumber(barang.jumlahPerkardus),
+    jumlahPerKemasan: bigIntToNumber(barang.jumlahPerKemasan),
     ukuran: bigIntToNumber(barang.ukuran),
+    limitPenjualan: bigIntToNumber(barang.limitPenjualan),
     supplier: barang.supplier
       ? {
           ...barang.supplier,
@@ -45,17 +46,20 @@ export async function POST(request: NextRequest) {
       hargaBeli,
       hargaJual,
       stok,
-      jumlahPerkardus,
+      jenisKemasan,
+      jumlahPerKemasan,
       ukuran,
       satuan,
       supplierId,
+      limitPenjualan,
     } = body;
 
     if (
       !namaBarang ||
       hargaBeli == null ||
       hargaJual == null ||
-      jumlahPerkardus == null ||
+      !jenisKemasan ||
+      jumlahPerKemasan == null ||
       ukuran == null ||
       !satuan ||
       supplierId == null
@@ -73,10 +77,12 @@ export async function POST(request: NextRequest) {
         hargaBeli: BigInt(hargaBeli),
         hargaJual: BigInt(hargaJual),
         stok: stok != null ? BigInt(stok) : BigInt(0),
-        jumlahPerkardus: BigInt(jumlahPerkardus),
+        jenisKemasan: String(jenisKemasan).trim(),
+        jumlahPerKemasan: BigInt(jumlahPerKemasan),
         ukuran: BigInt(ukuran),
         satuan: String(satuan).trim(),
         supplierId: Number(supplierId),
+        limitPenjualan: limitPenjualan != null ? BigInt(limitPenjualan) : BigInt(0),
       },
       include: {
         supplier: true,

@@ -466,7 +466,7 @@ const DataSalesPage = () => {
                   Data Sales
                 </h1>
                 <p className="text-blue-100 text-lg">
-                  Kelola informasi sales dan supplier Anda
+                  Kelola informasi sales dan sales Anda
                 </p>
               </div>
             </div>
@@ -515,12 +515,12 @@ const DataSalesPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Total Supplier
+                  Total Sales
                 </p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">
                   {pagination.totalCount}
                 </p>
-                <p className="text-xs text-gray-400 mt-2">Supplier aktif</p>
+                <p className="text-xs text-gray-400 mt-2">Sales aktif</p>
               </div>
               <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
                 <Building2 className="w-8 h-8 text-white" />
@@ -578,7 +578,7 @@ const DataSalesPage = () => {
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Cari nama supplier, NIK, alamat, atau nomor HP..."
+                placeholder="Cari nama sales, NIK, alamat, atau nomor HP..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
@@ -683,7 +683,7 @@ const DataSalesPage = () => {
                         </div>
                         <div className="flex items-center gap-2 text-blue-100 text-xs">
                           <Building2 className="w-3 h-3 flex-shrink-0" />
-                          <span className="truncate font-medium">Supplier</span>
+                          <span className="truncate font-medium">Sales</span>
                         </div>
                       </div>
                     </div>
@@ -926,7 +926,7 @@ const DataSalesPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5">
                     <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-2">
-                      Nama Supplier
+                      Nama Sales
                     </p>
                     <p className="text-gray-900 text-xl font-bold">
                       {selectedSales.namaSales}
@@ -1170,7 +1170,7 @@ const DataSalesPage = () => {
                   <div className="group">
                     <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                       <Building2 className="w-4 h-4 text-blue-600" />
-                      Nama Supplier <span className="text-red-500">*</span>
+                      Nama Sales <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -1178,7 +1178,7 @@ const DataSalesPage = () => {
                       value={formData.namaSales}
                       onChange={handleInputChange}
                       className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                      placeholder="Masukkan nama supplier"
+                      placeholder="Masukkan nama sales"
                       required
                     />
                   </div>
@@ -1352,7 +1352,7 @@ const DataSalesPage = () => {
                   <div className="group">
                     <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                       <Building2 className="w-4 h-4 text-yellow-600" />
-                      Nama Supplier <span className="text-red-500">*</span>
+                      Nama Sales <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -1360,7 +1360,7 @@ const DataSalesPage = () => {
                       value={editingSales.data.namaSales}
                       onChange={handleEditInputChange}
                       className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                      placeholder="Masukkan nama supplier"
+                      placeholder="Masukkan nama sales"
                       required
                     />
                   </div>

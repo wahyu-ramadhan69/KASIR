@@ -23,7 +23,7 @@ interface Barang {
   hargaBeli: number;
   hargaJual: number;
   stok: number;
-  jumlahPerkardus: number;
+  jumlahPerKemasan: number;
   ukuran: number;
   satuan: string;
   supplierId: number;

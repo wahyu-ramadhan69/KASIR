@@ -39,12 +39,12 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
     const jumlahPcs = toNumber(item.jumlahPcs);
     const hargaJual = toNumber(item.hargaJual);
     const diskonPerItem = toNumber(item.diskonPerItem);
-    const jumlahPerkardus = toNumber(item.barang?.jumlahPerkardus || 1);
+    const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan || 1);
 
-    const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+    const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
     const diskon = diskonPerItem * jumlahDus;
 
@@ -130,9 +130,9 @@ export async function PUT(
     // Validasi stok jika jumlah berubah
     const newJumlahDus = body.jumlahDus ?? toNumber(item.jumlahDus);
     const newJumlahPcs = body.jumlahPcs ?? toNumber(item.jumlahPcs);
-    const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+    const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
     const stokTersedia = toNumber(item.barang.stok);
-    const totalPcsNeeded = newJumlahDus * jumlahPerkardus + newJumlahPcs;
+    const totalPcsNeeded = newJumlahDus * jumlahPerKemasan + newJumlahPcs;
 
     if (stokTersedia < totalPcsNeeded) {
       return NextResponse.json(
@@ -149,8 +149,8 @@ export async function PUT(
     const newDiskonPerItem = body.diskonPerItem ?? toNumber(item.diskonPerItem);
     const hargaBeli = toNumber(item.hargaBeli);
 
-    const hargaBeliPerPcs = Math.round(hargaBeli / jumlahPerkardus);
-    const hargaJualPerPcs = Math.round(newHargaJual / jumlahPerkardus);
+    const hargaBeliPerPcs = Math.round(hargaBeli / jumlahPerKemasan);
+    const hargaJualPerPcs = Math.round(newHargaJual / jumlahPerKemasan);
 
     const labaPerDus = newHargaJual - newDiskonPerItem - hargaBeli;
     const labaFromDus = labaPerDus * newJumlahDus;

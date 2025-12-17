@@ -16,38 +16,48 @@ function bigIntToNumber(value: bigint | number): number {
 function serializeItem(item: any) {
   return {
     ...item,
+    id: Number(item.id),
+    pembelianId: Number(item.pembelianId),
+    barangId: Number(item.barangId),
     hargaPokok: bigIntToNumber(item.hargaPokok),
     diskonPerItem: bigIntToNumber(item.diskonPerItem),
     jumlahDus: bigIntToNumber(item.jumlahDus),
     barang: item.barang
       ? {
           ...item.barang,
+          id: Number(item.barang.id),
           hargaBeli: bigIntToNumber(item.barang.hargaBeli),
           hargaJual: bigIntToNumber(item.barang.hargaJual),
           stok: bigIntToNumber(item.barang.stok),
-          jumlahPerkardus: bigIntToNumber(item.barang.jumlahPerkardus),
+          jumlahPerKemasan: bigIntToNumber(item.barang.jumlahPerKemasan),
           ukuran: bigIntToNumber(item.barang.ukuran),
+          limitPenjualan: bigIntToNumber(item.barang.limitPenjualan),
         }
       : undefined,
   };
 }
 
-function serializePembelian(pembelian: any) {
+function serializePembelian(p: any) {
   return {
-    ...pembelian,
-    subtotal: bigIntToNumber(pembelian.subtotal),
-    diskonNota: bigIntToNumber(pembelian.diskonNota),
-    totalHarga: bigIntToNumber(pembelian.totalHarga),
-    jumlahDibayar: bigIntToNumber(pembelian.jumlahDibayar),
-    kembalian: bigIntToNumber(pembelian.kembalian),
-    supplier: pembelian.supplier
+    ...p,
+    id: Number(p.id),
+    supplierId: Number(p.supplierId),
+    subtotal: bigIntToNumber(p.subtotal),
+    diskonNota: bigIntToNumber(p.diskonNota),
+    totalHarga: bigIntToNumber(p.totalHarga),
+    jumlahDibayar: bigIntToNumber(p.jumlahDibayar),
+    kembalian: bigIntToNumber(p.kembalian),
+
+    supplier: p.supplier
       ? {
-          ...pembelian.supplier,
-          limitHutang: bigIntToNumber(pembelian.supplier.limitHutang),
-          hutang: bigIntToNumber(pembelian.supplier.hutang),
+          ...p.supplier,
+          id: Number(p.supplier.id),
+          limitHutang: bigIntToNumber(p.supplier.limitHutang),
+          hutang: bigIntToNumber(p.supplier.hutang),
         }
       : undefined,
-    items: pembelian.items?.map(serializeItem),
+
+    items: p.items?.map(serializeItem),
   };
 }
 
@@ -234,7 +244,7 @@ export async function POST(
     // Update totals
     await updatePembelianTotals(pembelianId);
 
-    // Ambil pembelian updated
+    // Ambil pembelian updated dengan calculation
     const updatedPembelian = await prisma.pembelianHeader.findUnique({
       where: { id: pembelianId },
       include: {
@@ -246,15 +256,74 @@ export async function POST(
       },
     });
 
+    // Hitung calculation
+    let pembelianWithCalc = null;
+    if (updatedPembelian) {
+      const items = updatedPembelian.items.map((item: any) => {
+        const hargaPokok = bigIntToNumber(item.hargaPokok);
+        const jumlahDus = bigIntToNumber(item.jumlahDus);
+        const diskonPerItem = bigIntToNumber(item.diskonPerItem);
+        const totalHarga = hargaPokok * jumlahDus;
+        const totalDiskon = diskonPerItem * jumlahDus;
+        const subtotal = totalHarga - totalDiskon;
+
+        return {
+          id: item.id,
+          barangId: item.barangId,
+          namaBarang: item.barang.namaBarang,
+          jumlahDus,
+          hargaPokok,
+          totalHarga,
+          diskonPerItem,
+          totalDiskon,
+          subtotal,
+        };
+      });
+
+      const totalSebelumDiskon = items.reduce(
+        (sum, item) => sum + item.totalHarga,
+        0
+      );
+      const totalDiskonItem = items.reduce(
+        (sum, item) => sum + item.totalDiskon,
+        0
+      );
+      const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+      const diskonNota = bigIntToNumber(updatedPembelian.diskonNota) || 0;
+      const totalHarga = subtotal - diskonNota;
+      const jumlahDibayar = bigIntToNumber(updatedPembelian.jumlahDibayar) || 0;
+      const kembalian =
+        jumlahDibayar > totalHarga ? jumlahDibayar - totalHarga : 0;
+      const sisaHutang =
+        jumlahDibayar < totalHarga ? totalHarga - jumlahDibayar : 0;
+
+      pembelianWithCalc = {
+        ...serializePembelian(updatedPembelian),
+        calculation: {
+          items,
+          ringkasan: {
+            totalSebelumDiskon,
+            totalDiskonItem,
+            subtotal,
+            diskonNota,
+            totalHarga,
+            jumlahDibayar,
+            kembalian,
+            sisaHutang,
+            statusPembayaran:
+              sisaHutang > 0 ? "HUTANG" : kembalian >= 0 ? "LUNAS" : "KURANG",
+          },
+        },
+      };
+    }
+
     return NextResponse.json(
       {
         success: true,
         message,
         data: {
           item: serializeItem(item),
-          pembelian: updatedPembelian
-            ? serializePembelian(updatedPembelian)
-            : null,
+          pembelian: pembelianWithCalc,
         },
       },
       { status: existingItem ? 200 : 201 }

@@ -8,10 +8,11 @@ interface BarangFormData {
   namaBarang: string;
   hargaBeli: string;
   hargaJual: string;
-  jumlahPerkardus: string;
+  jumlahPerKemasan: string;
   ukuran: string;
   satuan: string;
   supplierId: string;
+  limitPenjualan: string;
 }
 
 interface Supplier {
@@ -38,14 +39,16 @@ const BarangModal: React.FC<BarangModalProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [showLimitPenjualan, setShowLimitPenjualan] = useState(false);
   const [formData, setFormData] = useState<BarangFormData>({
     namaBarang: "",
     hargaBeli: "",
     hargaJual: "",
-    jumlahPerkardus: "",
+    jumlahPerKemasan: "",
     ukuran: "",
     satuan: "",
     supplierId: "",
+    limitPenjualan: "0",
   });
 
   // Fetch suppliers
@@ -69,17 +72,29 @@ const BarangModal: React.FC<BarangModalProps> = ({
 
   useEffect(() => {
     if (mode === "edit" && initialData) {
-      setFormData(initialData);
+      const dataWithLimit = {
+        ...initialData,
+        limitPenjualan: initialData.limitPenjualan || "0"
+      };
+      setFormData(dataWithLimit);
+      // Show limit penjualan field if it has a value > 0
+      if (initialData.limitPenjualan && parseInt(initialData.limitPenjualan) > 0) {
+        setShowLimitPenjualan(true);
+      } else {
+        setShowLimitPenjualan(false);
+      }
     } else {
       setFormData({
         namaBarang: "",
         hargaBeli: "",
         hargaJual: "",
-        jumlahPerkardus: "",
+        jumlahPerKemasan: "",
         ukuran: "",
         satuan: "",
         supplierId: "",
+        limitPenjualan: "0",
       });
+      setShowLimitPenjualan(false);
     }
   }, [mode, initialData, isOpen]);
 
@@ -114,10 +129,11 @@ const BarangModal: React.FC<BarangModalProps> = ({
           namaBarang: formData.namaBarang,
           hargaBeli: parseInt(formData.hargaBeli),
           hargaJual: parseInt(formData.hargaJual),
-          jumlahPerkardus: parseInt(formData.jumlahPerkardus),
+          jumlahPerKemasan: parseInt(formData.jumlahPerKemasan),
           ukuran: parseInt(formData.ukuran),
           satuan: formData.satuan,
           supplierId: parseInt(formData.supplierId),
+          limitPenjualan: showLimitPenjualan ? parseInt(formData.limitPenjualan) : 0,
         }),
       });
 
@@ -307,14 +323,52 @@ const BarangModal: React.FC<BarangModalProps> = ({
               </label>
               <input
                 type="number"
-                name="jumlahPerkardus"
-                value={formData.jumlahPerkardus}
+                name="jumlahPerKemasan"
+                value={formData.jumlahPerKemasan}
                 onChange={handleInputChange}
                 className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${focusColor} focus:border-transparent outline-none`}
                 placeholder="Contoh: 20"
                 required
               />
             </div>
+
+            {/* Checkbox untuk Limit Pembelian */}
+            <div className="flex items-center gap-2 pt-2">
+              <input
+                type="checkbox"
+                id="showLimitPenjualan"
+                checked={showLimitPenjualan}
+                onChange={(e) => setShowLimitPenjualan(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label
+                htmlFor="showLimitPenjualan"
+                className="text-sm font-medium text-gray-700 cursor-pointer"
+              >
+                Aktifkan Limit Pembelian
+              </label>
+            </div>
+
+            {/* Limit Pembelian - Hidden by default */}
+            {showLimitPenjualan && (
+              <div className="animate-fadeIn">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Limit Pembelian (dalam unit)
+                </label>
+                <input
+                  type="number"
+                  name="limitPenjualan"
+                  value={formData.limitPenjualan}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${focusColor} focus:border-transparent outline-none`}
+                  placeholder="Contoh: 100"
+                  min="0"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Batasan maksimal unit yang dapat dibeli per transaksi. Kosongkan atau isi 0 untuk tidak ada batasan.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 mt-6">

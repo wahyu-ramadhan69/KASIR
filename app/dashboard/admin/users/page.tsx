@@ -166,8 +166,8 @@ const DataUserPage = () => {
     const formData = new FormData(e.currentTarget);
     const password = formData.get("password") as string;
 
-    if (password.length < 6) {
-      toast.error("Password minimal 6 karakter");
+    if (password.length < 4) {
+      toast.error("Password minimal 4 karakter");
       setIsSubmitting(false);
       return;
     }
@@ -672,7 +672,7 @@ const DataUserPage = () => {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none pr-10"
                         placeholder="Min. 6 karakter"
                         required
-                        minLength={6}
+                        minLength={4}
                       />
                       <button
                         type="button"

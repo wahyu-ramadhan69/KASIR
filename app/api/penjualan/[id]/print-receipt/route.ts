@@ -1,0 +1,353 @@
+import { NextRequest, NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+
+// Singleton pattern untuk Prisma Client
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: idParam } = await context.params;
+    const id = parseInt(idParam);
+
+    // Ambil data penjualan dengan relasi
+    const penjualan = await prisma.penjualanHeader.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        karyawan: true,
+        items: {
+          include: {
+            barang: true,
+          },
+        },
+      },
+    });
+
+    if (!penjualan) {
+      return NextResponse.json(
+        { success: false, error: "Penjualan tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    // Format rupiah
+    const formatRupiah = (amount: number | bigint): string => {
+      return new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(Number(amount));
+    };
+
+    // Format tanggal
+    const formatDate = (dateString: string | Date): string => {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    };
+
+    // Generate HTML untuk nota
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nota ${penjualan.kodePenjualan}</title>
+  <style>
+    @page {
+      size: A6;
+      margin: 0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      line-height: 1.4;
+      padding: 15px;
+      width: 105mm;
+      background: white;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+      border-bottom: 1px dashed #000;
+      padding-bottom: 8px;
+    }
+
+    .header h1 {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 9px;
+      margin: 2px 0;
+    }
+
+    .info-section {
+      margin: 10px 0;
+      font-size: 9px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 3px 0;
+    }
+
+    .info-label {
+      font-weight: bold;
+      width: 80px;
+    }
+
+    .divider {
+      border-top: 1px dashed #000;
+      margin: 8px 0;
+    }
+
+    .items-table {
+      width: 100%;
+      margin: 10px 0;
+      font-size: 9px;
+    }
+
+    .items-header {
+      font-weight: bold;
+      border-bottom: 1px solid #000;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 4px;
+    }
+
+    .item-row {
+      padding: 4px 0;
+      border-bottom: 1px dotted #ccc;
+    }
+
+    .item-name {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+
+    .item-details {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 4px;
+      font-size: 9px;
+    }
+
+    .item-discount {
+      color: #dc2626;
+      font-size: 8px;
+      margin-top: 2px;
+      padding-left: 8px;
+    }
+
+    .summary {
+      margin-top: 10px;
+      border-top: 1px solid #000;
+      padding-top: 8px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+      font-size: 10px;
+    }
+
+    .summary-row.total {
+      font-weight: bold;
+      font-size: 12px;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      padding: 6px 0;
+      margin: 6px 0;
+    }
+
+    .summary-row.change {
+      color: #059669;
+      font-weight: bold;
+    }
+
+    .summary-row.discount {
+      color: #dc2626;
+    }
+
+    .footer {
+      margin-top: 15px;
+      text-align: center;
+      border-top: 1px dashed #000;
+      padding-top: 8px;
+      font-size: 9px;
+    }
+
+    .footer p {
+      margin: 3px 0;
+    }
+
+    @media print {
+      body {
+        padding: 10px;
+      }
+
+      .no-print {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>NOTA PENJUALAN</h1>
+    <p>Toko ABC</p>
+    <p>Jl. Contoh No. 123, Jakarta</p>
+    <p>Telp: 021-12345678</p>
+  </div>
+
+  <div class="info-section">
+    <div class="info-row">
+      <span class="info-label">No Nota:</span>
+      <span>${penjualan.kodePenjualan}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Tanggal:</span>
+      <span>${formatDate(penjualan.createdAt)}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Customer:</span>
+      <span>${penjualan.customer?.nama || penjualan.namaCustomer || "-"}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Sales:</span>
+      <span>${penjualan.karyawan?.nama || penjualan.namaSales || "-"}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Metode:</span>
+      <span>${penjualan.metodePembayaran}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Status:</span>
+      <span>${penjualan.statusPembayaran}</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="items-table">
+    <div class="items-header">
+      <span>Item</span>
+      <span style="text-align: center;">Qty</span>
+      <span style="text-align: right;">Total</span>
+    </div>
+
+    ${penjualan.items
+      .map((item) => {
+        const jumlahTotal =
+          Number(item.jumlahDus) * Number(item.barang.jumlahPerKemasan) +
+          Number(item.jumlahPcs || 0);
+        const hargaSatuan = Number(item.hargaJual || item.barang.hargaJual);
+        const totalHarga = jumlahTotal * hargaSatuan;
+        const diskonTotal = Number(item.diskonPerItem) * Number(item.jumlahDus);
+        const totalSetelahDiskon = totalHarga - diskonTotal;
+
+        return `
+    <div class="item-row">
+      <div class="item-name">${item.barang.namaBarang}</div>
+      <div class="item-details">
+        <span>${formatRupiah(hargaSatuan)}</span>
+        <span style="text-align: center;">${item.jumlahDus} dus + ${item.jumlahPcs || 0} pcs</span>
+        <span style="text-align: right;">${formatRupiah(totalSetelahDiskon)}</span>
+      </div>
+      ${
+        diskonTotal > 0
+          ? `<div class="item-discount">Diskon: -${formatRupiah(diskonTotal)}</div>`
+          : ""
+      }
+    </div>`;
+      })
+      .join("")}
+  </div>
+
+  <div class="summary">
+    <div class="summary-row">
+      <span>Subtotal:</span>
+      <span>${formatRupiah(penjualan.subtotal)}</span>
+    </div>
+    ${
+      Number(penjualan.diskonNota) > 0
+        ? `
+    <div class="summary-row discount">
+      <span>Diskon Nota:</span>
+      <span>-${formatRupiah(penjualan.diskonNota)}</span>
+    </div>`
+        : ""
+    }
+    <div class="summary-row total">
+      <span>TOTAL:</span>
+      <span>${formatRupiah(penjualan.totalHarga)}</span>
+    </div>
+    <div class="summary-row">
+      <span>Dibayar:</span>
+      <span>${formatRupiah(penjualan.jumlahDibayar)}</span>
+    </div>
+    <div class="summary-row change">
+      <span>Kembalian:</span>
+      <span>${formatRupiah(penjualan.kembalian)}</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p><strong>Terima kasih atas pembelian Anda!</strong></p>
+    <p>Barang yang sudah dibeli tidak dapat dikembalikan</p>
+  </div>
+
+  <script>
+    // Auto print when page loads
+    window.onload = function() {
+      window.print();
+    };
+  </script>
+</body>
+</html>
+    `;
+
+    return new NextResponse(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  } catch (error: any) {
+    console.error("Error generating receipt:", error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}

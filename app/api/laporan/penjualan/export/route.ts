@@ -163,12 +163,12 @@ async function generateSummaryReport(
     orderBy: { tanggalTransaksi: "desc" },
     include: {
       customer: true,
-      sales: true, // ⬅️ tambahkan ini
+      karyawan: true,
       items: {
         include: {
           barang: {
             select: {
-              jumlahPerkardus: true,
+              jumlahPerKemasan: true,
             },
           },
         },
@@ -270,7 +270,7 @@ async function generateSummaryReport(
     const totalPcs = penjualan.items.reduce((sum, item) => {
       const dus = toNumber(item.jumlahDus);
       const pcs = toNumber(item.jumlahPcs);
-      const perKardus = toNumber(item.barang.jumlahPerkardus);
+      const perKardus = toNumber(item.barang.jumlahPerKemasan);
       return sum + dus * perKardus + pcs;
     }, 0);
 
@@ -278,12 +278,12 @@ async function generateSummaryReport(
       const jumlahDus = toNumber(item.jumlahDus);
       const jumlahPcs = toNumber(item.jumlahPcs);
       const hargaBeli = toNumber(item.hargaBeli);
-      const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
         jumlahPcs > 0
-          ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+          ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
           : 0;
       return sum + modalDus + modalPcs;
     }, 0);
@@ -310,7 +310,7 @@ async function generateSummaryReport(
     ).toLocaleDateString("id-ID");
     row.getCell(4).value = penjualan.customer
       ? getCustomerOrSalesName(penjualan) // nama customer
-      : penjualan.sales
+      : penjualan.karyawan
       ? `${getCustomerOrSalesName(penjualan)} (Sales)` // nama sales + label
       : "-";
 
@@ -427,7 +427,7 @@ async function generateDetailReport(
               namaBarang: true,
               ukuran: true,
               satuan: true,
-              jumlahPerkardus: true,
+              jumlahPerKemasan: true,
             },
           },
         },
@@ -540,13 +540,13 @@ async function generateDetailReport(
       const hargaBeli = toNumber(item.hargaBeli);
       const diskonPerItem = toNumber(item.diskonPerItem);
       const laba = toNumber(item.laba);
-      const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
 
-      const totalPcs = jumlahDus * jumlahPerkardus + jumlahPcs;
+      const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
       const penjualanDus = hargaJual * jumlahDus;
       const penjualanPcs =
         jumlahPcs > 0
-          ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs)
+          ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
           : 0;
       const totalPenjualan = penjualanDus + penjualanPcs;
       const totalDiskon = diskonPerItem * jumlahDus;
@@ -555,7 +555,7 @@ async function generateDetailReport(
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
         jumlahPcs > 0
-          ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+          ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
           : 0;
       const totalModalItem = modalDus + modalPcs;
 
@@ -801,7 +801,7 @@ async function generateYearlyReport(
           include: {
             barang: {
               select: {
-                jumlahPerkardus: true,
+                jumlahPerKemasan: true,
               },
             },
           },
@@ -824,18 +824,18 @@ async function generateYearlyReport(
         const jumlahPcs = toNumber(item.jumlahPcs);
         const hargaBeli = toNumber(item.hargaBeli);
         const laba = toNumber(item.laba);
-        const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+        const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
 
         const modalDus = hargaBeli * jumlahDus;
         const modalPcs =
           jumlahPcs > 0
-            ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+            ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
             : 0;
         monthTotalModal += modalDus + modalPcs;
         monthTotalLaba += laba;
 
         monthTotalDus += jumlahDus;
-        monthTotalPcs += jumlahDus * jumlahPerkardus + jumlahPcs;
+        monthTotalPcs += jumlahDus * jumlahPerKemasan + jumlahPcs;
       });
     });
 

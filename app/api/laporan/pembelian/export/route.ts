@@ -395,13 +395,13 @@ async function exportDetail(
       const jumlahDus = toNumber(item.jumlahDus);
       const hargaPokok = toNumber(item.hargaPokok);
       const diskonPerItem = toNumber(item.diskonPerItem);
-      const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       const ukuran = toNumber(item.barang.ukuran);
 
       const totalHarga = hargaPokok * jumlahDus;
       const totalDiskon = diskonPerItem * jumlahDus;
       const subtotal = totalHarga - totalDiskon;
-      const totalPcs = jumlahDus * jumlahPerkardus;
+      const totalPcs = jumlahDus * jumlahPerKemasan;
 
       transaksiTotal.subtotal += totalHarga;
       transaksiTotal.diskon += totalDiskon;

@@ -39,8 +39,9 @@ function serializePembelian(pembelian: any) {
             hargaBeli: bigIntToNumber(item.barang.hargaBeli),
             hargaJual: bigIntToNumber(item.barang.hargaJual),
             stok: bigIntToNumber(item.barang.stok),
-            jumlahPerkardus: bigIntToNumber(item.barang.jumlahPerkardus),
+            jumlahPerKemasan: bigIntToNumber(item.barang.jumlahPerKemasan),
             ukuran: bigIntToNumber(item.barang.ukuran),
+            limitPenjualan: bigIntToNumber(item.barang.limitPenjualan),
           }
         : undefined,
     })),

@@ -168,7 +168,7 @@ async function generateLaporanPenjualan(
     orderBy: { tanggalTransaksi: "desc" },
     include: {
       customer: true,
-      sales: true,
+      karyawan: true,
       items: {
         include: {
           barang: {
@@ -177,7 +177,7 @@ async function generateLaporanPenjualan(
               namaBarang: true,
               ukuran: true,
               satuan: true,
-              jumlahPerkardus: true,
+              jumlahPerKemasan: true,
             },
           },
         },
@@ -275,20 +275,20 @@ async function generateLaporanPenjualan(
       const jumlahPcs = toNumber(item.jumlahPcs);
       const hargaBeli = toNumber(item.hargaBeli);
       const laba = toNumber(item.laba);
-      const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
-        jumlahPcs > 0 && jumlahPerkardus > 0
-          ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+        jumlahPcs > 0 && jumlahPerKemasan > 0
+          ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
           : 0;
 
       totalModal += modalDus + modalPcs;
       totalLaba += laba;
       totalDus += jumlahDus;
       totalPcs +=
-        jumlahPerkardus > 0
-          ? jumlahDus * jumlahPerkardus + jumlahPcs
+        jumlahPerKemasan > 0
+          ? jumlahDus * jumlahPerKemasan + jumlahPcs
           : jumlahPcs;
     });
 
@@ -737,9 +737,9 @@ async function generateLaporanPengeluaran(
   // Clear formatting for columns beyond F (7 onwards) to prevent green bleeding
   for (let i = 7; i <= 50; i++) {
     const cell = totalRow.getCell(i);
-    cell.fill = undefined;
-    cell.font = undefined;
-    cell.border = undefined;
+    cell.fill = {} as any;
+    cell.font = {} as any;
+    cell.border = {} as any;
   }
 
   totalRow.getCell(6).alignment = { horizontal: "right", vertical: "middle" };
@@ -825,12 +825,12 @@ async function generateRingkasan(
       const jumlahPcs = toNumber(item.jumlahPcs);
       const hargaBeli = toNumber(item.hargaBeli);
       const laba = toNumber(item.laba);
-      const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
-        jumlahPcs > 0 && jumlahPerkardus > 0
-          ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+        jumlahPcs > 0 && jumlahPerKemasan > 0
+          ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
           : 0;
 
       totalModalPenjualan += modalDus + modalPcs;
@@ -964,8 +964,8 @@ async function generateRingkasan(
       // Clear formatting for columns beyond D (5 onwards)
       for (let i = 5; i <= 50; i++) {
         const cell = row.getCell(i);
-        cell.fill = undefined;
-        cell.font = undefined;
+        cell.fill = {} as any;
+        cell.font = {} as any;
       }
     }
 
@@ -1125,20 +1125,20 @@ async function generateLaporanPenjualanDetail(
       const hargaBeli = toNumber(item.hargaBeli);
       const hargaJual = toNumber(item.hargaJual);
       const laba = toNumber(item.laba);
-      const jumlahPerkardus = toNumber(item.barang.jumlahPerkardus);
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       const ukuran = toNumber(item.barang.ukuran);
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
-        jumlahPcs > 0 && jumlahPerkardus > 0
-          ? Math.round((hargaBeli / jumlahPerkardus) * jumlahPcs)
+        jumlahPcs > 0 && jumlahPerKemasan > 0
+          ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
           : 0;
       const totalModal = modalDus + modalPcs;
 
       const hargaJualDus = hargaJual * jumlahDus;
       const hargaJualPcs =
-        jumlahPcs > 0 && jumlahPerkardus > 0
-          ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs)
+        jumlahPcs > 0 && jumlahPerKemasan > 0
+          ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
           : 0;
       const totalHargaJual = hargaJualDus + hargaJualPcs;
 
@@ -1231,9 +1231,9 @@ async function generateLaporanPenjualanDetail(
   // Clear formatting for columns beyond L (13 onwards) to prevent green bleeding
   for (let i = 13; i <= 50; i++) {
     const cell = totalRow.getCell(i);
-    cell.fill = undefined;
-    cell.font = undefined;
-    cell.border = undefined;
+    cell.fill = {} as any;
+    cell.font = {} as any;
+    cell.border = {} as any;
   }
 
   totalRow.getCell(9).alignment = { horizontal: "right", vertical: "middle" };
@@ -1436,9 +1436,9 @@ async function generateLaporanPembelianDetail(
   // Clear formatting for columns beyond J (11 onwards) to prevent green bleeding
   for (let i = 11; i <= 50; i++) {
     const cell = totalRow.getCell(i);
-    cell.fill = undefined;
-    cell.font = undefined;
-    cell.border = undefined;
+    cell.fill = {} as any;
+    cell.font = {} as any;
+    cell.border = {} as any;
   }
 
   totalRow.getCell(9).alignment = { horizontal: "right", vertical: "middle" };

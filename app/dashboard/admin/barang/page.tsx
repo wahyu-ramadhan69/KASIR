@@ -51,10 +51,12 @@ interface Barang {
   hargaBeli: number;
   hargaJual: number;
   stok: number;
-  jumlahPerkardus: number;
+  jenisKemasan: string;
+  jumlahPerKemasan: number;
   ukuran: number;
   satuan: string;
   supplierId: number;
+  limitPenjualan: number;
   createdAt: string;
   updatedAt: string;
   supplier: Supplier;
@@ -64,10 +66,12 @@ interface BarangFormData {
   namaBarang: string;
   hargaBeli: string;
   hargaJual: string;
-  jumlahPerkardus: string;
+  jenisKemasan: string;
+  jumlahPerKemasan: string;
   ukuran: string;
   satuan: string;
   supplierId: string;
+  limitPenjualan: string;
 }
 
 interface PaginationInfo {
@@ -125,6 +129,12 @@ const DataBarangPage = () => {
     useState<boolean>(false);
   const [addFormHargaBeli, setAddFormHargaBeli] = useState<string>("");
   const [addFormHargaJual, setAddFormHargaJual] = useState<string>("");
+  const [showAddLimitPenjualan, setShowAddLimitPenjualan] =
+    useState<boolean>(false);
+  const [addFormLimitPenjualan, setAddFormLimitPenjualan] =
+    useState<string>("0");
+  const [showEditLimitPenjualan, setShowEditLimitPenjualan] =
+    useState<boolean>(false);
   const [pagination, setPagination] = useState<PaginationInfo>({
     currentPage: 1,
     totalPages: 1,
@@ -204,19 +214,24 @@ const DataBarangPage = () => {
   };
 
   const handleEdit = (barang: Barang) => {
+    const limitValue = barang.limitPenjualan || 0;
     setEditingBarang({
       id: barang.id,
       data: {
         namaBarang: barang.namaBarang,
         hargaBeli: formatInputRupiah(barang.hargaBeli.toString()),
         hargaJual: formatInputRupiah(barang.hargaJual.toString()),
-        jumlahPerkardus: barang.jumlahPerkardus.toString(),
+        jenisKemasan: barang.jenisKemasan,
+        jumlahPerKemasan: barang.jumlahPerKemasan.toString(),
         ukuran: barang.ukuran.toString(),
         satuan: barang.satuan,
         supplierId: barang.supplierId.toString(),
+        limitPenjualan: limitValue.toString(),
       },
     });
     setEditSupplierSearch(barang.supplier?.namaSupplier || "");
+    // Show checkbox if limit > 0
+    setShowEditLimitPenjualan(limitValue > 0);
     setShowEditModal(true);
   };
 
@@ -292,10 +307,16 @@ const DataBarangPage = () => {
           namaBarang: formData.get("namaBarang"),
           hargaBeli: parseRupiahToNumber(addFormHargaBeli),
           hargaJual: parseRupiahToNumber(addFormHargaJual),
-          jumlahPerkardus: parseInt(formData.get("jumlahPerkardus") as string),
+          jenisKemasan: formData.get("jenisKemasan"),
+          jumlahPerKemasan: parseInt(
+            formData.get("jumlahPerKemasan") as string
+          ),
           ukuran: parseInt(formData.get("ukuran") as string),
           satuan: formData.get("satuan"),
           supplierId: parseInt(selectedSupplierId),
+          limitPenjualan: showAddLimitPenjualan
+            ? parseInt(addFormLimitPenjualan)
+            : 0,
         }),
       });
 
@@ -309,6 +330,8 @@ const DataBarangPage = () => {
         setSelectedSupplierName("");
         setAddFormHargaBeli("");
         setAddFormHargaJual("");
+        setShowAddLimitPenjualan(false);
+        setAddFormLimitPenjualan("0");
         fetchBarang();
       } else {
         toast.error(data.error || "Gagal menambahkan barang");
@@ -337,10 +360,14 @@ const DataBarangPage = () => {
           namaBarang: editingBarang.data.namaBarang,
           hargaBeli: parseRupiahToNumber(editingBarang.data.hargaBeli),
           hargaJual: parseRupiahToNumber(editingBarang.data.hargaJual),
-          jumlahPerkardus: parseInt(editingBarang.data.jumlahPerkardus),
+          jenisKemasan: editingBarang.data.jenisKemasan,
+          jumlahPerKemasan: parseInt(editingBarang.data.jumlahPerKemasan),
           ukuran: parseInt(editingBarang.data.ukuran),
           satuan: editingBarang.data.satuan,
           supplierId: parseInt(editingBarang.data.supplierId),
+          limitPenjualan: showEditLimitPenjualan
+            ? parseInt(editingBarang.data.limitPenjualan)
+            : 0,
         }),
       });
 
@@ -350,6 +377,7 @@ const DataBarangPage = () => {
         toast.success("Barang berhasil diupdate!");
         setShowEditModal(false);
         setEditingBarang(null);
+        setShowEditLimitPenjualan(false);
         fetchBarang();
       } else {
         toast.error(data.error || "Gagal mengupdate barang");
@@ -452,14 +480,14 @@ const DataBarangPage = () => {
     return "";
   };
 
-  const getStokStatus = (stok: number) => {
-    if (stok < 50)
+  const getStokStatus = (stok: number, jumlahPerKemasan: number) => {
+    if (stok / jumlahPerKemasan < 10)
       return {
         color: "bg-red-100 text-red-800",
         label: "Stok Rendah",
         badgeColor: "bg-red-500",
       };
-    if (stok < 100)
+    if (stok / jumlahPerKemasan < 20)
       return {
         color: "bg-yellow-100 text-yellow-800",
         label: "Stok Sedang",
@@ -494,9 +522,12 @@ const DataBarangPage = () => {
       item.supplier?.id.toString() === filterSupplier;
 
     let matchStok = true;
-    if (filterStok === "low") matchStok = item.stok < 50;
-    if (filterStok === "medium") matchStok = item.stok >= 50 && item.stok < 100;
-    if (filterStok === "high") matchStok = item.stok >= 100;
+    if (filterStok === "low")
+      matchStok = item.stok / item.jumlahPerKemasan < 50;
+    if (filterStok === "medium")
+      matchStok = item.stok / item.jumlahPerKemasan >= 50 && item.stok < 100;
+    if (filterStok === "high")
+      matchStok = item.stok / item.jumlahPerKemasan >= 100;
 
     return matchSearch && matchSupplier && matchStok;
   });
@@ -941,7 +972,7 @@ const DataBarangPage = () => {
                           Ukuran
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Per Kardus
+                          Kemasan
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider sticky right-0 bg-gradient-to-r from-blue-600 to-indigo-700">
                           Aksi
@@ -954,7 +985,10 @@ const DataBarangPage = () => {
                           item.hargaBeli,
                           item.hargaJual
                         );
-                        const stokStatus = getStokStatus(item.stok);
+                        const stokStatus = getStokStatus(
+                          item.stok,
+                          item.jumlahPerKemasan
+                        );
 
                         return (
                           <tr
@@ -973,8 +1007,20 @@ const DataBarangPage = () => {
                                   <div className="text-sm font-bold text-gray-900">
                                     {item.namaBarang}
                                   </div>
-                                  <div className="text-xs text-gray-500">
-                                    ID: {item.id}
+                                  <div className="text-xs flex items-center gap-1">
+                                    {item.limitPenjualan > 0 ? (
+                                      <>
+                                        <AlertCircle className="w-3 h-3 text-orange-500" />
+                                        <span className="text-orange-600 font-semibold">
+                                          Limit: {item.limitPenjualan} item
+                                          perhari
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span className="text-green-600 font-medium">
+                                        ♾️ Unlimited
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -1027,7 +1073,8 @@ const DataBarangPage = () => {
                                 <span
                                   className={`w-2 h-2 rounded-full ${stokStatus.badgeColor} mr-2`}
                                 ></span>
-                                {item.stok} {item.satuan}
+                                {item.stok / item.jumlahPerKemasan}{" "}
+                                {item.jenisKemasan}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -1036,9 +1083,14 @@ const DataBarangPage = () => {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <span className="text-sm font-semibold text-gray-700">
-                                {item.jumlahPerkardus} pcs
-                              </span>
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-sm font-bold text-purple-700 bg-purple-100 px-3 py-1 rounded-lg">
+                                  {item.jumlahPerKemasan} pcs
+                                </span>
+                                <span className="text-xs font-semibold text-gray-600">
+                                  per {item.jenisKemasan}
+                                </span>
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-blue-50 transition-colors">
                               <div className="flex items-center justify-center gap-2">
@@ -1421,7 +1473,7 @@ const DataBarangPage = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
                     <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Harga Beli
+                      Harga Beli Perkemasan
                     </p>
                     <p className="text-gray-900 text-xl font-bold">
                       {formatRupiah(selectedBarang.hargaBeli)}
@@ -1430,7 +1482,7 @@ const DataBarangPage = () => {
 
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
                     <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Harga Jual
+                      Harga Jual Perkemasan
                     </p>
                     <p className="text-blue-600 text-xl font-bold">
                       {formatRupiah(selectedBarang.hargaJual)}
@@ -1502,7 +1554,7 @@ const DataBarangPage = () => {
                       Stok
                     </p>
                     <p className="text-gray-900 text-xl font-bold">
-                      {selectedBarang.stok} {selectedBarang.satuan}
+                      {selectedBarang.stok} pcs
                     </p>
                   </div>
 
@@ -1515,12 +1567,15 @@ const DataBarangPage = () => {
                     </p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Per Kardus
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
+                    <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-2">
+                      Kemasan
                     </p>
-                    <p className="text-gray-900 text-xl font-bold">
-                      {selectedBarang.jumlahPerkardus}
+                    <p className="text-purple-900 text-xl font-bold">
+                      {selectedBarang.jumlahPerKemasan} pcs
+                    </p>
+                    <p className="text-xs text-purple-600 mt-1">
+                      per {selectedBarang.jenisKemasan}
                     </p>
                   </div>
                 </div>
@@ -1590,6 +1645,8 @@ const DataBarangPage = () => {
                       setSelectedSupplierName("");
                       setAddFormHargaBeli("");
                       setAddFormHargaJual("");
+                      setShowAddLimitPenjualan(false);
+                      setAddFormLimitPenjualan("0");
                     }}
                     className="text-white hover:bg-white/20 p-3 rounded-xl transition-all"
                   >
@@ -1677,7 +1734,8 @@ const DataBarangPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <TrendingDown className="w-4 h-4 text-red-600" />
-                        Harga Beli <span className="text-red-500">*</span>
+                        Harga Beli Perkemasan{" "}
+                        <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1695,7 +1753,8 @@ const DataBarangPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <TrendingUp className="w-4 h-4 text-green-600" />
-                        Harga Jual <span className="text-red-500">*</span>
+                        Harga Jual Perkemasan
+                        <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1738,25 +1797,94 @@ const DataBarangPage = () => {
                         <option value="">Pilih Satuan</option>
                         <option value="kg">KG</option>
                         <option value="liter">Liter</option>
-                        <option value="pcs">PCS</option>
-                        <option value="pack">Pack</option>
-                        <option value="sak">Sak</option>
+                        <option value="pcs">Pcs</option>
+                        <option value="g">G</option>
                       </select>
                     </div>
                   </div>
 
-                  <div className="group">
-                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                      Jumlah Per Kardus <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="jumlahPerkardus"
-                      className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                      placeholder="20"
-                      required
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="group">
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                        <Package className="w-4 h-4 text-purple-600" />
+                        Jenis Kemasan <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="jenisKemasan"
+                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white group-hover:border-gray-300"
+                        required
+                      >
+                        <option value="">Pilih Jenis Kemasan</option>
+                        <option value="Dus">Dus</option>
+                        <option value="Box">Box</option>
+                        <option value="Karton">Karton</option>
+                        <option value="Pack">Pack</option>
+                        <option value="Lusin">Lusin</option>
+                        <option value="Krat">Krat</option>
+                        <option value="Bal">Bal</option>
+                        <option value="Sak">Sak</option>
+                      </select>
+                    </div>
+
+                    <div className="group">
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                        <Box className="w-4 h-4 text-purple-600" />
+                        Jumlah Per Kemasan{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="jumlahPerKemasan"
+                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
+                        placeholder="24"
+                        required
+                      />
+                    </div>
                   </div>
+
+                  {/* Checkbox untuk Limit Pembelian */}
+                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border-2 border-blue-100">
+                    <input
+                      type="checkbox"
+                      id="showAddLimitPenjualan"
+                      checked={showAddLimitPenjualan}
+                      onChange={(e) =>
+                        setShowAddLimitPenjualan(e.target.checked)
+                      }
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label
+                      htmlFor="showAddLimitPenjualan"
+                      className="text-sm font-bold text-gray-700 cursor-pointer uppercase tracking-wide"
+                    >
+                      Aktifkan Limit Pembelian
+                    </label>
+                  </div>
+
+                  {/* Limit Pembelian Field - Hidden by default */}
+                  {showAddLimitPenjualan && (
+                    <div className="group animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                        <AlertCircle className="w-4 h-4 text-orange-600" />
+                        Limit Pembelian (dalam unit)
+                      </label>
+                      <input
+                        type="number"
+                        name="limitPenjualan"
+                        value={addFormLimitPenjualan}
+                        onChange={(e) =>
+                          setAddFormLimitPenjualan(e.target.value)
+                        }
+                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
+                        placeholder="Contoh: 100"
+                        min="0"
+                      />
+                      <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
+                        💡 Batasan maksimal unit yang dapat dibeli per
+                        transaksi. Isi 0 atau kosongkan untuk tidak ada batasan.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-8">
@@ -1769,6 +1897,8 @@ const DataBarangPage = () => {
                       setSelectedSupplierName("");
                       setAddFormHargaBeli("");
                       setAddFormHargaJual("");
+                      setShowAddLimitPenjualan(false);
+                      setAddFormLimitPenjualan("0");
                     }}
                     className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-4 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
                   >
@@ -1822,6 +1952,7 @@ const DataBarangPage = () => {
                       setShowEditModal(false);
                       setEditSupplierSearch("");
                       setShowEditSupplierDropdown(false);
+                      setShowEditLimitPenjualan(false);
                     }}
                     className="text-white hover:bg-white/20 p-3 rounded-xl transition-all"
                   >
@@ -1974,26 +2105,97 @@ const DataBarangPage = () => {
                         <option value="">Pilih Satuan</option>
                         <option value="kg">KG</option>
                         <option value="liter">Liter</option>
-                        <option value="pcs">PCS</option>
-                        <option value="pack">Pack</option>
-                        <option value="sak">Sak</option>
+                        <option value="kg">KG</option>
+                        <option value="liter">Liter</option>
+                        <option value="pcs">Pcs</option>
+                        <option value="g">G</option>
                       </select>
                     </div>
                   </div>
 
-                  <div className="group">
-                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                      Jumlah Per Kardus <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="jumlahPerkardus"
-                      value={editingBarang.data.jumlahPerkardus}
-                      onChange={handleInputChange}
-                      className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                      required
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="group">
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                        <Package className="w-4 h-4 text-yellow-600" />
+                        Jenis Kemasan <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="jenisKemasan"
+                        value={editingBarang.data.jenisKemasan}
+                        onChange={handleInputChange}
+                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-white group-hover:border-gray-300"
+                        required
+                      >
+                        <option value="">Pilih Jenis Kemasan</option>
+                        <option value="Dus">Dus</option>
+                        <option value="Box">Box</option>
+                        <option value="Karton">Karton</option>
+                        <option value="Pack">Pack</option>
+                        <option value="Lusin">Lusin</option>
+                        <option value="Krat">Krat</option>
+                        <option value="Bal">Bal</option>
+                        <option value="Sak">Sak</option>
+                      </select>
+                    </div>
+
+                    <div className="group">
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                        <Box className="w-4 h-4 text-yellow-600" />
+                        Jumlah Per Kemasan{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="jumlahPerKemasan"
+                        value={editingBarang.data.jumlahPerKemasan}
+                        onChange={handleInputChange}
+                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
+                        required
+                      />
+                    </div>
                   </div>
+
+                  {/* Checkbox untuk Limit Pembelian */}
+                  <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-100">
+                    <input
+                      type="checkbox"
+                      id="showEditLimitPenjualan"
+                      checked={showEditLimitPenjualan}
+                      onChange={(e) =>
+                        setShowEditLimitPenjualan(e.target.checked)
+                      }
+                      className="w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500 cursor-pointer"
+                    />
+                    <label
+                      htmlFor="showEditLimitPenjualan"
+                      className="text-sm font-bold text-gray-700 cursor-pointer uppercase tracking-wide"
+                    >
+                      Aktifkan Limit Pembelian
+                    </label>
+                  </div>
+
+                  {/* Limit Pembelian Field - Hidden by default */}
+                  {showEditLimitPenjualan && (
+                    <div className="group animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                        <AlertCircle className="w-4 h-4 text-orange-600" />
+                        Limit Pembelian (dalam unit)
+                      </label>
+                      <input
+                        type="number"
+                        name="limitPenjualan"
+                        value={editingBarang.data.limitPenjualan}
+                        onChange={handleInputChange}
+                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
+                        placeholder="Contoh: 100"
+                        min="0"
+                      />
+                      <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
+                        💡 Batasan maksimal unit yang dapat dibeli per
+                        transaksi. Isi 0 atau kosongkan untuk tidak ada batasan.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-8">
@@ -2003,6 +2205,7 @@ const DataBarangPage = () => {
                       setShowEditModal(false);
                       setEditSupplierSearch("");
                       setShowEditSupplierDropdown(false);
+                      setShowEditLimitPenjualan(false);
                     }}
                     className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-4 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
                   >
