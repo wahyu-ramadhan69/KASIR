@@ -27,6 +27,9 @@ import {
   PackageOpen,
   Wallet2,
   Wallet,
+  Calendar1,
+  CalendarDays,
+  Undo2,
 } from "lucide-react";
 
 const navLinks = [
@@ -91,7 +94,7 @@ const transactionLinks = [
     ],
   },
   {
-    label: "Penjualan",
+    label: "Transaksi Toko",
     href: "/dashboard/admin/penjualan",
     icon: <ShoppingBag className="w-5 h-5" />,
     subMenu: [
@@ -99,6 +102,11 @@ const transactionLinks = [
         label: "Penjualan Toko",
         href: "/dashboard/admin/penjualan",
         icon: <ShoppingBag className="w-4 h-4" />,
+      },
+      {
+        label: "Pengembalian Barang",
+        href: "/dashboard/admin/penjualan/pengembalian",
+        icon: <Undo2 className="w-4 h-4" />,
       },
       {
         label: "Riwayat Penjualan",
@@ -127,14 +135,15 @@ const transactionLinks = [
         href: "/dashboard/admin/penjualan-sales/kanvas",
         icon: <Truck className="w-4 h-4" />,
       },
-      {
-        label: "Riwayat Kanvas Sales",
-        href: "/dashboard/admin/penjualan-sales/luar-kota/riwayat",
-        icon: <History className="w-4 h-4" />,
-      },
+
       {
         label: "Riwayat Penjualan",
         href: "/dashboard/admin/penjualan-sales/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+      {
+        label: "Riwayat Kanvas Sales",
+        href: "/dashboard/admin/penjualan-sales/luar-kota/riwayat",
         icon: <History className="w-4 h-4" />,
       },
     ],
@@ -163,18 +172,23 @@ const transactionLinks = [
   },
   {
     label: "Pengeluaran",
-    href: "/dashboard/admin/pengeluaran",
+    href: "/dashboard/admin/pengeluaran/harian",
     icon: <DollarSign className="w-5 h-5" />,
     subMenu: [
       {
-        label: "Catat Pengeluaran",
-        href: "/dashboard/admin/pengeluaran",
-        icon: <DollarSign className="w-4 h-4" />,
+        label: "Pengeluaran Harian",
+        href: "/dashboard/admin/pengeluaran/harian",
+        icon: <CalendarDays className="w-4 h-4" />,
+      },
+      {
+        label: "Pengeluaran Bulanan",
+        href: "/dashboard/admin/pengeluaran/bulanan",
+        icon: <Calendar1 className="w-4 h-4" />,
       },
     ],
   },
   {
-    label: "Laporan Transaksi",
+    label: "Laporan",
     href: "/dashboard/admin/laporan/pembelian",
     icon: <FileText className="w-5 h-5" />,
     subMenu: [
@@ -194,7 +208,12 @@ const transactionLinks = [
         icon: <FileText className="w-4 h-4" />,
       },
       {
-        label: "Semua Pengeluaran",
+        label: "Laporan laba Barang",
+        href: "/dashboard/admin/laporan/laba-barang",
+        icon: <FileText className="w-4 h-4" />,
+      },
+      {
+        label: "Semua Laporan",
         href: "/dashboard/admin/laporan/all",
         icon: <FileText className="w-4 h-4" />,
       },

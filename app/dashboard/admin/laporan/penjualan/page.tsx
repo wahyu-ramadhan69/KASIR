@@ -8,11 +8,7 @@ import {
   Package,
   Eye,
   X,
-  Download,
-  RefreshCw,
-  Filter as FilterIcon,
   FileSpreadsheet,
-  FileText,
   Loader2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
@@ -580,7 +576,7 @@ const LaporanPenjualanPage = () => {
                     Tanggal
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                    Customer/Sales
+                    Customer
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                     Penjualan

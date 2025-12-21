@@ -172,7 +172,7 @@ model Pengeluaran {
   id                Int      @id @default(autoincrement())
   namaPengeluaran   String
   jumlah            BigInt
-  jenisPengeluaran  String
+  jenisPengeluaran  JenisPengeluaran  @default(HARIAN)
   keterangan        String?
   tanggalInput      DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -201,6 +201,7 @@ model PerjalananSales {
   @@index([karyawanId])
   @@index([statusPerjalanan])
 }
+
 model ManifestBarang {
   id                    Int                     @id @default(autoincrement())
   perjalanan            PerjalananSales         @relation(fields: [perjalananId], references: [id], onDelete: Cascade)
@@ -221,8 +222,8 @@ model ManifestBarang {
 // Model untuk mencatat pengembalian barang
 model PengembalianBarang {
   id                    Int                     @id @default(autoincrement())
-  perjalanan            PerjalananSales         @relation(fields: [perjalananId], references: [id], onDelete: Cascade)
-  perjalananId          Int
+  perjalanan            PerjalananSales?         @relation(fields: [perjalananId], references: [id], onDelete: Cascade)
+  perjalananId          Int?
   barang                Barang                  @relation(fields: [barangId], references: [id])
   barangId              Int
   jumlahDus             BigInt
@@ -230,13 +231,13 @@ model PengembalianBarang {
   kondisiBarang         KondisiBarang           @default(BAIK)
   keterangan            String?
   tanggalPengembalian   DateTime                @default(now())
-  
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
   
   @@index([perjalananId])
   @@index([barangId])
 }
+
 enum MetodePembayaran {
   CASH
   TRANSFER
@@ -274,4 +275,10 @@ enum KondisiBarang {
   BAIK
   RUSAK
   KADALUARSA
+}
+
+enum JenisPengeluaran {
+  HARIAN
+  BULANAN
+  TAHUNAN
 }

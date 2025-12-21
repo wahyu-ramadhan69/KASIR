@@ -78,11 +78,26 @@ export async function POST(request: Request) {
   }
   try {
     const body = await request.json();
-    const { namaPengeluaran, jumlah, keterangan } = body;
+    const { namaPengeluaran, jumlah, keterangan, jenisPengeluaran, tanggalInput } =
+      body;
 
-    if (!namaPengeluaran || !jumlah) {
+    if (
+      !namaPengeluaran ||
+      !jumlah ||
+      !["HARIAN", "BULANAN", "TAHUNAN"].includes(jenisPengeluaran)
+    ) {
       return NextResponse.json(
         { success: false, error: "Jenis, jumlah harus diisi" },
+        { status: 400 }
+      );
+    }
+
+    const tanggal = tanggalInput
+      ? new Date(tanggalInput)
+      : new Date();
+    if (isNaN(tanggal.getTime())) {
+      return NextResponse.json(
+        { success: false, error: "Tanggal tidak valid" },
         { status: 400 }
       );
     }
@@ -90,9 +105,11 @@ export async function POST(request: Request) {
     const pengeluaran = await prisma.pengeluaran.create({
       data: {
         namaPengeluaran: namaPengeluaran,
+        jenisPengeluaran: jenisPengeluaran,
         jumlah: parseInt(jumlah),
         keterangan: keterangan || null,
         userId: parseInt(authData.userId),
+        tanggalInput: tanggal,
       },
       include: {
         user: true,

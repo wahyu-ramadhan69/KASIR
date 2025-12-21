@@ -10,9 +10,10 @@ import {
   Edit,
   Trash2,
   X,
-  Filter,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+
+type JenisPengeluaran = "HARIAN" | "BULANAN" | "TAHUNAN";
 
 interface User {
   id: number;
@@ -23,6 +24,7 @@ interface User {
 interface Pengeluaran {
   id: number;
   namaPengeluaran: string;
+  jenisPengeluaran: JenisPengeluaran;
   jumlah: number;
   keterangan: string | null;
   tanggalInput: string;
@@ -32,14 +34,15 @@ interface Pengeluaran {
 
 interface PengeluaranFormData {
   namaPengeluaran: string;
+  jenisPengeluaran: JenisPengeluaran;
   jumlah: string;
   keterangan: string;
+  tanggalInput: string;
 }
 
-const jenisPengeluaranOptions = [
-  { value: "BAHAN_BAKAR", label: "Bahan Bakar" },
-  { value: "UPAH_KULI", label: "Upah Kuli" },
-  { value: "LAINNYA", label: "Lainnya" },
+const jenisPengeluaranOptions: { value: JenisPengeluaran; label: string }[] = [
+  { value: "BULANAN", label: "Bulanan" },
+  { value: "TAHUNAN", label: "Tahunan" },
 ];
 
 const DataPengeluaranPage = () => {
@@ -48,9 +51,9 @@ const DataPengeluaranPage = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterJenis, setFilterJenis] = useState<string>("all");
 
-  // Date range states
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  // Date filters
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedYear, setSelectedYear] = useState<string>("");
 
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
@@ -62,25 +65,21 @@ const DataPengeluaranPage = () => {
   const [jumlahInput, setJumlahInput] = useState<string>("");
   const [jumlahEditInput, setJumlahEditInput] = useState<string>("");
   const [namaPengeluaranInput, setNamaPengeluaranInput] = useState<string>("");
+  const [jenisPengeluaranInput, setJenisPengeluaranInput] =
+    useState<JenisPengeluaran>("BULANAN");
   const [keteranganInput, setKeteranganInput] = useState<string>("");
+  const [tanggalInputAdd, setTanggalInputAdd] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
 
   useEffect(() => {
     fetchPengeluaran();
-  }, [startDate, endDate]);
+  }, []);
 
   const fetchPengeluaran = async () => {
     setLoading(true);
     try {
-      let url = "/api/pengeluaran?limit=1000"; // Fetch all data for client-side filtering
-
-      if (startDate) {
-        url += `&startDate=${startDate}`;
-      }
-      if (endDate) {
-        url += `&endDate=${endDate}`;
-      }
-
-      const res = await fetch(url);
+      const res = await fetch("/api/pengeluaran?limit=1000");
       const data = await res.json();
 
       if (data.success) {
@@ -99,20 +98,28 @@ const DataPengeluaranPage = () => {
       id: pengeluaran.id,
       data: {
         namaPengeluaran: pengeluaran.namaPengeluaran,
+        jenisPengeluaran: pengeluaran.jenisPengeluaran,
         jumlah: pengeluaran.jumlah.toString(),
         keterangan: pengeluaran.keterangan || "",
+        tanggalInput: new Date(pengeluaran.tanggalInput)
+          .toISOString()
+          .split("T")[0],
       },
     });
     setJumlahEditInput(formatRupiahInput(pengeluaran.jumlah.toString()));
     setShowEditModal(true);
   };
 
-  const handleDelete = async (id: number, namaPengeluaran: string) => {
+  const handleDelete = async (
+    id: number,
+    namaPengeluaran: string,
+    jenisPengeluaran: JenisPengeluaran
+  ) => {
     if (
       !confirm(
-        `Apakah Anda yakin ingin menghapus pengeluaran "${getJenisLabel(
-          namaPengeluaran
-        )}"?`
+        `Apakah Anda yakin ingin menghapus pengeluaran "${namaPengeluaran}" (${getJenisLabel(
+          jenisPengeluaran
+        )})?`
       )
     ) {
       return;
@@ -143,12 +150,16 @@ const DataPengeluaranPage = () => {
     >
   ) => {
     const { name, value } = e.target;
+    const parsedValue =
+      name === "jenisPengeluaran"
+        ? (value as JenisPengeluaran)
+        : value;
     if (editingPengeluaran) {
       setEditingPengeluaran({
         ...editingPengeluaran,
         data: {
           ...editingPengeluaran.data,
-          [name]: value,
+          [name]: parsedValue,
         },
       });
     }
@@ -162,6 +173,11 @@ const DataPengeluaranPage = () => {
 
     if (!namaPengeluaranInput) {
       toast.error("Nama pengeluaran harus dipilih!");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!jenisPengeluaranInput) {
+      toast.error("Jenis pengeluaran harus dipilih!");
       setIsSubmitting(false);
       return;
     }
@@ -180,7 +196,9 @@ const DataPengeluaranPage = () => {
         },
         body: JSON.stringify({
           namaPengeluaran: namaPengeluaranInput,
+          jenisPengeluaran: jenisPengeluaranInput,
           jumlah: jumlahValue,
+          tanggalInput: tanggalInputAdd,
           keterangan: keteranganInput || null,
         }),
       });
@@ -192,7 +210,9 @@ const DataPengeluaranPage = () => {
         setShowAddModal(false);
         setJumlahInput("");
         setNamaPengeluaranInput("");
+        setJenisPengeluaranInput("BULANAN");
         setKeteranganInput("");
+        setTanggalInputAdd(new Date().toISOString().split("T")[0]);
         fetchPengeluaran();
       } else {
         toast.error(data.error || "Gagal menambahkan pengeluaran");
@@ -227,7 +247,9 @@ const DataPengeluaranPage = () => {
         },
         body: JSON.stringify({
           namaPengeluaran: editingPengeluaran.data.namaPengeluaran,
+          jenisPengeluaran: editingPengeluaran.data.jenisPengeluaran,
           jumlah: jumlahValue,
+          tanggalInput: editingPengeluaran.data.tanggalInput,
           keterangan: editingPengeluaran.data.keterangan || null,
         }),
       });
@@ -280,87 +302,95 @@ const DataPengeluaranPage = () => {
     setJumlahEditInput(formatRupiahInput(value));
   };
 
-  const formatTanggal = (tanggal: string, withTime: boolean = true): string => {
+  const formatTanggal = (tanggal: string, _withTime: boolean = true): string => {
     const date = new Date(tanggal);
-    if (withTime) {
-      return date.toLocaleString("id-ID", {
-        day: "2-digit",
-        month: "short",
+    const tanggalString = date
+      .toLocaleDateString("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
         year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-    return date.toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+      })
+      .toLowerCase();
+
+    return tanggalString;
   };
 
-  const getJenisLabel = (namaPengeluaran: string): string => {
+  const getJenisLabel = (jenisPengeluaran: JenisPengeluaran): string => {
     const option = jenisPengeluaranOptions.find(
-      (opt) => opt.value === namaPengeluaran
+      (opt) => opt.value === jenisPengeluaran
     );
-    return option ? option.label : namaPengeluaran;
+    if (option) return option.label;
+    if (jenisPengeluaran === "HARIAN") return "Harian";
+    return jenisPengeluaran;
   };
 
-  const getJenisColor = (namaPengeluaran: string): string => {
-    switch (namaPengeluaran) {
-      case "BAHAN_BAKAR":
-        return "bg-red-100 text-red-800";
-      case "UPAH_KULI":
-        return "bg-blue-100 text-blue-800";
-      case "LAINNYA":
-        return "bg-gray-100 text-gray-800";
+  const getJenisColor = (jenisPengeluaran: JenisPengeluaran): string => {
+    switch (jenisPengeluaran) {
+      case "BULANAN":
+        return "bg-indigo-100 text-indigo-800";
+      case "TAHUNAN":
+        return "bg-amber-100 text-amber-800";
+      case "HARIAN":
+        return "bg-emerald-100 text-emerald-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
   };
 
   const clearDateFilter = () => {
-    setStartDate("");
-    setEndDate("");
+    setSelectedMonth("");
+    setSelectedYear("");
   };
 
-  const setTodayFilter = () => {
-    const today = new Date().toISOString().split("T")[0];
-    setStartDate(today);
-    setEndDate(today);
+  const handleMonthChange = (value: string) => {
+    setSelectedMonth(value);
+    if (value) {
+      setSelectedYear(value.split("-")[0]);
+    }
   };
 
-  const setThisWeekFilter = () => {
+  const setCurrentMonthFilter = () => {
     const today = new Date();
-    const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-    const lastDay = new Date(
-      today.setDate(today.getDate() - today.getDay() + 6)
-    );
-
-    setStartDate(firstDay.toISOString().split("T")[0]);
-    setEndDate(lastDay.toISOString().split("T")[0]);
+    const monthValue = `${today.getFullYear()}-${String(
+      today.getMonth() + 1
+    ).padStart(2, "0")}`;
+    setSelectedMonth(monthValue);
+    setSelectedYear(today.getFullYear().toString());
   };
 
-  const setThisMonthFilter = () => {
+  const setCurrentYearFilter = () => {
     const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-    setStartDate(firstDay.toISOString().split("T")[0]);
-    setEndDate(lastDay.toISOString().split("T")[0]);
+    setSelectedYear(today.getFullYear().toString());
   };
 
-  const filteredPengeluaran = pengeluaranList.filter((item) => {
+  const allowedJenis: JenisPengeluaran[] = ["BULANAN", "TAHUNAN"];
+
+  const bulTahPengeluaran = pengeluaranList.filter((item) =>
+    allowedJenis.includes(item.jenisPengeluaran)
+  );
+
+  const filteredPengeluaran = bulTahPengeluaran.filter((item) => {
     const matchSearch =
-      getJenisLabel(item.namaPengeluaran)
+      item.namaPengeluaran
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       item.keterangan?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.user?.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchJenis =
-      filterJenis === "all" || item.namaPengeluaran === filterJenis;
+      filterJenis === "all" || item.jenisPengeluaran === filterJenis;
 
-    return matchSearch && matchJenis;
+    const itemDate = new Date(item.tanggalInput);
+    const matchMonth = selectedMonth
+      ? itemDate.getFullYear() === parseInt(selectedMonth.split("-")[0]) &&
+        itemDate.getMonth() === parseInt(selectedMonth.split("-")[1]) - 1
+      : true;
+    const matchYear = selectedYear
+      ? itemDate.getFullYear() === parseInt(selectedYear)
+      : true;
+
+    return matchSearch && matchJenis && matchMonth && matchYear;
   });
 
   const totalPengeluaran = filteredPengeluaran.reduce(
@@ -370,7 +400,7 @@ const DataPengeluaranPage = () => {
 
   const getTodayPengeluaran = () => {
     const today = new Date().toISOString().split("T")[0];
-    return pengeluaranList
+    return bulTahPengeluaran
       .filter(
         (item) =>
           new Date(item.tanggalInput).toISOString().split("T")[0] === today
@@ -383,7 +413,7 @@ const DataPengeluaranPage = () => {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    return pengeluaranList
+    return bulTahPengeluaran
       .filter((item) => {
         const itemDate = new Date(item.tanggalInput);
         return (
@@ -393,6 +423,12 @@ const DataPengeluaranPage = () => {
       })
       .reduce((sum, item) => sum + item.jumlah, 0);
   };
+
+  const availableYears = Array.from(
+    new Set(
+      bulTahPengeluaran.map((item) => new Date(item.tanggalInput).getFullYear())
+    )
+  ).sort((a, b) => b - a);
 
   return (
     <div className="w-full max-w-7xl mx-auto">
@@ -421,10 +457,10 @@ const DataPengeluaranPage = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">
-              Data Pengeluaran
+              Pengeluaran Bulanan & Tahunan
             </h1>
             <p className="text-purple-100">
-              Kelola dan pantau pengeluaran harian toko Anda
+              Kelola dan pantau pengeluaran bulanan atau tahunan toko Anda
             </p>
           </div>
           <div className="flex gap-3">
@@ -432,7 +468,9 @@ const DataPengeluaranPage = () => {
               onClick={() => {
                 setJumlahInput("");
                 setNamaPengeluaranInput("");
+                setJenisPengeluaranInput("BULANAN");
                 setKeteranganInput("");
+                setTanggalInputAdd(new Date().toISOString().split("T")[0]);
                 setShowAddModal(true);
               }}
               className="bg-white hover:bg-purple-50 text-purple-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
@@ -512,60 +550,65 @@ const DataPengeluaranPage = () => {
               />
             </div>
 
+            <select
+              value={filterJenis}
+              onChange={(e) => setFilterJenis(e.target.value)}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-[160px]"
+            >
+              <option value="all">Semua Jenis</option>
+              {jenisPengeluaranOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
             <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              placeholder="dd/mm/yyyy"
-              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-auto"
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => handleMonthChange(e.target.value)}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-[180px]"
             />
 
-            <span className="hidden lg:flex items-center text-gray-500 font-medium">
-              -
-            </span>
-
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              placeholder="dd/mm/yyyy"
-              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-auto"
-            />
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-[140px]"
+            >
+              <option value="">Semua Tahun</option>
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Quick Filter Buttons */}
-          {(startDate || endDate) && (
-            <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-sm text-gray-600 font-medium">
-                Quick filter:
-              </span>
-              <button
-                onClick={setTodayFilter}
-                className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-all"
-              >
-                Hari Ini
-              </button>
-              <button
-                onClick={setThisWeekFilter}
-                className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium transition-all"
-              >
-                Minggu Ini
-              </button>
-              <button
-                onClick={setThisMonthFilter}
-                className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-medium transition-all"
-              >
-                Bulan Ini
-              </button>
-              <button
-                onClick={clearDateFilter}
-                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
-              >
-                <X className="w-3.5 h-3.5" />
-                Reset Filter
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm text-gray-600 font-medium">
+              Quick filter:
+            </span>
+            <button
+              onClick={setCurrentMonthFilter}
+              className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-medium transition-all"
+            >
+              Bulan Ini
+            </button>
+            <button
+              onClick={setCurrentYearFilter}
+              className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-all"
+            >
+              Tahun Ini
+            </button>
+            <button
+              onClick={clearDateFilter}
+              className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
+            >
+              <X className="w-3.5 h-3.5" />
+              Reset Filter
+            </button>
+          </div>
         </div>
       </div>
 
@@ -597,9 +640,6 @@ const DataPengeluaranPage = () => {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Tanggal Input
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Terakhir Edit
-                  </th>
                   <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Aksi
                   </th>
@@ -609,7 +649,7 @@ const DataPengeluaranPage = () => {
                 {filteredPengeluaran.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={7}
                       className="px-6 py-12 text-center text-gray-500"
                     >
                       Tidak ada data pengeluaran ditemukan
@@ -625,12 +665,15 @@ const DataPengeluaranPage = () => {
                         {index + 1}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-semibold text-gray-900">
+                          {item.namaPengeluaran}
+                        </div>
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${getJenisColor(
-                            item.namaPengeluaran
+                          className={`inline-flex mt-1 px-3 py-1 rounded-full text-xs font-semibold ${getJenisColor(
+                            item.jenisPengeluaran
                           )}`}
                         >
-                          {getJenisLabel(item.namaPengeluaran)}
+                          {getJenisLabel(item.jenisPengeluaran)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
@@ -648,9 +691,6 @@ const DataPengeluaranPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {formatTanggal(item.tanggalInput)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {formatTanggal(item.updatedAt)}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
@@ -662,7 +702,11 @@ const DataPengeluaranPage = () => {
                           </button>
                           <button
                             onClick={() =>
-                              handleDelete(item.id, item.namaPengeluaran)
+                              handleDelete(
+                                item.id,
+                                item.namaPengeluaran,
+                                item.jenisPengeluaran
+                              )
                             }
                             className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
                             title="Hapus"
@@ -681,7 +725,7 @@ const DataPengeluaranPage = () => {
       </div>
 
       <div className="mt-4 text-center text-sm text-gray-500">
-        Menampilkan {filteredPengeluaran.length} dari {pengeluaranList.length}{" "}
+        Menampilkan {filteredPengeluaran.length} dari {bulTahPengeluaran.length}{" "}
         pengeluaran
       </div>
 
@@ -704,7 +748,9 @@ const DataPengeluaranPage = () => {
                   setShowAddModal(false);
                   setJumlahInput("");
                   setNamaPengeluaranInput("");
+                  setJenisPengeluaranInput("BULANAN");
                   setKeteranganInput("");
+                  setTanggalInputAdd(new Date().toISOString().split("T")[0]);
                 }}
                 className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
               >
@@ -730,6 +776,25 @@ const DataPengeluaranPage = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Jenis Pengeluaran <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={jenisPengeluaranInput}
+                    onChange={(e) =>
+                      setJenisPengeluaranInput(e.target.value as JenisPengeluaran)
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
+                  >
+                    {jenisPengeluaranOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Jumlah (Rp) <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -743,6 +808,19 @@ const DataPengeluaranPage = () => {
                   <p className="text-xs text-gray-500 mt-1">
                     Contoh: 50000 akan menjadi Rp 50.000
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Tanggal Pengeluaran <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={tanggalInputAdd}
+                    onChange={(e) => setTanggalInputAdd(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
+                    required
+                  />
                 </div>
 
                 <div>
@@ -766,7 +844,9 @@ const DataPengeluaranPage = () => {
                     setShowAddModal(false);
                     setJumlahInput("");
                     setNamaPengeluaranInput("");
+                    setJenisPengeluaranInput("BULANAN");
                     setKeteranganInput("");
+                    setTanggalInputAdd(new Date().toISOString().split("T")[0]);
                   }}
                   className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
                 >
@@ -836,6 +916,24 @@ const DataPengeluaranPage = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Jenis Pengeluaran <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="jenisPengeluaran"
+                    value={editingPengeluaran.data.jenisPengeluaran}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
+                  >
+                    {jenisPengeluaranOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Jumlah (Rp) <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -849,6 +947,20 @@ const DataPengeluaranPage = () => {
                   <p className="text-xs text-gray-500 mt-1">
                     Contoh: 50000 akan menjadi Rp 50.000
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Tanggal Pengeluaran <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    name="tanggalInput"
+                    type="date"
+                    value={editingPengeluaran.data.tanggalInput}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
+                    required
+                  />
                 </div>
 
                 <div>

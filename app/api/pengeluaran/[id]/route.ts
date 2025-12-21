@@ -50,14 +50,38 @@ export async function PUT(
   try {
     const { id } = await params; // ← Await params
     const body = await request.json();
-    const { namaPengeluaran, jumlah, keterangan } = body;
+    const { namaPengeluaran, jumlah, keterangan, jenisPengeluaran, tanggalInput } =
+      body;
+
+    if (
+      !["HARIAN", "BULANAN", "TAHUNAN"].includes(jenisPengeluaran) ||
+      !namaPengeluaran ||
+      !jumlah
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Jenis, jumlah harus diisi" },
+        { status: 400 }
+      );
+    }
+
+    const tanggal = tanggalInput
+      ? new Date(tanggalInput)
+      : new Date();
+    if (isNaN(tanggal.getTime())) {
+      return NextResponse.json(
+        { success: false, error: "Tanggal tidak valid" },
+        { status: 400 }
+      );
+    }
 
     const pengeluaran = await prisma.pengeluaran.update({
       where: { id: parseInt(id) },
       data: {
         namaPengeluaran: namaPengeluaran,
+        jenisPengeluaran: jenisPengeluaran,
         jumlah: parseInt(jumlah),
         keterangan: keterangan || null,
+        tanggalInput: tanggal,
         userId: parseInt(authData.userId),
       },
       include: {

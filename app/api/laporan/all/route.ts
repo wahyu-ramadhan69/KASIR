@@ -115,6 +115,11 @@ export async function GET(request: NextRequest) {
     // ====================================
     await generateRingkasan(workbook, dateFilter, startDate, endDate);
 
+    // ====================================
+    // SHEET 5: LABA PER BARANG
+    // ====================================
+    await generateLaporanLabaBarang(workbook, dateFilter, startDate, endDate);
+
     const buffer = await workbook.xlsx.writeBuffer();
     const dateRange = formatDateRange(
       startDate || undefined,
@@ -737,9 +742,7 @@ async function generateLaporanPengeluaran(
   // Clear formatting for columns beyond F (7 onwards) to prevent green bleeding
   for (let i = 7; i <= 50; i++) {
     const cell = totalRow.getCell(i);
-    cell.fill = {} as any;
-    cell.font = {} as any;
-    cell.border = {} as any;
+    cell.style = {};
   }
 
   totalRow.getCell(6).alignment = { horizontal: "right", vertical: "middle" };
@@ -920,7 +923,7 @@ async function generateRingkasan(
       jumlah: pengeluaranList.length,
       total: totalPengeluaran,
       keterangan: "Total pengeluaran operasional",
-      color: "FFF44336",
+      color: "FF388E3C",
       isBold: false,
     },
     {
@@ -928,7 +931,7 @@ async function generateRingkasan(
       jumlah: "-",
       total: labaBersih,
       keterangan: "Laba Kotor - Pengeluaran",
-      color: labaBersih >= 0 ? "FF388E3C" : "FFD32F2F",
+      color: "FF388E3C",
       isBold: true,
     },
   ];
@@ -964,8 +967,7 @@ async function generateRingkasan(
       // Clear formatting for columns beyond D (5 onwards)
       for (let i = 5; i <= 50; i++) {
         const cell = row.getCell(i);
-        cell.fill = {} as any;
-        cell.font = {} as any;
+        cell.style = {};
       }
     }
 
@@ -1231,9 +1233,7 @@ async function generateLaporanPenjualanDetail(
   // Clear formatting for columns beyond L (13 onwards) to prevent green bleeding
   for (let i = 13; i <= 50; i++) {
     const cell = totalRow.getCell(i);
-    cell.fill = {} as any;
-    cell.font = {} as any;
-    cell.border = {} as any;
+    cell.style = {};
   }
 
   totalRow.getCell(9).alignment = { horizontal: "right", vertical: "middle" };
@@ -1436,9 +1436,7 @@ async function generateLaporanPembelianDetail(
   // Clear formatting for columns beyond J (11 onwards) to prevent green bleeding
   for (let i = 11; i <= 50; i++) {
     const cell = totalRow.getCell(i);
-    cell.fill = {} as any;
-    cell.font = {} as any;
-    cell.border = {} as any;
+    cell.style = {};
   }
 
   totalRow.getCell(9).alignment = { horizontal: "right", vertical: "middle" };
@@ -1446,4 +1444,256 @@ async function generateLaporanPembelianDetail(
 
   totalRow.getCell(9).numFmt = "#,##0";
   totalRow.getCell(10).numFmt = "#,##0";
+}
+
+// ====================================
+// LABA PER BARANG
+// ====================================
+async function generateLaporanLabaBarang(
+  workbook: ExcelJS.Workbook,
+  dateFilter: any,
+  startDate: string | null,
+  endDate: string | null
+) {
+  const worksheet = workbook.addWorksheet("Laba Per Barang");
+
+  const penjualanFilter: any = {
+    statusTransaksi: "SELESAI",
+  };
+
+  if (Object.keys(dateFilter).length > 0) {
+    penjualanFilter.tanggalTransaksi = dateFilter;
+  }
+
+  const items = await prisma.penjualanItem.findMany({
+    where: {
+      penjualan: penjualanFilter,
+    },
+    include: {
+      barang: {
+        select: {
+          id: true,
+          namaBarang: true,
+          ukuran: true,
+          satuan: true,
+          jumlahPerKemasan: true,
+          jenisKemasan: true,
+        },
+      },
+    },
+  });
+
+  const barangMap = new Map<
+    number,
+    {
+      barangId: number;
+      namaBarang: string;
+      ukuran: number;
+      satuan: string;
+      jumlahPerKemasan: number;
+      jenisKemasan: string;
+      totalKemasan: number;
+      totalItem: number;
+      totalModal: number;
+      totalPenjualan: number;
+      totalLaba: number;
+    }
+  >();
+
+  for (const item of items) {
+    const jumlahPerKemasan = Math.max(1, toNumber(item.barang.jumlahPerKemasan));
+    const jumlahDus = toNumber(item.jumlahDus);
+    const jumlahPcs = toNumber(item.jumlahPcs);
+    const hargaJual = toNumber(item.hargaJual);
+    const hargaBeli = toNumber(item.hargaBeli);
+
+    const modalDus = hargaBeli * jumlahDus;
+    const modalPcs =
+      jumlahPcs > 0 ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs) : 0;
+    const totalModalItem = modalDus + modalPcs;
+
+    const penjualanDus = hargaJual * jumlahDus;
+    const penjualanPcs =
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
+    const totalPenjualanItem = penjualanDus + penjualanPcs;
+
+    const labaItem =
+      typeof item.laba === "bigint" || typeof item.laba === "number"
+        ? toNumber(item.laba)
+        : totalPenjualanItem - totalModalItem;
+
+    const totalItemTerjual = jumlahDus * jumlahPerKemasan + jumlahPcs;
+    const totalKemasanTerjual = totalItemTerjual / jumlahPerKemasan;
+
+    if (!barangMap.has(item.barangId)) {
+      barangMap.set(item.barangId, {
+        barangId: item.barangId,
+        namaBarang: item.barang.namaBarang,
+        ukuran: toNumber(item.barang.ukuran),
+        satuan: item.barang.satuan,
+        jumlahPerKemasan,
+        jenisKemasan: item.barang.jenisKemasan,
+        totalKemasan: 0,
+        totalItem: 0,
+        totalModal: 0,
+        totalPenjualan: 0,
+        totalLaba: 0,
+      });
+    }
+
+    const agg = barangMap.get(item.barangId)!;
+    agg.totalKemasan += totalKemasanTerjual;
+    agg.totalItem += totalItemTerjual;
+    agg.totalModal += totalModalItem;
+    agg.totalPenjualan += totalPenjualanItem;
+    agg.totalLaba += labaItem;
+  }
+
+  const rows = Array.from(barangMap.values()).sort(
+    (a, b) => b.totalLaba - a.totalLaba
+  );
+
+  // Title
+  worksheet.mergeCells("A1:I1");
+  const titleCell = worksheet.getCell("A1");
+  titleCell.value = "LAPORAN LABA PER BARANG";
+  titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF2196F3" },
+  };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 30;
+
+  // Periode
+  worksheet.mergeCells("A2:I2");
+  const periodeCell = worksheet.getCell("A2");
+  periodeCell.value = `Periode: ${formatDateRange(
+    startDate || undefined,
+    endDate || undefined
+  )}`;
+  periodeCell.font = { italic: true, size: 11 };
+  periodeCell.alignment = { horizontal: "center" };
+
+  worksheet.getRow(3).height = 5;
+
+  const headers = [
+    "No",
+    "Barang",
+    "Kemasan",
+    "Qty Kemasan",
+    "Qty Item",
+    "Penjualan",
+    "Modal",
+    "Laba",
+    "Margin %",
+  ];
+  const headerRow = worksheet.getRow(4);
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF424242" },
+    };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+  });
+  headerRow.height = 20;
+
+  worksheet.columns = [
+    { key: "no", width: 5 },
+    { key: "barang", width: 32 },
+    { key: "kemasan", width: 22 },
+    { key: "qtyKemasan", width: 14 },
+    { key: "qtyItem", width: 14 },
+    { key: "penjualan", width: 16 },
+    { key: "modal", width: 16 },
+    { key: "laba", width: 16 },
+    { key: "margin", width: 12 },
+  ];
+
+  let rowIndex = 5;
+  let totalModal = 0;
+  let totalPenjualan = 0;
+  let totalLaba = 0;
+  let totalItem = 0;
+  let totalKemasan = 0;
+
+  rows.forEach((row, idx) => {
+    const margin = row.totalPenjualan
+      ? (row.totalLaba / row.totalPenjualan) * 100
+      : 0;
+
+    const excelRow = worksheet.getRow(rowIndex);
+    excelRow.getCell("A").value = idx + 1;
+    excelRow.getCell("B").value = row.namaBarang;
+    excelRow.getCell("C").value = `${row.jumlahPerKemasan} item/${row.jenisKemasan}`;
+    excelRow.getCell("D").value = row.totalKemasan;
+    excelRow.getCell("E").value = row.totalItem;
+    excelRow.getCell("F").value = row.totalPenjualan;
+    excelRow.getCell("G").value = row.totalModal;
+    excelRow.getCell("H").value = row.totalLaba;
+    excelRow.getCell("I").value = margin;
+
+    ["D", "E", "F", "G", "H", "I"].forEach((key) => {
+      const cell = excelRow.getCell(key);
+      cell.alignment = { horizontal: "right" };
+      cell.numFmt = key === "I" ? "0.00" : "#,##0";
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    ["A", "B", "C"].forEach((key) => {
+      const cell = excelRow.getCell(key);
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    totalModal += row.totalModal;
+    totalPenjualan += row.totalPenjualan;
+    totalLaba += row.totalLaba;
+    totalItem += row.totalItem;
+    totalKemasan += row.totalKemasan;
+    rowIndex++;
+  });
+
+  const totalRow = worksheet.getRow(rowIndex + 1);
+  totalRow.getCell("B").value = "TOTAL";
+  totalRow.getCell("B").font = { bold: true };
+  totalRow.getCell("D").value = totalKemasan;
+  totalRow.getCell("E").value = totalItem;
+  totalRow.getCell("F").value = totalPenjualan;
+  totalRow.getCell("G").value = totalModal;
+  totalRow.getCell("H").value = totalLaba;
+  totalRow.getCell("I").value = totalPenjualan
+    ? (totalLaba / totalPenjualan) * 100
+    : 0;
+
+  ["D", "E", "F", "G", "H", "I"].forEach((key) => {
+    const cell = totalRow.getCell(key);
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: "right" };
+    cell.numFmt = key === "I" ? "0.00" : "#,##0";
+    cell.border = {
+      top: { style: "double" },
+      bottom: { style: "double" },
+    };
+  });
 }

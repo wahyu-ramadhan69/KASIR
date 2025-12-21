@@ -320,6 +320,19 @@ const LaporanLengkapPage = () => {
                   </p>
                 </div>
               </div>
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-green-600 text-xs font-bold">✓</span>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">
+                    Sheet 5: Laba Barang
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    Summary dari laba per barang
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -350,7 +363,7 @@ const LaporanLengkapPage = () => {
             <div>
               <p className="text-sm text-amber-800">
                 <span className="font-semibold">Tips:</span> File Excel yang
-                dihasilkan berisi 4 sheet berbeda. Anda dapat membuka dan
+                dihasilkan berisi 5 sheet berbeda. Anda dapat membuka dan
                 menganalisis setiap sheet secara terpisah di Microsoft Excel
                 atau Google Sheets.
               </p>
