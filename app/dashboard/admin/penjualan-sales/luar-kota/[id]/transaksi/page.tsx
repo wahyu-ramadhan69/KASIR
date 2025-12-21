@@ -127,9 +127,10 @@ const InputTransaksiPage = () => {
   }>({});
   const [jumlahDibayar, setJumlahDibayar] = useState("");
   const [keterangan, setKeterangan] = useState("");
-  const [kodePenjualan, setKodePenjualan] = useState("");
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
   const [customerHutangInfo, setCustomerHutangInfo] =
     useState<CustomerHutangInfo | null>(null);
   const [loadingHutangInfo, setLoadingHutangInfo] = useState(false);
@@ -535,22 +536,6 @@ const InputTransaksiPage = () => {
       return;
     }
 
-    // Fetch kode penjualan baru
-    try {
-      const res = await fetch("/api/penjualan/createcode");
-      const data = await res.json();
-      if (data.success) {
-        setKodePenjualan(data.data.kodePenjualan);
-      } else {
-        toast.error("Gagal generate kode penjualan");
-        return;
-      }
-    } catch (error) {
-      console.error("Error fetching kode penjualan:", error);
-      toast.error("Gagal generate kode penjualan");
-      return;
-    }
-
     setShowCheckoutModal(true);
   };
 
@@ -580,7 +565,6 @@ const InputTransaksiPage = () => {
     setSubmitting(true);
     try {
       const payload: any = {
-        kodePenjualan, // Kirim kode yang sudah di-generate di frontend
         items: items.map((item) => ({
           barangId: item.barangId,
           jumlahDus: item.jumlahDus,
@@ -621,28 +605,11 @@ const InputTransaksiPage = () => {
       const data = await res.json();
       if (data.success) {
         toast.success("Transaksi berhasil disimpan");
-        router.push(`/dashboard/admin/penjualan-sales/kanvas`);
+        setShowCheckoutModal(false);
+        setReceiptData(data.data);
+        setShowReceiptModal(true);
       } else {
-        // Jika kode penjualan sudah digunakan (conflict), generate kode baru
-        if (res.status === 409) {
-          toast.error(
-            "Kode penjualan sudah digunakan. Menggenerate kode baru..."
-          );
-          try {
-            const codeRes = await fetch("/api/penjualan/createcode");
-            const codeData = await codeRes.json();
-            if (codeData.success) {
-              setKodePenjualan(codeData.data.kodePenjualan);
-              toast.success(
-                "Kode penjualan baru berhasil di-generate. Silakan coba lagi."
-              );
-            }
-          } catch (error) {
-            toast.error("Gagal generate kode baru");
-          }
-        } else {
-          toast.error(data.message || "Gagal menyimpan transaksi");
-        }
+        toast.error(data.message || "Gagal menyimpan transaksi");
       }
     } catch (error) {
       console.error("Error:", error);
@@ -1569,20 +1536,7 @@ const InputTransaksiPage = () => {
             {/* Modal Body */}
             <div className="p-5 space-y-4">
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="bg-slate-100 p-1.5 rounded-lg">
-                      <Receipt className="w-4 h-4 text-slate-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500 font-medium">
-                        Nota Penjualan
-                      </p>
-                      <p className="font-semibold text-gray-800 text-sm">
-                        {kodePenjualan || "Loading..."}
-                      </p>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-2.5">
                     <div className="bg-slate-100 p-1.5 rounded-lg">
                       <User className="w-4 h-4 text-slate-600" />
@@ -1872,6 +1826,161 @@ const InputTransaksiPage = () => {
                 className="w-full bg-white hover:bg-gray-50 text-gray-700 py-2.5 rounded-lg font-semibold text-sm transition-all border border-gray-300 hover:border-gray-400"
               >
                 Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceiptModal && receiptData && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
+            {/* Success Header */}
+            <div className="bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 p-8 rounded-t-3xl text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50"></div>
+              <div className="relative">
+                <div className="bg-white w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center shadow-xl">
+                  <Check className="w-12 h-12 text-green-500" strokeWidth={3} />
+                </div>
+                <h3 className="text-2xl font-extrabold text-white mb-2 drop-shadow-md">
+                  Transaksi Berhasil!
+                </h3>
+                <p className="text-green-100 text-sm font-medium">
+                  {receiptData.kodePenjualan}
+                </p>
+              </div>
+            </div>
+
+            {/* Receipt Body */}
+            <div className="p-6 space-y-4">
+              {/* Transaction Info */}
+              <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 p-4 rounded-2xl border-2 border-gray-200 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 font-semibold">No Nota</span>
+                  <span className="font-bold text-gray-900">
+                    {receiptData.kodePenjualan}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 font-semibold">Customer</span>
+                  <span className="font-bold text-gray-900">
+                    {receiptData.customer?.nama || receiptData.namaCustomer}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 font-semibold">Sales</span>
+                  <span className="font-bold text-gray-900">
+                    {receiptData.karyawan?.nama || perjalanan?.karyawan?.nama}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 font-semibold">Metode</span>
+                  <span className="font-bold text-gray-900">
+                    {receiptData.metodePembayaran}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 font-semibold">Status</span>
+                  <span
+                    className={`px-3 py-1 rounded-lg font-extrabold text-xs ${
+                      receiptData.statusPembayaran === "LUNAS"
+                        ? "bg-green-500 text-white"
+                        : "bg-yellow-500 text-white"
+                    }`}
+                  >
+                    {receiptData.statusPembayaran}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-gray-900 text-sm uppercase tracking-wide">
+                  Detail Pembelian
+                </h4>
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+                  {receiptData.items?.map((item: any, index: number) => (
+                    <div
+                      key={index}
+                      className="text-sm pb-2 border-b last:border-b-0"
+                    >
+                      <div className="flex justify-between font-bold text-gray-900">
+                        <span>{item.barang?.namaBarang}</span>
+                        <span>{formatRupiah(item.hargaJual)}</span>
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        {item.jumlahDus} dus + {item.jumlahPcs} pcs
+                        {item.diskonPerItem > 0 && (
+                          <span className="text-red-600 ml-2">
+                            (Diskon: {formatRupiah(item.diskonPerItem)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment Summary */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border-2 border-blue-200 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700 font-semibold">Subtotal</span>
+                  <span className="font-bold text-gray-900">
+                    {formatRupiah(receiptData.subtotal)}
+                  </span>
+                </div>
+                {receiptData.diskonNota > 0 && (
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span className="font-semibold">Diskon Nota</span>
+                    <span className="font-bold">
+                      -{formatRupiah(receiptData.diskonNota)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-3 border-t-2 border-blue-300 text-lg">
+                  <span className="font-extrabold text-gray-900">TOTAL</span>
+                  <span className="font-extrabold text-blue-600">
+                    {formatRupiah(receiptData.totalHarga)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-blue-200">
+                  <span className="text-gray-700 font-semibold">Dibayar</span>
+                  <span className="font-bold text-gray-900">
+                    {formatRupiah(receiptData.jumlahDibayar)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700 font-semibold">Kembalian</span>
+                  <span className="font-bold text-green-600">
+                    {formatRupiah(receiptData.kembalian)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-6 bg-gray-50 border-t-2 border-gray-200 rounded-b-3xl space-y-3">
+              <button
+                onClick={() => {
+                  window.open(
+                    `/api/penjualan/${receiptData.id}/print-receipt`,
+                    "_blank"
+                  );
+                }}
+                className="w-full bg-gradient-to-r from-green-600 via-emerald-600 to-green-700 hover:from-green-700 hover:via-emerald-700 hover:to-green-800 text-white py-4 rounded-2xl font-extrabold text-base transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl active:scale-98"
+              >
+                <Receipt className="w-5 h-5" />
+                CETAK NOTA
+              </button>
+              <button
+                onClick={() => {
+                  router.push(`/dashboard/admin/penjualan-sales/kanvas`);
+                }}
+                className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white py-4 rounded-2xl font-extrabold text-base transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl active:scale-98"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                KEMBALI KE KANVAS
               </button>
             </div>
           </div>

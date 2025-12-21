@@ -85,10 +85,7 @@ export async function GET(
     doc.text("Telp: 021-12345678", { align: "center" });
 
     doc.moveDown(0.5);
-    doc
-      .moveTo(20, doc.y)
-      .lineTo(277.6, doc.y)
-      .stroke();
+    doc.moveTo(20, doc.y).lineTo(277.6, doc.y).stroke();
     doc.moveDown(0.5);
 
     // Info Transaksi
@@ -98,33 +95,46 @@ export async function GET(
 
     doc.fontSize(8).font("Helvetica-Bold");
     doc.text("No Nota:", leftCol, currentY);
-    doc.font("Helvetica").text(penjualan.kodePenjualan || "-", leftCol + 60, currentY);
+    doc
+      .font("Helvetica")
+      .text(penjualan.kodePenjualan || "-", leftCol + 60, currentY);
 
     currentY += 12;
     doc.font("Helvetica-Bold").text("Tanggal:", leftCol, currentY);
-    doc.font("Helvetica").text(formatDate(penjualan.createdAt.toISOString()), leftCol + 60, currentY);
+    doc
+      .font("Helvetica")
+      .text(
+        formatDate(penjualan.createdAt.toISOString()),
+        leftCol + 60,
+        currentY
+      );
 
     currentY += 12;
     doc.font("Helvetica-Bold").text("Customer:", leftCol, currentY);
-    doc.font("Helvetica").text(penjualan.customer?.nama || "-", leftCol + 60, currentY);
+    doc
+      .font("Helvetica")
+      .text(penjualan.customer?.nama || "-", leftCol + 60, currentY);
 
     currentY += 12;
     doc.font("Helvetica-Bold").text("Sales:", leftCol, currentY);
-    doc.font("Helvetica").text(penjualan.karyawan?.nama || "-", leftCol + 60, currentY);
+    doc
+      .font("Helvetica")
+      .text(penjualan.karyawan?.nama || "-", leftCol + 60, currentY);
 
     currentY += 12;
     doc.font("Helvetica-Bold").text("Metode:", leftCol, currentY);
-    doc.font("Helvetica").text(penjualan.metodePembayaran || "-", leftCol + 60, currentY);
+    doc
+      .font("Helvetica")
+      .text(penjualan.metodePembayaran || "-", leftCol + 60, currentY);
 
     currentY += 12;
     doc.font("Helvetica-Bold").text("Status:", leftCol, currentY);
-    doc.font("Helvetica").text(penjualan.statusPembayaran || "-", leftCol + 60, currentY);
+    doc
+      .font("Helvetica")
+      .text(penjualan.statusPembayaran || "-", leftCol + 60, currentY);
 
     doc.moveDown(0.5);
-    doc
-      .moveTo(20, doc.y)
-      .lineTo(277.6, doc.y)
-      .stroke();
+    doc.moveTo(20, doc.y).lineTo(277.6, doc.y).stroke();
     doc.moveDown(0.5);
 
     // Header Tabel
@@ -136,10 +146,7 @@ export async function GET(
     doc.text("Total", leftCol + 205, currentY, { width: 52.6, align: "right" });
 
     currentY += 10;
-    doc
-      .moveTo(20, currentY)
-      .lineTo(277.6, currentY)
-      .stroke();
+    doc.moveTo(20, currentY).lineTo(277.6, currentY).stroke();
     currentY += 5;
 
     // Items
@@ -164,7 +171,10 @@ export async function GET(
 
       // Qty
       const qtyText = `${item.jumlahDus} dus + ${item.jumlahPcs} pcs`;
-      doc.text(qtyText, leftCol + 115, currentY, { width: 40, align: "center" });
+      doc.text(qtyText, leftCol + 115, currentY, {
+        width: 40,
+        align: "center",
+      });
 
       // Harga
       doc.text(formatRupiah(hargaSatuan), leftCol + 155, currentY, {
@@ -183,12 +193,9 @@ export async function GET(
       // Tampilkan diskon jika ada
       if (diskonTotal > 0) {
         doc.fontSize(6).fillColor("#DC2626");
-        doc.text(
-          `  Diskon: -${formatRupiah(diskonTotal)}`,
-          leftCol,
-          currentY,
-          { width: 257.6 }
-        );
+        doc.text(`  Diskon: -${formatRupiah(diskonTotal)}`, leftCol, currentY, {
+          width: 257.6,
+        });
         currentY += 8;
         doc.fillColor("#000000").fontSize(7);
       }
@@ -197,10 +204,7 @@ export async function GET(
     // Garis pembatas
     doc.moveDown(0.3);
     currentY = doc.y;
-    doc
-      .moveTo(20, currentY)
-      .lineTo(277.6, currentY)
-      .stroke();
+    doc.moveTo(20, currentY).lineTo(277.6, currentY).stroke();
     currentY += 8;
 
     // Summary
@@ -215,50 +219,70 @@ export async function GET(
       currentY += 12;
       doc.fillColor("#DC2626");
       doc.text("Diskon Nota:", leftCol + 155, currentY);
-      doc.text(`-${formatRupiah(Number(penjualan.diskonNota))}`, leftCol + 205, currentY, {
-        width: 52.6,
-        align: "right",
-      });
+      doc.text(
+        `-${formatRupiah(Number(penjualan.diskonNota))}`,
+        leftCol + 205,
+        currentY,
+        {
+          width: 52.6,
+          align: "right",
+        }
+      );
       doc.fillColor("#000000");
     }
 
     currentY += 15;
     doc.font("Helvetica-Bold").fontSize(10);
     doc.text("TOTAL:", leftCol + 155, currentY);
-    doc.text(formatRupiah(Number(penjualan.totalHarga)), leftCol + 205, currentY, {
-      width: 52.6,
-      align: "right",
-    });
+    doc.text(
+      formatRupiah(Number(penjualan.totalHarga)),
+      leftCol + 205,
+      currentY,
+      {
+        width: 52.6,
+        align: "right",
+      }
+    );
 
     currentY += 12;
     doc.font("Helvetica").fontSize(8);
     doc.text("Dibayar:", leftCol + 155, currentY);
-    doc.text(formatRupiah(Number(penjualan.jumlahDibayar)), leftCol + 205, currentY, {
-      width: 52.6,
-      align: "right",
-    });
+    doc.text(
+      formatRupiah(Number(penjualan.jumlahDibayar)),
+      leftCol + 205,
+      currentY,
+      {
+        width: 52.6,
+        align: "right",
+      }
+    );
 
     currentY += 12;
     doc.fillColor("#059669");
     doc.text("Kembalian:", leftCol + 155, currentY);
-    doc.text(formatRupiah(Number(penjualan.kembalian)), leftCol + 205, currentY, {
-      width: 52.6,
-      align: "right",
-    });
+    doc.text(
+      formatRupiah(Number(penjualan.kembalian)),
+      leftCol + 205,
+      currentY,
+      {
+        width: 52.6,
+        align: "right",
+      }
+    );
     doc.fillColor("#000000");
 
     // Footer
     doc.moveDown(1);
     currentY = doc.y;
-    doc
-      .moveTo(20, currentY)
-      .lineTo(277.6, currentY)
-      .stroke();
+    doc.moveTo(20, currentY).lineTo(277.6, currentY).stroke();
     doc.moveDown(0.5);
 
-    doc.fontSize(7).font("Helvetica").text("Terima kasih atas pembelian Anda!", {
-      align: "center",
-    });
+    doc
+      .fontSize(7)
+      .font("Helvetica")
+      .text("Terima kasih atas pembelian Anda!", {
+        align: "center",
+      });
     doc.fontSize(6).text("Barang yang sudah dibeli tidak dapat dikembalikan", {
       align: "center",
     });

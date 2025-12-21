@@ -212,6 +212,24 @@ export async function GET(
       margin: 3px 0;
     }
 
+    .signature-section {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .signature-box {
+      text-align: center;
+      width: 120px;
+    }
+
+    .signature-line {
+      border-top: 1px solid #000;
+      margin-top: 50px;
+      padding-top: 4px;
+      font-size: 9px;
+    }
+
     @media print {
       body {
         padding: 10px;
@@ -225,10 +243,9 @@ export async function GET(
 </head>
 <body>
   <div class="header">
-    <h1>NOTA PENJUALAN</h1>
-    <p>Toko ABC</p>
-    <p>Jl. Contoh No. 123, Jakarta</p>
-    <p>Telp: 021-12345678</p>
+    <h1>AW Sembako Sarolangun</h1>
+    <p>Jln Simpang Raya, Aur Gading, Sarolangun</p>
+    <p>Telp: 081278054340</p>
   </div>
 
   <div class="info-section">
@@ -282,12 +299,18 @@ export async function GET(
       <div class="item-name">${item.barang.namaBarang}</div>
       <div class="item-details">
         <span>${formatRupiah(hargaSatuan)}</span>
-        <span style="text-align: center;">${item.jumlahDus} dus + ${item.jumlahPcs || 0} pcs</span>
-        <span style="text-align: right;">${formatRupiah(totalSetelahDiskon)}</span>
+        <span style="text-align: center;">${Number(item.jumlahDus)} dus + ${
+          Number(item.jumlahPcs || 0)
+        } pcs</span>
+        <span style="text-align: right;">${formatRupiah(
+          totalSetelahDiskon
+        )}</span>
       </div>
       ${
         diskonTotal > 0
-          ? `<div class="item-discount">Diskon: -${formatRupiah(diskonTotal)}</div>`
+          ? `<div class="item-discount">Diskon: -${formatRupiah(
+              diskonTotal
+            )}</div>`
           : ""
       }
     </div>`;
@@ -326,6 +349,15 @@ export async function GET(
   <div class="footer">
     <p><strong>Terima kasih atas pembelian Anda!</strong></p>
     <p>Barang yang sudah dibeli tidak dapat dikembalikan</p>
+  </div>
+
+  <div class="signature-section">
+    <div class="signature-box">
+      <p style="font-size: 9px; margin-bottom: 5px;">Tanda Terima,</p>
+      <div class="signature-line">
+        ( _________________ )
+      </div>
+    </div>
   </div>
 
   <script>

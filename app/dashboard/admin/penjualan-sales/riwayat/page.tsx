@@ -980,7 +980,7 @@ const RiwayatPenjualanPage = () => {
                 {/* Items */}
                 <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
                   <Package className="w-5 h-5" />
-                  Daftar Barang
+                  Daftar Barangggg
                 </h3>
                 <div className="border rounded-lg overflow-hidden mb-4">
                   <table className="w-full text-sm">
@@ -1084,6 +1084,22 @@ const RiwayatPenjualanPage = () => {
                       </span>
                     </div>
                   )}
+                </div>
+
+                {/* Tombol Cetak */}
+                <div className="mt-6">
+                  <button
+                    onClick={() => {
+                      window.open(
+                        `/api/penjualan/${selectedPenjualan.id}/print-receipt`,
+                        "_blank"
+                      );
+                    }}
+                    className="w-full bg-gradient-to-r from-green-600 via-emerald-600 to-green-700 hover:from-green-700 hover:via-emerald-700 hover:to-green-800 text-white py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                  >
+                    <Receipt className="w-5 h-5" />
+                    CETAK NOTA
+                  </button>
                 </div>
               </div>
             </div>

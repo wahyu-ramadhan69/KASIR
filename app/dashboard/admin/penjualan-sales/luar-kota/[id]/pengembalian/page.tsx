@@ -120,8 +120,7 @@ const InputPengembalianPage = () => {
           [field]: Math.max(0, Number(value)),
         } as PengembalianItem;
 
-        const totalPcs =
-          nextItem.jumlahDus * jumlahPerDus + nextItem.jumlahPcs;
+        const totalPcs = nextItem.jumlahDus * jumlahPerDus + nextItem.jumlahPcs;
 
         if (totalPcs > maxTotalPcs) {
           const maxDus =
@@ -429,22 +428,22 @@ const InputPengembalianPage = () => {
               {items.length > 0 ? (
                 <div className="space-y-3">
                   {items.map((item) => {
-                  const manifest = manifestBarang.find(
-                    (m) => m.barangId === item.barangId
-                  );
-                  if (!manifest) return null;
-                  const jumlahPerDus =
-                    Number(manifest.barang.jumlahPerKemasan) || 0;
-                  const manifestTotalPcs = Number(manifest.totalItem) || 0;
-                  const currentTotalPcs =
-                    item.jumlahDus * jumlahPerDus + item.jumlahPcs;
-                  const canAddDus =
-                    jumlahPerDus > 0 &&
-                    currentTotalPcs + jumlahPerDus <= manifestTotalPcs;
-                  const canAddPcs = currentTotalPcs + 1 <= manifestTotalPcs;
+                    const manifest = manifestBarang.find(
+                      (m) => m.barangId === item.barangId
+                    );
+                    if (!manifest) return null;
+                    const jumlahPerDus =
+                      Number(manifest.barang.jumlahPerKemasan) || 0;
+                    const manifestTotalPcs = Number(manifest.totalItem) || 0;
+                    const currentTotalPcs =
+                      item.jumlahDus * jumlahPerDus + item.jumlahPcs;
+                    const canAddDus =
+                      jumlahPerDus > 0 &&
+                      currentTotalPcs + jumlahPerDus <= manifestTotalPcs;
+                    const canAddPcs = currentTotalPcs + 1 <= manifestTotalPcs;
 
-                  return (
-                    <div
+                    return (
+                      <div
                         key={item.barangId}
                         className="border-2 border-gray-200 rounded-xl p-3 bg-white shadow-md hover:shadow-lg transition-all duration-200"
                       >
@@ -466,7 +465,7 @@ const InputPengembalianPage = () => {
                         <div className="grid grid-cols-2 gap-2 mb-3">
                           <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-2 rounded-xl">
                             <span className="text-xs font-bold text-gray-700 block mb-1.5 uppercase">
-                              Dus:
+                              {manifest.barang.jenisKemasan}:
                             </span>
                             <div className="flex items-center gap-1.5">
                               <button
@@ -515,7 +514,7 @@ const InputPengembalianPage = () => {
 
                           <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-2 rounded-xl">
                             <span className="text-xs font-bold text-gray-700 block mb-1.5 uppercase">
-                              Pcs:
+                              Item:
                             </span>
                             <div className="flex items-center gap-1.5">
                               <button
@@ -622,7 +621,7 @@ const InputPengembalianPage = () => {
                                 {item.jumlahDus *
                                   Number(manifest.barang.jumlahPerKemasan) +
                                   item.jumlahPcs}{" "}
-                                pcs
+                                Item
                               </span>
                             </p>
                           </div>

@@ -57,6 +57,11 @@ interface PenjualanHeader {
   namaCustomer: string | null;
   totalHarga: number;
   statusPembayaran: "LUNAS" | "HUTANG";
+  customer?: {
+    id: number;
+    nama: string;
+    namaToko: string;
+  } | null;
 }
 
 interface PerjalananSales {
@@ -894,6 +899,7 @@ const RiwayatPerjalananLuarKotaPage = () => {
                           <th className="px-3 py-2 text-left">Customer</th>
                           <th className="px-3 py-2 text-right">Total</th>
                           <th className="px-3 py-2 text-center">Status</th>
+                          <th className="px-3 py-2 text-center">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -903,7 +909,20 @@ const RiwayatPerjalananLuarKotaPage = () => {
                               {pj.kodePenjualan}
                             </td>
                             <td className="px-3 py-2">
-                              {pj.namaCustomer || "-"}
+                              {pj.customer ? (
+                                <div>
+                                  <p className="font-medium text-gray-900">
+                                    {pj.customer.nama}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {pj.customer.namaToko}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-gray-500">
+                                  {pj.namaCustomer || "-"}
+                                </p>
+                              )}
                             </td>
                             <td className="px-3 py-2 text-right font-medium">
                               {formatRupiah(pj.totalHarga)}
@@ -918,6 +937,21 @@ const RiwayatPerjalananLuarKotaPage = () => {
                               >
                                 {pj.statusPembayaran}
                               </span>
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                onClick={() => {
+                                  window.open(
+                                    `/api/penjualan/${pj.id}/print-receipt`,
+                                    "_blank"
+                                  );
+                                }}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all text-xs font-semibold shadow-sm hover:shadow-md"
+                                title="Cetak Nota"
+                              >
+                                <Receipt className="w-3.5 h-3.5" />
+                                Cetak
+                              </button>
                             </td>
                           </tr>
                         ))}

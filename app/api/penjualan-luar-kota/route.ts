@@ -73,6 +73,13 @@ export async function GET(request: NextRequest) {
             namaCustomer: true,
             totalHarga: true,
             statusPembayaran: true,
+            customer: {
+              select: {
+                id: true,
+                nama: true,
+                namaToko: true,
+              },
+            },
           },
         },
         pengembalianBarang: {

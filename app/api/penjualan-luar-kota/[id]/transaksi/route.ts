@@ -43,16 +43,6 @@ export async function POST(
       );
     }
 
-    if (!body.kodePenjualan) {
-      return Response.json(
-        {
-          success: false,
-          message: "Kode penjualan tidak boleh kosong",
-        },
-        { status: 400 }
-      );
-    }
-
     // Cek perjalanan exists dan statusnya
     const perjalanan = await prisma.perjalananSales.findUnique({
       where: { id: perjalananId },
@@ -94,23 +84,70 @@ export async function POST(
       );
     }
 
-    // Validasi uniqueness kode penjualan dari frontend
-    const kodePenjualan = body.kodePenjualan;
-    const existingPenjualan = await prisma.penjualanHeader.findFirst({
-      where: {
-        kodePenjualan: kodePenjualan,
-      },
-    });
+    // Generate kode penjualan
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    const dateFormat = `${year}${month}${day}`;
+    const datePrefix = `PJ-${dateFormat}`;
 
-    if (existingPenjualan) {
-      return Response.json(
-        {
-          success: false,
-          message: "Kode penjualan sudah digunakan. Silakan refresh halaman dan coba lagi.",
-        },
-        { status: 409 } // 409 Conflict
-      );
+    // Helper function untuk generate hash dari string untuk advisory lock
+    function stringToHash(str: string): number {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      // Ensure positive integer for advisory lock
+      return Math.abs(hash);
     }
+
+    const lockKey = stringToHash(datePrefix);
+
+    // Generate kode penjualan dengan advisory lock
+    const kodePenjualan = await prisma.$transaction(
+      async (tx) => {
+        // Acquire advisory lock - ini akan block sampai lock didapat
+        await tx.$executeRawUnsafe(
+          `SELECT pg_advisory_xact_lock(${lockKey})`
+        );
+
+        // Cari kode penjualan terakhir hari ini
+        const lastPenjualan = await tx.penjualanHeader.findFirst({
+          where: {
+            kodePenjualan: {
+              startsWith: datePrefix,
+            },
+          },
+          orderBy: {
+            kodePenjualan: "desc",
+          },
+          select: {
+            kodePenjualan: true,
+          },
+        });
+
+        // Ambil nomor urut terakhir, jika ada
+        const lastNumber = lastPenjualan
+          ? parseInt(lastPenjualan.kodePenjualan.split("-")[2])
+          : 0;
+
+        // Generate kode penjualan baru dengan format PJ-YYYYMMDD-NNNN
+        const newCode = `PJ-${dateFormat}-${String(lastNumber + 1).padStart(
+          4,
+          "0"
+        )}`;
+
+        return newCode;
+      },
+      {
+        isolationLevel: "ReadCommitted",
+        maxWait: 5000,
+        timeout: 10000,
+      }
+    );
 
     // Validasi barang dalam manifest
     const barangIds: number[] = body.items.map((item: any) => item.barangId);

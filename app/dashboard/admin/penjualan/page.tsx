@@ -173,10 +173,6 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [receiptData, setReceiptData] = useState<any>(null);
-  const [currentKodePenjualan, setCurrentKodePenjualan] = useState<string>("");
-  const [currentPenjualanId, setCurrentPenjualanId] = useState<number | null>(
-    null
-  );
 
   useEffect(() => {
     fetchBarang();
@@ -585,17 +581,57 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       return;
     }
 
-    if (!currentPenjualanId) {
-      toast.error("Penjualan belum dibuat");
-      return;
-    }
-
     const diskonNotaRupiah = calculateDiskonNotaRupiah();
 
     setLoading(true);
     try {
-      // Langsung checkout menggunakan penjualan yang sudah dibuat saat modal dibuka
-      const penjualanId = currentPenjualanId;
+      // Step 1: Create penjualan baru dengan status KERANJANG
+      const createData: any = {
+        customerId: selectedCustomer?.id,
+        namaCustomer: manualCustomerName || null,
+        userId,
+      };
+
+      const createRes = await fetch("/api/penjualan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createData),
+      });
+      const createResult = await createRes.json();
+
+      if (!createResult.success) {
+        toast.error(createResult.error || "Gagal membuat penjualan");
+        setLoading(false);
+        return;
+      }
+
+      const penjualanId = createResult.data.id;
+
+      // Step 2: Tambahkan items ke penjualan
+      for (const item of cartItems) {
+        const itemData = {
+          barangId: item.barangId,
+          jumlahDus: item.jumlahDus,
+          jumlahPcs: item.jumlahPcs,
+          hargaJual: item.hargaJual,
+          diskonPerItem: item.diskonPerItem,
+        };
+
+        const itemRes = await fetch(`/api/penjualan/${penjualanId}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(itemData),
+        });
+        const itemResult = await itemRes.json();
+
+        if (!itemResult.success) {
+          toast.error(`Gagal menambah ${item.barang.namaBarang}`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Step 3: Checkout - Selesaikan transaksi dan generate kode penjualan
       const checkoutData: any = {
         jumlahDibayar: parseRupiahToNumber(jumlahDibayar),
         diskonNota: diskonNotaRupiah,
@@ -627,7 +663,11 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       const checkoutResult = await checkoutRes.json();
 
       if (checkoutResult.success) {
-        setReceiptData(checkoutResult.data.receipt);
+        // Tambahkan id ke receiptData untuk keperluan print
+        setReceiptData({
+          ...checkoutResult.data.receipt,
+          id: penjualanId
+        });
         setShowCheckoutModal(false);
         setShowReceiptModal(true);
         toast.success(checkoutResult.message);
@@ -660,65 +700,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       return;
     }
 
-    setLoading(true);
-    try {
-      // Step 1: Create draft penjualan (KERANJANG) saat modal dibuka
-      const createData: any = {
-        customerId: selectedCustomer?.id,
-        namaCustomer: manualCustomerName || null,
-        userId,
-      };
-
-      const createRes = await fetch("/api/penjualan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(createData),
-      });
-      const createResult = await createRes.json();
-
-      if (!createResult.success) {
-        toast.error(createResult.error || "Gagal membuat penjualan");
-        return;
-      }
-
-      const penjualanId = createResult.data.id;
-      const kodePenjualan = createResult.data.kodePenjualan;
-
-      // Simpan kode penjualan dan ID untuk digunakan saat checkout
-      setCurrentKodePenjualan(kodePenjualan);
-      setCurrentPenjualanId(penjualanId);
-
-      // Step 2: Add items to penjualan
-      for (const item of cartItems) {
-        const itemData = {
-          barangId: item.barangId,
-          jumlahDus: item.jumlahDus,
-          jumlahPcs: item.jumlahPcs,
-          hargaJual: item.hargaJual,
-          diskonPerItem: item.diskonPerItem,
-        };
-
-        const itemRes = await fetch(`/api/penjualan/${penjualanId}/items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(itemData),
-        });
-        const itemResult = await itemRes.json();
-
-        if (!itemResult.success) {
-          toast.error(`Gagal menambah ${item.barang.namaBarang}`);
-          return;
-        }
-      }
-
-      // Buka modal checkout setelah berhasil membuat draft dan menambahkan item
-      setShowCheckoutModal(true);
-    } catch (error) {
-      console.error("Error preparing checkout:", error);
-      toast.error("Terjadi kesalahan saat menyiapkan checkout");
-    } finally {
-      setLoading(false);
-    }
+    // Langsung buka modal checkout tanpa membuat penjualan draft
+    setShowCheckoutModal(true);
   };
 
   const handleReset = () => {
@@ -731,8 +714,6 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setDiskonNotaType("rupiah");
     setJumlahDibayar("");
     setMetodePembayaran("CASH");
-    setCurrentKodePenjualan("");
-    setCurrentPenjualanId(null);
     setTanggalJatuhTempo("");
     setItemDiskonTypes({});
     setItemDiskonValues({});
@@ -1427,7 +1408,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   }
                                   className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
                                 >
-                                  <Minus className="w-3.5 h-3.5" strokeWidth={3} />
+                                  <Minus
+                                    className="w-3.5 h-3.5"
+                                    strokeWidth={3}
+                                  />
                                 </button>
                                 <input
                                   type="number"
@@ -1452,7 +1436,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   }
                                   className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
                                 >
-                                  <Plus className="w-3.5 h-3.5" strokeWidth={3} />
+                                  <Plus
+                                    className="w-3.5 h-3.5"
+                                    strokeWidth={3}
+                                  />
                                 </button>
                               </div>
                             </div>
@@ -1473,7 +1460,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   }
                                   className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
                                 >
-                                  <Minus className="w-3.5 h-3.5" strokeWidth={3} />
+                                  <Minus
+                                    className="w-3.5 h-3.5"
+                                    strokeWidth={3}
+                                  />
                                 </button>
                                 <input
                                   type="number"
@@ -1499,7 +1489,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   }
                                   className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
                                 >
-                                  <Plus className="w-3.5 h-3.5" strokeWidth={3} />
+                                  <Plus
+                                    className="w-3.5 h-3.5"
+                                    strokeWidth={3}
+                                  />
                                 </button>
                               </div>
                             </div>
@@ -1521,7 +1514,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                 }
                                 className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
                               >
-                                <Minus className="w-3.5 h-3.5" strokeWidth={3} />
+                                <Minus
+                                  className="w-3.5 h-3.5"
+                                  strokeWidth={3}
+                                />
                               </button>
                               <input
                                 type="number"
@@ -1750,15 +1746,6 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 mb-4 border border-slate-200">
                 <div className="grid grid-cols-3 gap-4">
                   {/* No Nota */}
-                  <div>
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1">
-                      <Receipt className="w-3.5 h-3.5" />
-                      No Nota
-                    </div>
-                    <p className="text-sm font-bold text-slate-900">
-                      {currentKodePenjualan || "-"}
-                    </p>
-                  </div>
 
                   {/* Customer */}
                   <div>
@@ -1775,10 +1762,6 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
                   {/* Sales - Placeholder kosong */}
                   <div>
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1">
-                      <Building2 className="w-3.5 h-3.5" />
-                      Sales
-                    </div>
                     <p className="text-sm font-bold text-slate-900">-</p>
                   </div>
                 </div>
@@ -2138,16 +2121,30 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                 </span>
               </div>
 
-              <button
-                onClick={() => {
-                  setShowReceiptModal(false);
-                  handleReset();
-                }}
-                className="w-full mt-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98"
-              >
-                <Plus className="w-5 h-5" strokeWidth={3} />
-                Transaksi Baru
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    window.open(
+                      `/api/penjualan/${receiptData.id}/print-receipt`,
+                      "_blank"
+                    );
+                  }}
+                  className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98"
+                >
+                  <Receipt className="w-5 h-5" />
+                  CETAK NOTA
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReceiptModal(false);
+                    handleReset();
+                  }}
+                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98"
+                >
+                  <Plus className="w-5 h-5" strokeWidth={3} />
+                  Transaksi Baru
+                </button>
+              </div>
             </div>
           </div>
         </div>
