@@ -10,6 +10,7 @@ import {
   AlertCircle,
   X,
   RefreshCw,
+  Search,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -35,24 +36,51 @@ interface PengembalianItem {
 
 const InputPengembalianPage = () => {
   const [barangList, setBarangList] = useState<Barang[]>([]);
+  const [barangById, setBarangById] = useState<Record<number, Barang>>({});
+  const [loadingBarang, setLoadingBarang] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<PengembalianItem[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
-    fetchBarang();
-  }, []);
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 400);
 
-  const fetchBarang = async () => {
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    fetchBarang(debouncedSearch);
+  }, [debouncedSearch]);
+
+  const fetchBarang = async (keyword: string = "") => {
+    setLoadingBarang(true);
     try {
-      const res = await fetch("/api/barang");
+      const endpoint = keyword
+        ? `/api/barang/search/${encodeURIComponent(keyword)}`
+        : "/api/barang";
+      const res = await fetch(endpoint);
       const data = await res.json();
       if (data.success) {
         setBarangList(data.data);
+        setBarangById((prev) => {
+          const next = { ...prev };
+          for (const barang of data.data as Barang[]) {
+            next[barang.id] = barang;
+          }
+          return next;
+        });
+      } else {
+        setBarangList([]);
       }
     } catch (error) {
       console.error("Error fetching barang:", error);
       toast.error("Gagal mengambil data barang");
+    } finally {
+      setLoadingBarang(false);
     }
   };
 
@@ -220,8 +248,8 @@ const InputPengembalianPage = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 min-h-0">
-        <div className="flex gap-3 h-full min-h-0">
-          <div className="w-1/2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
+        <div className="flex gap-4 h-full min-h-0">
+          <div className="w-[60%] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
             <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
               <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                 <div className="bg-blue-600 p-1.5 rounded-lg shadow-md">
@@ -232,120 +260,151 @@ const InputPengembalianPage = () => {
                   {barangList.length} item
                 </span>
               </h2>
+              <div className="mt-3 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
+                <input
+                  type="text"
+                  placeholder="Cari barang..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-9 py-2 text-xs border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none font-semibold bg-white/90"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500 hover:text-blue-700 p-1"
+                    aria-label="Hapus pencarian"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
-              <div className="grid grid-cols-2 gap-3">
-                {barangList.map((barang) => {
-                  const isAdded = items.some(
-                    (i) => i.barangId === barang.id
-                  );
+              {loadingBarang ? (
+                <div className="flex items-center justify-center py-12 text-gray-500 font-medium">
+                  Memuat data barang...
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {barangList.map((barang) => {
+                      const isAdded = items.some(
+                        (i) => i.barangId === barang.id
+                      );
 
-                  return (
-                    <div
-                      key={barang.id}
-                      className={`group relative overflow-hidden rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
-                        isAdded
-                          ? "border-blue-400 bg-gradient-to-br from-blue-50 to-blue-100/50 shadow-md shadow-blue-100/50"
-                          : "border-gray-200 bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-100/50"
-                      }`}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-
-                      {isAdded && (
-                        <div className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-lg z-10 animate-in fade-in zoom-in duration-300">
-                          <Check className="w-2.5 h-2.5" />
-                          Di List
-                        </div>
-                      )}
-
-                      <div className="relative p-3">
-                        <div className="flex items-start gap-1.5 mb-2">
-                          <div className="bg-blue-100 p-1 rounded-lg mt-0.5 group-hover:bg-blue-200 transition-colors flex-shrink-0">
-                            <Package className="w-3 h-3 text-blue-600" />
-                          </div>
-                          <h4 className="font-extrabold text-gray-900 text-xs leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">
-                            {barang.namaBarang}
-                          </h4>
-                        </div>
-
-                        <div className="space-y-1.5 mb-3">
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="bg-gray-200 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-gray-700">
-                              {barang.ukuran} {barang.satuan}
-                            </span>
-                            <span className="text-gray-400 text-[10px]">•</span>
-                            <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md text-[10px] font-bold">
-                              {barang.jumlahPerKemasan} pcs/
-                              {barang.jenisKemasan}
-                            </span>
-                          </div>
-
-                          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2 py-1 rounded-lg shadow-md group-hover:shadow-lg transition-shadow inline-block">
-                            <p className="text-[11px] font-extrabold">
-                              {formatRupiah(barang.hargaJual)}
-                              <span className="text-[9px] font-medium opacity-90 ml-0.5">
-                                /{barang.jenisKemasan}
-                              </span>
-                            </p>
-                          </div>
-
-                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-2 py-1.5 rounded-lg border border-blue-200">
-                            <p className="text-[10px] font-bold text-blue-700">
-                              Stok: {barang.stok} pcs
-                            </p>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => handleAddItem(barang)}
-                          disabled={isAdded}
-                          className={`relative overflow-hidden w-full py-2 rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 font-bold text-xs ${
+                      return (
+                        <div
+                          key={barang.id}
+                          className={`group relative overflow-hidden rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
                             isAdded
-                              ? "bg-blue-200 text-blue-700 cursor-not-allowed"
-                              : "bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl active:scale-95"
+                              ? "border-blue-400 bg-gradient-to-br from-blue-50 to-blue-100/50 shadow-md shadow-blue-100/50"
+                              : "border-gray-200 bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-100/50"
                           }`}
                         >
-                          {!isAdded && (
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+
+                          {isAdded && (
+                            <div className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-lg z-10 animate-in fade-in zoom-in duration-300">
+                              <Check className="w-2.5 h-2.5" />
+                              Di List
+                            </div>
                           )}
 
-                          <Plus
-                            className={`w-4 h-4 relative z-10 ${
-                              isAdded ? "text-blue-700" : "text-white"
+                          <div className="relative p-3">
+                            <div className="flex items-start gap-1.5 mb-2">
+                              <div className="bg-blue-100 p-1 rounded-lg mt-0.5 group-hover:bg-blue-200 transition-colors flex-shrink-0">
+                                <Package className="w-3 h-3 text-blue-600" />
+                              </div>
+                              <h4 className="font-extrabold text-gray-900 text-xs leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">
+                                {barang.namaBarang}
+                              </h4>
+                            </div>
+
+                            <div className="space-y-1.5 mb-3">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="bg-gray-200 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-gray-700">
+                                  {barang.ukuran} {barang.satuan}
+                                </span>
+                                <span className="text-gray-400 text-[10px]">
+                                  •
+                                </span>
+                                <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md text-[10px] font-bold">
+                                  {barang.jumlahPerKemasan} pcs/
+                                  {barang.jenisKemasan}
+                                </span>
+                              </div>
+
+                              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2 py-1 rounded-lg shadow-md group-hover:shadow-lg transition-shadow inline-block">
+                                <p className="text-[11px] font-extrabold">
+                                  {formatRupiah(barang.hargaJual)}
+                                  <span className="text-[9px] font-medium opacity-90 ml-0.5">
+                                    /{barang.jenisKemasan}
+                                  </span>
+                                </p>
+                              </div>
+
+                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-2 py-1.5 rounded-lg border border-blue-200">
+                                <p className="text-[10px] font-bold text-blue-700">
+                                  Stok: {barang.stok} pcs
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => handleAddItem(barang)}
+                              disabled={isAdded}
+                              className={`relative overflow-hidden w-full py-2 rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 font-bold text-xs ${
+                                isAdded
+                                  ? "bg-blue-200 text-blue-700 cursor-not-allowed"
+                                  : "bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl active:scale-95"
+                              }`}
+                            >
+                              {!isAdded && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                              )}
+
+                              <Plus
+                                className={`w-4 h-4 relative z-10 ${
+                                  isAdded ? "text-blue-700" : "text-white"
+                                }`}
+                                strokeWidth={3}
+                              />
+                              <span className="relative z-10">
+                                {isAdded ? "Ditambahkan" : "Tambah"}
+                              </span>
+                            </button>
+                          </div>
+
+                          <div
+                            className={`h-1 ${
+                              isAdded
+                                ? "bg-gradient-to-r from-blue-400 to-indigo-600"
+                                : "bg-gradient-to-r from-blue-400 via-indigo-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                             }`}
-                            strokeWidth={3}
-                          />
-                          <span className="relative z-10">
-                            {isAdded ? "Ditambahkan" : "Tambah"}
-                          </span>
-                        </button>
-                      </div>
+                          ></div>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                      <div
-                        className={`h-1 ${
-                          isAdded
-                            ? "bg-gradient-to-r from-blue-400 to-indigo-600"
-                            : "bg-gradient-to-r from-blue-400 via-indigo-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                        }`}
-                      ></div>
+                  {barangList.length === 0 && (
+                    <div className="text-center py-12">
+                      <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500 font-medium">
+                        {debouncedSearch
+                          ? "Barang tidak ditemukan"
+                          : "Tidak ada data barang"}
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-
-              {barangList.length === 0 && (
-                <div className="text-center py-12">
-                  <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">
-                    Tidak ada data barang
-                  </p>
-                </div>
+                  )}
+                </>
               )}
             </div>
           </div>
 
-          <div className="w-1/2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
+          <div className="w-[40%] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
             <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
               <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                 <div className="bg-blue-600 p-1.5 rounded-lg shadow-md">
@@ -362,9 +421,7 @@ const InputPengembalianPage = () => {
               {items.length > 0 ? (
                 <div className="space-y-3">
                   {items.map((item) => {
-                    const barang = barangList.find(
-                      (b) => b.id === item.barangId
-                    );
+                    const barang = barangById[item.barangId];
                     if (!barang) return null;
                     const jumlahPerDus = Number(barang.jumlahPerKemasan) || 0;
                     const currentTotalPcs =
@@ -389,12 +446,12 @@ const InputPengembalianPage = () => {
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-3">
                           <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-2 rounded-xl">
                             <span className="text-xs font-bold text-gray-700 block mb-1.5 uppercase">
                               {barang.jenisKemasan}:
                             </span>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 w-full">
                               <button
                                 onClick={() =>
                                   handleUpdateItem(
@@ -403,7 +460,7 @@ const InputPengembalianPage = () => {
                                     item.jumlahDus - 1
                                   )
                                 }
-                                className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+                                className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
                               >
                                 <Minus
                                   className="w-3.5 h-3.5"
@@ -420,7 +477,7 @@ const InputPengembalianPage = () => {
                                     parseInt(e.target.value) || 0
                                   )
                                 }
-                                className="flex-1 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                className="flex-1 min-w-0 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                 min="0"
                               />
                               <button
@@ -431,7 +488,7 @@ const InputPengembalianPage = () => {
                                     item.jumlahDus + 1
                                   )
                                 }
-                                className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+                                className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
                               >
                                 <Plus className="w-3.5 h-3.5" strokeWidth={3} />
                               </button>
@@ -442,7 +499,7 @@ const InputPengembalianPage = () => {
                             <span className="text-xs font-bold text-gray-700 block mb-1.5 uppercase">
                               Item:
                             </span>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 w-full">
                               <button
                                 onClick={() =>
                                   handleUpdateItem(
@@ -451,7 +508,7 @@ const InputPengembalianPage = () => {
                                     item.jumlahPcs - 1
                                   )
                                 }
-                                className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+                                className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
                               >
                                 <Minus
                                   className="w-3.5 h-3.5"
@@ -468,7 +525,7 @@ const InputPengembalianPage = () => {
                                     parseInt(e.target.value) || 0
                                   )
                                 }
-                                className="flex-1 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                className="flex-1 min-w-0 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                 min="0"
                               />
                               <button
@@ -479,7 +536,7 @@ const InputPengembalianPage = () => {
                                     item.jumlahPcs + 1
                                   )
                                 }
-                                className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+                                className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
                               >
                                 <Plus className="w-3.5 h-3.5" strokeWidth={3} />
                               </button>
@@ -491,7 +548,7 @@ const InputPengembalianPage = () => {
                           <label className="text-xs font-bold text-gray-700 block mb-1.5 uppercase">
                             Kondisi Barang:
                           </label>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                             {(["BAIK", "RUSAK", "KADALUARSA"] as const).map(
                               (kondisi) => (
                                 <button
@@ -623,9 +680,7 @@ const InputPengembalianPage = () => {
                 <div className="max-h-96 overflow-y-auto p-3 bg-gray-50">
                   <div className="space-y-2">
                     {items.map((item) => {
-                      const barang = barangList.find(
-                        (b) => b.id === item.barangId
-                      );
+                      const barang = barangById[item.barangId];
                       if (!barang) return null;
 
                       const totalPcs =

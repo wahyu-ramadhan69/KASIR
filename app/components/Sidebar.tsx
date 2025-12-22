@@ -113,10 +113,15 @@ const transactionLinks = [
         href: "/dashboard/admin/penjualan/riwayat",
         icon: <History className="w-4 h-4" />,
       },
+      {
+        label: "Riwayat Pengembalian",
+        href: "/dashboard/admin/penjualan/pengembalian/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
     ],
   },
   {
-    label: "Penjualan Sales",
+    label: "Sales dan Kanvas",
     href: "/dashboard/admin/penjualan-sales",
     icon: <Truck className="w-5 h-5" />,
     subMenu: [
@@ -142,7 +147,7 @@ const transactionLinks = [
         icon: <History className="w-4 h-4" />,
       },
       {
-        label: "Riwayat Kanvas Sales",
+        label: "Riwayat Kanvas",
         href: "/dashboard/admin/penjualan-sales/luar-kota/riwayat",
         icon: <History className="w-4 h-4" />,
       },

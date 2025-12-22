@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Supplier {
   id: number;
@@ -52,6 +53,7 @@ interface Barang {
 // Local cart item (tidak perlu id karena belum di database)
 interface CartItem {
   tempId: string; // temporary ID untuk tracking di UI
+  itemId?: number;
   barangId: number;
   jumlahDus: number;
   hargaPokok: number;
@@ -72,6 +74,8 @@ const parseRupiahToNumber = (value: string): number => {
 };
 
 const PembelianPage = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   // State management
   const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
   const [barangList, setBarangList] = useState<Barang[]>([]);
@@ -112,10 +116,35 @@ const PembelianPage = () => {
   // Receipt state
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [editPembelianId, setEditPembelianId] = useState<number | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState<boolean>(false);
 
   useEffect(() => {
     // Tidak fetch suppliers di awal, hanya saat user search
   }, []);
+
+  useEffect(() => {
+    const editIdParam = searchParams.get("editId");
+    if (!editIdParam) {
+      setEditPembelianId(null);
+      return;
+    }
+
+    const parsedId = parseInt(editIdParam);
+    if (Number.isNaN(parsedId)) {
+      toast.error("ID pembelian tidak valid untuk edit");
+      setEditPembelianId(null);
+      return;
+    }
+
+    setEditPembelianId(parsedId);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (editPembelianId) {
+      loadPembelianForEdit(editPembelianId);
+    }
+  }, [editPembelianId]);
 
   // Debounce untuk search supplier
   useEffect(() => {
@@ -161,6 +190,79 @@ const PembelianPage = () => {
     } catch (error) {
       console.error("Error fetching barang:", error);
       toast.error("Gagal mengambil data barang");
+    }
+  };
+
+  const loadPembelianForEdit = async (pembelianId: number) => {
+    setLoadingEdit(true);
+    try {
+      const res = await fetch(`/api/pembelian/${pembelianId}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        toast.error(data.error || "Gagal mengambil data pembelian");
+        return;
+      }
+
+      const pembelian = data.data;
+      if (pembelian.statusTransaksi !== "SELESAI") {
+        toast.error("Hanya pembelian selesai yang bisa diedit");
+        setEditPembelianId(null);
+        router.replace("/dashboard/admin/pembelian");
+        return;
+      }
+
+      if (pembelian.supplier) {
+        setSelectedSupplier(pembelian.supplier);
+        setSearchSupplier("");
+        setExpandSupplierSearch(false);
+        await fetchBarangBySupplier(pembelian.supplier.id);
+      }
+
+      const newCartItems: CartItem[] = pembelian.items.map((item: any) => ({
+        tempId: `item-${item.id}`,
+        itemId: item.id,
+        barangId: item.barangId,
+        jumlahDus: Number(item.jumlahDus),
+        hargaPokok: Number(item.hargaPokok),
+        diskonPerItem: Number(item.diskonPerItem),
+        barang: item.barang,
+      }));
+
+      const diskonTypes: { [key: string]: "rupiah" | "persen" } = {};
+      const diskonValues: { [key: string]: string } = {};
+
+      newCartItems.forEach((item) => {
+        diskonTypes[item.tempId] = "rupiah";
+        diskonValues[item.tempId] = Number(
+          item.diskonPerItem
+        ).toLocaleString("id-ID");
+      });
+
+      setCartItems(newCartItems);
+      setItemDiskonTypes(diskonTypes);
+      setItemDiskonValues(diskonValues);
+      setDiskonNotaType("rupiah");
+      setDiskonNota(Number(pembelian.diskonNota).toLocaleString("id-ID"));
+      setJumlahDibayar(
+        Number(pembelian.jumlahDibayar).toLocaleString("id-ID")
+      );
+      setTanggalJatuhTempo(
+        pembelian.tanggalJatuhTempo
+          ? new Date(pembelian.tanggalJatuhTempo).toISOString().split("T")[0]
+          : ""
+      );
+      setTanggalPembelian(
+        pembelian.createdAt
+          ? new Date(pembelian.createdAt).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0]
+      );
+      setKeterangan(pembelian.keterangan || "");
+    } catch (error) {
+      console.error("Error loading pembelian:", error);
+      toast.error("Gagal memuat data pembelian");
+    } finally {
+      setLoadingEdit(false);
     }
   };
 
@@ -435,6 +537,47 @@ const PembelianPage = () => {
 
     setLoading(true);
     try {
+      if (editPembelianId) {
+        const updatePayload: any = {
+          items: cartItems.map((item) => ({
+            id: item.itemId,
+            barangId: item.barangId,
+            jumlahDus: item.jumlahDus,
+            hargaPokok: item.hargaPokok,
+            diskonPerItem: item.diskonPerItem,
+          })),
+          supplierId: selectedSupplier?.id,
+          diskonNota: diskonNotaRupiah,
+          jumlahDibayar: parseRupiahToNumber(jumlahDibayar),
+          tanggalJatuhTempo: tanggalJatuhTempo || undefined,
+          keterangan: keterangan || undefined,
+        };
+
+        const updateRes = await fetch(
+          `/api/pembelian/${editPembelianId}/edit`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatePayload),
+          }
+        );
+        const updateResult = await updateRes.json();
+
+        if (updateResult.success) {
+          setReceiptData({
+            ...updateResult.data.receipt,
+            id: editPembelianId,
+          });
+          setShowCheckoutModal(false);
+          setShowReceiptModal(true);
+          toast.success(updateResult.message || "Pembelian berhasil diupdate");
+        } else {
+          toast.error(updateResult.error || "Gagal update pembelian");
+        }
+
+        return;
+      }
+
       // Step 1: Create pembelian header
       const createData: any = {
         supplierId: selectedSupplier.id,
@@ -530,6 +673,10 @@ const PembelianPage = () => {
     setSearchSupplier("");
     setExpandSupplierSearch(false);
     toast.success("Transaksi direset");
+    if (editPembelianId) {
+      setEditPembelianId(null);
+      router.replace("/dashboard/admin/pembelian");
+    }
   };
 
   const formatRupiah = (number: number): string => {
@@ -632,6 +779,16 @@ const PembelianPage = () => {
                 <p className="text-emerald-100 text-sm">
                   Kelola transaksi pembelian dari supplier
                 </p>
+                {editPembelianId && (
+                  <div className="mt-2">
+                    <span className="inline-flex items-center gap-2 bg-yellow-400/90 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full">
+                      Mode Edit • #{editPembelianId}
+                      {loadingEdit && (
+                        <span className="inline-block h-2 w-2 rounded-full bg-slate-900 animate-pulse" />
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
@@ -1143,7 +1300,11 @@ const PembelianPage = () => {
                   className="w-full mt-4 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98"
                 >
                   <CreditCard className="w-5 h-5" />
-                  {loading ? "Memproses..." : "Proses Pembayaran"}
+                  {loading
+                    ? "Memproses..."
+                    : editPembelianId
+                    ? "Simpan Perubahan"
+                    : "Proses Pembayaran"}
                 </button>
 
                 {/* Peringatan jika supplier belum dipilih */}
@@ -1440,7 +1601,7 @@ const PembelianPage = () => {
                   ) : (
                     <>
                       <Check className="w-5 h-5" />
-                      Selesaikan Pembayaran
+                      {editPembelianId ? "Simpan Perubahan" : "Selesaikan Pembayaran"}
                     </>
                   )}
                 </button>

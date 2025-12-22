@@ -13,6 +13,7 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
+  Pencil,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -368,6 +369,20 @@ const RiwayatPembelianPage = () => {
     }).format(number);
   };
 
+  const formatShortRupiah = (value: number): string => {
+    const sign = value < 0 ? "-" : "";
+    const abs = Math.abs(value);
+    const formatShort = (num: number, suffix: string) => {
+      const rounded = num % 1 === 0 ? num.toFixed(0) : num.toFixed(1);
+      return `${sign}${rounded} ${suffix}`;
+    };
+
+    if (abs >= 1_000_000_000) return formatShort(abs / 1_000_000_000, "M");
+    if (abs >= 1_000_000) return formatShort(abs / 1_000_000, "jt");
+    if (abs >= 1_000) return formatShort(abs / 1_000, "rb");
+    return `${value}`;
+  };
+
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString("id-ID", {
       day: "2-digit",
@@ -673,7 +688,7 @@ const RiwayatPembelianPage = () => {
                                     : "bg-red-50 text-red-700 border-red-200"
                                 }`}
                               >
-                                Sisa Limit: {formatRupiah(sisaLimit)}
+                                Sisa Limit: {formatShortRupiah(sisaLimit)}
                               </span>
                             </div>
                           </div>
@@ -686,7 +701,7 @@ const RiwayatPembelianPage = () => {
                           })}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatRupiah(pb.totalHarga)}
+                          {formatShortRupiah(pb.totalHarga)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex gap-1">
@@ -712,6 +727,15 @@ const RiwayatPembelianPage = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
+                            {pb.statusTransaksi === "SELESAI" && (
+                              <Link
+                                href={`/dashboard/admin/pembelian?editId=${pb.id}`}
+                                className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                title="Edit Pembelian"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Link>
+                            )}
                           </div>
                         </td>
                       </tr>
