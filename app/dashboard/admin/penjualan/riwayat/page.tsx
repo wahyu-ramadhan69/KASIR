@@ -19,6 +19,7 @@ import {
   Building2,
   Package,
   CalendarClock,
+  Pencil,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -775,6 +776,15 @@ const RiwayatPenjualanPage = () => {
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
+                              {pj.statusTransaksi === "SELESAI" && (
+                                <Link
+                                  href={`/dashboard/admin/penjualan?editId=${pj.id}`}
+                                  className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                  title="Edit Penjualan"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Link>
+                              )}
                             </div>
                           </td>
                         </tr>

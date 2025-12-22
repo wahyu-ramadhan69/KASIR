@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Customer {
   id: number;
@@ -64,6 +65,7 @@ interface Barang {
 // Local cart item (tidak perlu id karena belum di database)
 interface CartItem {
   tempId: string; // temporary ID untuk tracking di UI
+  itemId?: number;
   barangId: number;
   jumlahDus: number;
   jumlahPcs: number;
@@ -128,6 +130,8 @@ const parseRupiahToNumber = (value: string): number => {
 };
 
 const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [barangList, setBarangList] = useState<Barang[]>([]);
   const [customerList, setCustomerList] = useState<Customer[]>([]);
 
@@ -173,6 +177,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState<boolean>(false);
 
   useEffect(() => {
     fetchBarang();
@@ -181,6 +187,29 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     const today = new Date().toISOString().split("T")[0];
     setTanggalTransaksi(today);
   }, []);
+
+  useEffect(() => {
+    const editIdParam = searchParams.get("editId");
+    if (!editIdParam) {
+      setEditPenjualanId(null);
+      return;
+    }
+
+    const parsedId = parseInt(editIdParam);
+    if (Number.isNaN(parsedId)) {
+      toast.error("ID penjualan tidak valid untuk edit");
+      setEditPenjualanId(null);
+      return;
+    }
+
+    setEditPenjualanId(parsedId);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (editPenjualanId) {
+      loadPenjualanForEdit(editPenjualanId);
+    }
+  }, [editPenjualanId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -192,6 +221,85 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     }, 500);
     return () => clearTimeout(timer);
   }, [searchCustomer]);
+
+  const loadPenjualanForEdit = async (penjualanId: number) => {
+    setLoadingEdit(true);
+    try {
+      const res = await fetch(`/api/penjualan/${penjualanId}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        toast.error(data.error || "Gagal mengambil data penjualan");
+        return;
+      }
+
+      const penjualan: PenjualanHeader = data.data;
+      if (penjualan.statusTransaksi !== "SELESAI") {
+        toast.error("Hanya penjualan selesai yang bisa diedit");
+        setEditPenjualanId(null);
+        router.replace("/dashboard/admin/penjualan");
+        return;
+      }
+
+      const newCartItems: CartItem[] = penjualan.items.map((item) => ({
+        tempId: `item-${item.id}`,
+        itemId: item.id,
+        barangId: item.barangId,
+        jumlahDus: Number(item.jumlahDus),
+        jumlahPcs: Number(item.jumlahPcs),
+        hargaJual: Number(item.hargaJual),
+        diskonPerItem: Number(item.diskonPerItem),
+        barang: item.barang,
+      }));
+
+      const diskonTypes: { [key: string]: "rupiah" | "persen" } = {};
+      const diskonValues: { [key: string]: string } = {};
+
+      newCartItems.forEach((item) => {
+        diskonTypes[item.tempId] = "rupiah";
+        diskonValues[item.tempId] = Number(item.diskonPerItem).toLocaleString(
+          "id-ID"
+        );
+      });
+
+      setCartItems(newCartItems);
+      setItemDiskonTypes(diskonTypes);
+      setItemDiskonValues(diskonValues);
+
+      if (penjualan.customer) {
+        setSelectedCustomer(penjualan.customer);
+        setManualCustomerName("");
+        setUseManualCustomer(false);
+        fetchCustomerHutangInfo(penjualan.customer.id);
+      } else {
+        setSelectedCustomer(null);
+        setManualCustomerName(penjualan.namaCustomer || "");
+        setUseManualCustomer(true);
+      }
+
+      setDiskonNotaType("rupiah");
+      setDiskonNota(Number(penjualan.diskonNota).toLocaleString("id-ID"));
+      setJumlahDibayar(
+        Number(penjualan.jumlahDibayar).toLocaleString("id-ID")
+      );
+      setMetodePembayaran(penjualan.metodePembayaran);
+
+      const transaksiDate = penjualan.tanggalTransaksi
+        ? new Date(penjualan.tanggalTransaksi).toISOString().split("T")[0]
+        : "";
+      setTanggalTransaksi(transaksiDate);
+
+      const jatuhTempoDate = penjualan.tanggalJatuhTempo
+        ? new Date(penjualan.tanggalJatuhTempo).toISOString().split("T")[0]
+        : "";
+      setTanggalJatuhTempo(jatuhTempoDate);
+    } catch (error) {
+      console.error("Error loading penjualan:", error);
+      toast.error("Gagal memuat data penjualan");
+    } finally {
+      setLoadingEdit(false);
+    }
+  };
 
   const fetchBarang = async () => {
     try {
@@ -585,6 +693,54 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
     setLoading(true);
     try {
+      if (editPenjualanId) {
+        const updatePayload: any = {
+          items: cartItems.map((item) => ({
+            id: item.itemId,
+            barangId: item.barangId,
+            jumlahDus: item.jumlahDus,
+            jumlahPcs: item.jumlahPcs,
+            hargaJual: item.hargaJual,
+            diskonPerItem: item.diskonPerItem,
+          })),
+          jumlahDibayar: parseRupiahToNumber(jumlahDibayar),
+          diskonNota: diskonNotaRupiah,
+          metodePembayaran,
+          tanggalTransaksi,
+          tanggalJatuhTempo,
+        };
+
+        if (selectedCustomer) {
+          updatePayload.customerId = selectedCustomer.id;
+        } else {
+          updatePayload.namaCustomer = manualCustomerName;
+        }
+
+        const updateRes = await fetch(`/api/penjualan/${editPenjualanId}/edit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatePayload),
+        });
+
+        const updateResult = await updateRes.json();
+
+        if (updateResult.success) {
+          setReceiptData({
+            ...updateResult.data.receipt,
+            id: editPenjualanId,
+          });
+          setShowCheckoutModal(false);
+          setShowReceiptModal(true);
+          toast.success(updateResult.message || "Penjualan berhasil diupdate");
+          fetchBarang();
+          fetchTodaySales();
+        } else {
+          toast.error(updateResult.error || "Gagal update penjualan");
+        }
+
+        return;
+      }
+
       // Step 1: Create penjualan baru dengan status KERANJANG
       const createData: any = {
         customerId: selectedCustomer?.id,
@@ -718,6 +874,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setItemDiskonTypes({});
     setItemDiskonValues({});
     setSearchCustomer("");
+    if (editPenjualanId) {
+      setEditPenjualanId(null);
+      router.replace("/dashboard/admin/penjualan");
+    }
     setExpandCustomerSearch(false);
     const today = new Date().toISOString().split("T")[0];
     setTanggalTransaksi(today);
@@ -835,6 +995,16 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                     ? "Mode Admin - Dapat mengatur tanggal transaksi"
                     : "Kelola transaksi penjualan ke customer"}
                 </p>
+                {editPenjualanId && (
+                  <div className="mt-2">
+                    <span className="inline-flex items-center gap-2 bg-yellow-400/90 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full">
+                      Mode Edit • #{editPenjualanId}
+                      {loadingEdit && (
+                        <span className="inline-block h-2 w-2 rounded-full bg-slate-900 animate-pulse" />
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
@@ -2015,7 +2185,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   ) : (
                     <>
                       <Check className="w-5 h-5" />
-                      Selesaikan Pembayaran
+                      {editPenjualanId ? "Simpan Perubahan" : "Selesaikan Pembayaran"}
                     </>
                   )}
                 </button>

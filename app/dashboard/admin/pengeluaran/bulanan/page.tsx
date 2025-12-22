@@ -71,6 +71,7 @@ const DataPengeluaranPage = () => {
   const [tanggalInputAdd, setTanggalInputAdd] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
+  const todayDate = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     fetchPengeluaran();
@@ -187,6 +188,11 @@ const DataPengeluaranPage = () => {
       setIsSubmitting(false);
       return;
     }
+    if (tanggalInputAdd > todayDate) {
+      toast.error("Tanggal pengeluaran tidak boleh lebih dari hari ini!");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/pengeluaran", {
@@ -212,7 +218,7 @@ const DataPengeluaranPage = () => {
         setNamaPengeluaranInput("");
         setJenisPengeluaranInput("BULANAN");
         setKeteranganInput("");
-        setTanggalInputAdd(new Date().toISOString().split("T")[0]);
+        setTanggalInputAdd(todayDate);
         fetchPengeluaran();
       } else {
         toast.error(data.error || "Gagal menambahkan pengeluaran");
@@ -235,6 +241,11 @@ const DataPengeluaranPage = () => {
 
     if (jumlahValue === 0) {
       toast.error("Jumlah harus diisi!");
+      setIsSubmitting(false);
+      return;
+    }
+    if (editingPengeluaran.data.tanggalInput > todayDate) {
+      toast.error("Tanggal pengeluaran tidak boleh lebih dari hari ini!");
       setIsSubmitting(false);
       return;
     }
@@ -470,7 +481,7 @@ const DataPengeluaranPage = () => {
                 setNamaPengeluaranInput("");
                 setJenisPengeluaranInput("BULANAN");
                 setKeteranganInput("");
-                setTanggalInputAdd(new Date().toISOString().split("T")[0]);
+                setTanggalInputAdd(todayDate);
                 setShowAddModal(true);
               }}
               className="bg-white hover:bg-purple-50 text-purple-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium shadow-md"
@@ -750,7 +761,7 @@ const DataPengeluaranPage = () => {
                   setNamaPengeluaranInput("");
                   setJenisPengeluaranInput("BULANAN");
                   setKeteranganInput("");
-                  setTanggalInputAdd(new Date().toISOString().split("T")[0]);
+                  setTanggalInputAdd(todayDate);
                 }}
                 className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
               >
@@ -818,6 +829,7 @@ const DataPengeluaranPage = () => {
                     type="date"
                     value={tanggalInputAdd}
                     onChange={(e) => setTanggalInputAdd(e.target.value)}
+                    max={todayDate}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
                     required
                   />
@@ -846,7 +858,7 @@ const DataPengeluaranPage = () => {
                     setNamaPengeluaranInput("");
                     setJenisPengeluaranInput("BULANAN");
                     setKeteranganInput("");
-                    setTanggalInputAdd(new Date().toISOString().split("T")[0]);
+                    setTanggalInputAdd(todayDate);
                   }}
                   className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition-all font-medium"
                 >
@@ -958,6 +970,7 @@ const DataPengeluaranPage = () => {
                     type="date"
                     value={editingPengeluaran.data.tanggalInput}
                     onChange={handleInputChange}
+                    max={todayDate}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
                     required
                   />

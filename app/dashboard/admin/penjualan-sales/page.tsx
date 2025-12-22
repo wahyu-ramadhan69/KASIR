@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // ... (semua interface tetap sama)
 
@@ -78,6 +79,7 @@ interface PenjualanItem {
   jumlahDus: number;
   jumlahPcs: number;
   hargaJual: number;
+  hargaJualPerDus?: number;
   hargaBeli: number;
   diskonPerItem: number;
   laba: number;
@@ -118,6 +120,8 @@ interface PenjualanHeader {
 
 const PenjualanPage = () => {
   // ... (semua state tetap sama seperti sebelumnya)
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [barangList, setBarangList] = useState<Barang[]>([]);
   const [customerList, setCustomerList] = useState<Customer[]>([]);
   const [karyawanList, setKaryawanList] = useState<Karyawan[]>([]);
@@ -171,6 +175,8 @@ const PenjualanPage = () => {
   const [loadingHutangInfo, setLoadingHutangInfo] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
   const [tanggalPenjualan, setTanggalPenjualan] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -186,6 +192,9 @@ const PenjualanPage = () => {
   );
 
   const getTodaySold = (barangId: number): number => todaySales[barangId] || 0;
+
+  const getHargaJualPerDus = (item: PenjualanItem): number =>
+    item.hargaJualPerDus ?? item.barang.hargaJual;
 
   const getCartPcsForBarang = (barangId: number): number => {
     const item = currentPenjualan.items.find(
@@ -203,6 +212,29 @@ const PenjualanPage = () => {
     fetchTopKaryawan();
     fetchTodaySales();
   }, []);
+
+  useEffect(() => {
+    const editIdParam = searchParams.get("editId");
+    if (!editIdParam) {
+      setEditPenjualanId(null);
+      return;
+    }
+
+    const parsedId = parseInt(editIdParam);
+    if (Number.isNaN(parsedId)) {
+      toast.error("ID penjualan tidak valid untuk edit");
+      setEditPenjualanId(null);
+      return;
+    }
+
+    setEditPenjualanId(parsedId);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (editPenjualanId) {
+      loadPenjualanForEdit(editPenjualanId);
+    }
+  }, [editPenjualanId]);
 
   const fetchTodaySales = async () => {
     try {
@@ -280,6 +312,102 @@ const PenjualanPage = () => {
       }
     } catch (error) {
       console.error("Error fetching top karyawan:", error);
+    }
+  };
+
+  const loadPenjualanForEdit = async (penjualanId: number) => {
+    setLoadingEdit(true);
+    try {
+      const res = await fetch(`/api/penjualan/${penjualanId}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        toast.error(data.error || "Gagal mengambil data penjualan");
+        return;
+      }
+
+      const penjualan: PenjualanHeader = data.data;
+      if (penjualan.statusTransaksi !== "SELESAI") {
+        toast.error("Hanya penjualan selesai yang bisa diedit");
+        setEditPenjualanId(null);
+        router.replace("/dashboard/admin/penjualan-sales");
+        return;
+      }
+
+      const hydratedItems: PenjualanItem[] = penjualan.items.map((item) => {
+        const hargaJualPerDus = Number(item.hargaJual);
+        const totalPcs =
+          Number(item.jumlahDus) * Number(item.barang.jumlahPerKemasan) +
+          Number(item.jumlahPcs);
+        const hargaJualPerPcs =
+          hargaJualPerDus / Number(item.barang.jumlahPerKemasan);
+        const hargaBeliPerPcs =
+          Number(item.barang.hargaBeli) /
+          Number(item.barang.jumlahPerKemasan);
+        const hargaJualTotal = hargaJualPerPcs * totalPcs;
+        const diskonTotal = Number(item.diskonPerItem) * Number(item.jumlahDus);
+        const hargaBeliTotal = hargaBeliPerPcs * totalPcs;
+        const totalHarga = hargaJualTotal - diskonTotal;
+
+        return {
+          ...item,
+          hargaJualPerDus,
+          hargaJual: totalHarga,
+          hargaBeli: hargaBeliTotal,
+          laba: totalHarga - hargaBeliTotal,
+        };
+      });
+
+      const diskonTypes: { [key: number]: "rupiah" | "persen" } = {};
+      const diskonValues: { [key: number]: string } = {};
+
+      hydratedItems.forEach((item, index) => {
+        diskonTypes[index] = "rupiah";
+        diskonValues[index] = Number(item.diskonPerItem).toLocaleString("id-ID");
+      });
+
+      setItemDiskonTypes(diskonTypes);
+      setItemDiskonValues(diskonValues);
+      setSelectedCustomer(penjualan.customer || null);
+      setSelectedKaryawan(penjualan.karyawan || null);
+      setDiskonNotaType("rupiah");
+      setDiskonNota(Number(penjualan.diskonNota).toLocaleString("id-ID"));
+      setJumlahDibayar(
+        Number(penjualan.jumlahDibayar).toLocaleString("id-ID")
+      );
+      setTanggalPenjualan(
+        penjualan.tanggalTransaksi
+          ? new Date(penjualan.tanggalTransaksi).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0]
+      );
+      setTanggalJatuhTempo(
+        penjualan.tanggalJatuhTempo
+          ? new Date(penjualan.tanggalJatuhTempo).toISOString().split("T")[0]
+          : ""
+      );
+      setKeterangan(penjualan.keterangan || "");
+      setRutePengiriman(penjualan.rutePengiriman || "");
+
+      setCurrentPenjualan({
+        items: hydratedItems,
+        subtotal: Number(penjualan.subtotal),
+        diskonNota: Number(penjualan.diskonNota),
+        totalHarga: Number(penjualan.totalHarga),
+        jumlahDibayar: Number(penjualan.jumlahDibayar),
+        kembalian: Number(penjualan.kembalian),
+        metodePembayaran: penjualan.metodePembayaran,
+        statusPembayaran: penjualan.statusPembayaran,
+        statusTransaksi: penjualan.statusTransaksi,
+      });
+
+      if (penjualan.customer?.id) {
+        fetchCustomerHutangInfo(penjualan.customer.id);
+      }
+    } catch (error) {
+      console.error("Error loading penjualan:", error);
+      toast.error("Gagal memuat data penjualan");
+    } finally {
+      setLoadingEdit(false);
     }
   };
 
@@ -442,6 +570,7 @@ const PenjualanPage = () => {
           jumlahDus: 1,
           jumlahPcs: 0,
           hargaJual: barang.hargaJual,
+          hargaJualPerDus: barang.hargaJual,
           hargaBeli: barang.hargaBeli,
           diskonPerItem: 0,
           laba: 0,
@@ -473,7 +602,7 @@ const PenjualanPage = () => {
     const totalPcs =
       item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
     const hargaJualPerPcs =
-      item.barang.hargaJual / item.barang.jumlahPerKemasan;
+      getHargaJualPerDus(item) / item.barang.jumlahPerKemasan;
     const hargaBeliPerPcs =
       item.barang.hargaBeli / item.barang.jumlahPerKemasan;
 
@@ -494,7 +623,7 @@ const PenjualanPage = () => {
       const totalPcs =
         item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
       const hargaJualPerPcs =
-        item.barang.hargaJual / item.barang.jumlahPerKemasan;
+        getHargaJualPerDus(item) / item.barang.jumlahPerKemasan;
       return sum + hargaJualPerPcs * totalPcs;
     }, 0);
 
@@ -534,7 +663,7 @@ const PenjualanPage = () => {
       const totalPcs =
         item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
       const hargaJualPerPcs =
-        item.barang.hargaJual / item.barang.jumlahPerKemasan;
+        getHargaJualPerDus(item) / item.barang.jumlahPerKemasan;
       return sum + hargaJualPerPcs * totalPcs;
     }, 0);
 
@@ -674,7 +803,7 @@ const PenjualanPage = () => {
       const cleanValue = value.replace(/[^\d]/g, "");
       const persen = parseInt(cleanValue) || 0;
       const clampedPersen = Math.min(100, Math.max(0, persen));
-      const hargaPerDus = item.barang.hargaJual;
+      const hargaPerDus = getHargaJualPerDus(item);
       diskonRupiah = Math.round((hargaPerDus * clampedPersen) / 100);
       displayValue = cleanValue === "" ? "" : clampedPersen.toString();
     } else {
@@ -697,7 +826,7 @@ const PenjualanPage = () => {
     setItemDiskonTypes((prev) => ({ ...prev, [index]: newType }));
 
     if (newType === "persen") {
-      const hargaPerDus = item.barang.hargaJual;
+      const hargaPerDus = getHargaJualPerDus(item);
       const persen =
         hargaPerDus > 0
           ? Math.round((item.diskonPerItem / hargaPerDus) * 100)
@@ -721,7 +850,7 @@ const PenjualanPage = () => {
     const item = currentPenjualan.items[index];
 
     if (type === "persen") {
-      const hargaPerDus = item.barang.hargaJual;
+      const hargaPerDus = getHargaJualPerDus(item);
       const persen =
         hargaPerDus > 0
           ? Math.round((item.diskonPerItem / hargaPerDus) * 100)
@@ -834,6 +963,56 @@ const PenjualanPage = () => {
 
     setLoading(true);
     try {
+      if (editPenjualanId) {
+        const updatePayload: any = {
+          items: currentPenjualan.items.map((item) => ({
+            id: item.id,
+            barangId: item.barangId,
+            jumlahDus: item.jumlahDus,
+            jumlahPcs: item.jumlahPcs,
+            hargaJual: getHargaJualPerDus(item),
+            diskonPerItem: item.diskonPerItem,
+          })),
+          customerId: selectedCustomer?.id,
+          karyawanId: selectedKaryawan?.id,
+          diskonNota: currentPenjualan.diskonNota,
+          jumlahDibayar: currentPenjualan.jumlahDibayar,
+          metodePembayaran: currentPenjualan.metodePembayaran,
+          tanggalTransaksi: tanggalPenjualan,
+          tanggalJatuhTempo: tanggalJatuhTempo || undefined,
+          keterangan: keterangan || undefined,
+          rutePengiriman: rutePengiriman || undefined,
+        };
+
+        const updateRes = await fetch(
+          `/api/penjualan/${editPenjualanId}/edit`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatePayload),
+          }
+        );
+        const updateResult = await updateRes.json();
+
+        if (updateResult.success) {
+          setReceiptData({
+            ...updateResult.data.receipt,
+            id: editPenjualanId,
+          });
+          setShowCheckoutModal(false);
+          setShowReceiptModal(true);
+          toast.success(updateResult.message || "Penjualan berhasil diupdate");
+          fetchMasterData();
+          fetchTopCustomers();
+          fetchTopKaryawan();
+          fetchTodaySales();
+        } else {
+          throw new Error(updateResult.error || "Gagal update penjualan");
+        }
+
+        return;
+      }
+
       // Buat transaksi baru dan dapatkan kode penjualan
       const createRes = await fetch("/api/penjualan", {
         method: "POST",
@@ -954,6 +1133,10 @@ const PenjualanPage = () => {
     setExpandCustomerSearch(false);
     setExpandKaryawanSearch(false);
     setCustomerHutangInfo(null);
+    if (editPenjualanId) {
+      setEditPenjualanId(null);
+      router.replace("/dashboard/admin/penjualan-sales");
+    }
   };
 
   const filteredBarang = barangList.filter((b) =>
@@ -1053,6 +1236,16 @@ const PenjualanPage = () => {
                 <p className="text-blue-100 text-sm">
                   Kelola transaksi penjualan ke customer melalui sales
                 </p>
+                {editPenjualanId && (
+                  <div className="mt-2">
+                    <span className="inline-flex items-center gap-2 bg-yellow-400/90 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full">
+                      Mode Edit • #{editPenjualanId}
+                      {loadingEdit && (
+                        <span className="inline-block h-2 w-2 rounded-full bg-slate-900 animate-pulse" />
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
@@ -1729,7 +1922,7 @@ const PenjualanPage = () => {
                               {item.barang.namaBarang}
                             </h4>
                             <p className="text-xs text-gray-600 font-semibold truncate bg-gray-100 px-2 py-0.5 rounded-md inline-block">
-                              {formatRupiah(item.barang.hargaJual)}/
+                              {formatRupiah(getHargaJualPerDus(item))}/
                               {item.barang.jenisKemasan}
                             </p>
                           </div>
@@ -2034,7 +2227,7 @@ const PenjualanPage = () => {
                     className="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
                   >
                     <CreditCard className="w-5 h-5" />
-                    Bayar Sekarang
+                    {editPenjualanId ? "Simpan Perubahan" : "Bayar Sekarang"}
                   </button>
                 </div>
               )}
@@ -2389,7 +2582,7 @@ const PenjualanPage = () => {
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    Konfirmasi Pembayaran
+                    {editPenjualanId ? "Simpan Perubahan" : "Konfirmasi Pembayaran"}
                   </>
                 )}
               </button>

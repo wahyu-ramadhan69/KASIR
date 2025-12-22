@@ -495,13 +495,16 @@ const DaftarPerjalananPage = () => {
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() =>
-                                      handleUpdateStatus(perjalanan.id, "KEMBALI")
+                                      handleUpdateStatus(
+                                        perjalanan.id,
+                                        "KEMBALI"
+                                      )
                                     }
                                     disabled={loading}
                                     className="flex-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 disabled:opacity-50"
                                   >
                                     <AlertCircle className="w-3.5 h-3.5" />
-                                    Kembali
+                                    Pulang
                                   </button>
                                   <button
                                     onClick={() =>
@@ -616,7 +619,7 @@ const DaftarPerjalananPage = () => {
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Ya, Kembali ke Gudang
+                    Pulang Ke Gudang
                   </>
                 )}
               </button>

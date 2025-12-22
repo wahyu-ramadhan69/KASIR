@@ -132,12 +132,37 @@ export async function GET(request: Request) {
       },
     });
 
+    // Fetch data pengembalian barang rusak/kadaluarsa untuk kerugian
+    const pengembalianRusak = await prisma.pengembalianBarang.findMany({
+      where: {
+        tanggalPengembalian: {
+          gte: startDate,
+          lte: today,
+        },
+        kondisiBarang: {
+          in: ["RUSAK", "KADALUARSA"],
+        },
+      },
+      select: {
+        tanggalPengembalian: true,
+        jumlahDus: true,
+        jumlahPcs: true,
+        barang: {
+          select: {
+            hargaBeli: true,
+            jumlahPerKemasan: true,
+          },
+        },
+      },
+    });
+
     type DailyValue = {
       penjualan: number;
       pembelian: number;
       pengeluaran: number;
       labaKotor: number;
-      laba: number; // ✅ Ini akan dihitung = labaKotor - pengeluaran
+      kerugian: number;
+      laba: number; // ✅ Ini akan dihitung = labaKotor - pengeluaran - kerugian
     };
 
     const dataMap: Record<string, DailyValue> = {};
@@ -163,6 +188,7 @@ export async function GET(request: Request) {
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
+          kerugian: 0,
           laba: 0,
         };
       }
@@ -185,6 +211,7 @@ export async function GET(request: Request) {
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
+          kerugian: 0,
           laba: 0,
         };
       }
@@ -200,6 +227,7 @@ export async function GET(request: Request) {
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
+          kerugian: 0,
           laba: 0,
         };
       }
@@ -215,10 +243,35 @@ export async function GET(request: Request) {
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
+          kerugian: 0,
           laba: 0,
         };
       }
       dataMap[key].pengeluaran += Number(e.jumlah);
+    }
+
+    // ✅ Isi data kerugian dari pengembalian barang rusak/kadaluarsa
+    for (const item of pengembalianRusak) {
+      const key = getKey(item.tanggalPengembalian);
+      if (!dataMap[key]) {
+        dataMap[key] = {
+          penjualan: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          kerugian: 0,
+          laba: 0,
+        };
+      }
+
+      const hargaBeli = Number(item.barang.hargaBeli);
+      const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan);
+      const modalDus = hargaBeli * Number(item.jumlahDus);
+      const modalPcs =
+        jumlahPerKemasan > 0
+          ? Math.round((hargaBeli / jumlahPerKemasan) * Number(item.jumlahPcs))
+          : 0;
+      dataMap[key].kerugian += modalDus + modalPcs;
     }
 
     // ✅ Isi data laba kotor
@@ -230,6 +283,7 @@ export async function GET(request: Request) {
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
+          kerugian: 0,
           laba: 0,
         };
       }
@@ -241,10 +295,13 @@ export async function GET(request: Request) {
       dataMap[key].labaKotor += labaKotorPerItem;
     }
 
-    // ✅ HITUNG LABA BERSIH = Laba Kotor - Pengeluaran
+    // ✅ HITUNG LABA BERSIH = Laba Kotor - Pengeluaran - Kerugian
     // (setelah semua data terkumpul)
     for (const key in dataMap) {
-      dataMap[key].laba = dataMap[key].labaKotor - dataMap[key].pengeluaran;
+      dataMap[key].laba =
+        dataMap[key].labaKotor -
+        dataMap[key].pengeluaran -
+        dataMap[key].kerugian;
     }
 
     // Convert ke array & sort
@@ -255,7 +312,7 @@ export async function GET(request: Request) {
         penjualan: value.penjualan,
         pembelian: value.pembelian,
         pengeluaran: value.pengeluaran,
-        labaKotor: value.labaKotor,
+        kerugian: value.kerugian,
         laba: value.laba, // ✅ Sudah dikurangi pengeluaran
       }));
 

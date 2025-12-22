@@ -17,6 +17,7 @@ import {
   CreditCard,
   Loader2,
   Clock,
+  Pencil,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -798,13 +799,24 @@ const RiwayatPenjualanPage = () => {
                           </td>
 
                           <td className="px-4 py-3 whitespace-nowrap text-center">
-                            <button
-                              onClick={() => handleViewDetail(pj)}
-                              className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
-                              title="Lihat Detail"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => handleViewDetail(pj)}
+                                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
+                                title="Lihat Detail"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              {pj.statusTransaksi === "SELESAI" && (
+                                <Link
+                                  href={`/dashboard/admin/penjualan-sales?editId=${pj.id}`}
+                                  className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                  title="Edit Penjualan"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Link>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

@@ -90,6 +90,7 @@ export async function GET(
       where: { id: penjualanId },
       include: {
         customer: true,
+        karyawan: true,
         items: {
           include: {
             barang: true,

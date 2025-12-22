@@ -25,7 +25,6 @@ import {
   ArrowDownRight,
   BarChart3,
   Sparkles,
-  TrendingDown,
   Clock,
   Wallet,
   ShoppingCart,
@@ -33,7 +32,7 @@ import {
   CalendarRange,
   CalendarClock,
   Package,
-  BadgeDollarSign,
+  AlertTriangle,
 } from "lucide-react";
 
 interface DailySales {
@@ -41,7 +40,7 @@ interface DailySales {
   penjualan: number;
   pembelian: number;
   pengeluaran: number;
-  labaKotor: number;
+  kerugian: number;
   laba: number;
   label?: string;
 }
@@ -57,10 +56,17 @@ const formatRupiah = (number: number): string => {
 };
 
 const formatNumber = (num: number): string => {
-  if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)}M`;
-  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}jt`;
-  if (num >= 1000) return `${(num / 1000).toFixed(1)}rb`;
-  return num.toString();
+  const sign = num < 0 ? "-" : "";
+  const abs = Math.abs(num);
+  const formatShort = (value: number, suffix: string) => {
+    const rounded = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
+    return `${sign}${rounded} ${suffix}`;
+  };
+
+  if (abs >= 1000000000) return formatShort(abs / 1000000000, "M");
+  if (abs >= 1000000) return formatShort(abs / 1000000, "jt");
+  if (abs >= 1000) return formatShort(abs / 1000, "rb");
+  return `${num}`;
 };
 
 // Custom Tooltip dengan 5 metrics
@@ -92,8 +98,8 @@ const CustomTooltip = ({ active, payload, period }: any) => {
 
   const marginLabaBersih =
     d.penjualan > 0 ? ((d.laba / d.penjualan) * 100).toFixed(1) : "0";
-  const marginLabaKotor =
-    d.penjualan > 0 ? ((d.labaKotor / d.penjualan) * 100).toFixed(1) : "0";
+  const marginKerugian =
+    d.penjualan > 0 ? ((d.kerugian / d.penjualan) * 100).toFixed(1) : "0";
   const totalKeluar = d.pembelian + d.pengeluaran;
 
   return (
@@ -136,15 +142,15 @@ const CustomTooltip = ({ active, payload, period }: any) => {
 
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
-            <span className="text-sm text-gray-600">Laba Kotor</span>
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-slate-700 to-slate-900" />
+            <span className="text-sm text-gray-600">Kerugian</span>
           </div>
           <span
             className={`font-bold ${
-              d.labaKotor >= 0 ? "text-blue-600" : "text-red-600"
+              d.kerugian >= 0 ? "text-slate-700" : "text-red-600"
             }`}
           >
-            {formatRupiah(d.labaKotor)}
+            {formatRupiah(d.kerugian)}
           </span>
         </div>
 
@@ -170,15 +176,15 @@ const CustomTooltip = ({ active, payload, period }: any) => {
             </span>
           </div>
           <div className="flex items-center justify-between gap-8">
-            <span className="text-xs text-gray-500">Margin Laba Kotor</span>
+            <span className="text-xs text-gray-500">Rasio Kerugian</span>
             <span
               className={`text-sm font-bold ${
-                parseFloat(marginLabaKotor) >= 0
-                  ? "text-blue-600"
+                parseFloat(marginKerugian) >= 0
+                  ? "text-slate-700"
                   : "text-red-600"
               }`}
             >
-              {marginLabaKotor}%
+              {marginKerugian}%
             </span>
           </div>
           <div className="flex items-center justify-between gap-8">
@@ -280,7 +286,7 @@ const Penjualan30HariPage = () => {
     penjualan: true,
     pembelian: true,
     pengeluaran: true,
-    labaKotor: true,
+    kerugian: true,
     laba: true,
   });
 
@@ -328,7 +334,7 @@ const Penjualan30HariPage = () => {
     (sum, item) => sum + item.pengeluaran,
     0
   );
-  const totalLabaKotor = data.reduce((sum, item) => sum + item.labaKotor, 0);
+  const totalKerugian = data.reduce((sum, item) => sum + item.kerugian, 0);
   const totalLaba = data.reduce((sum, item) => sum + item.laba, 0);
 
   // Trend calculation
@@ -383,10 +389,10 @@ const Penjualan30HariPage = () => {
       ? data.reduce((max, cur) => (cur.laba > max.laba ? cur : max), data[0])
       : null;
 
-  const maxLabaKotor =
+  const maxKerugian =
     data.length > 0
       ? data.reduce(
-          (max, cur) => (cur.labaKotor > max.labaKotor ? cur : max),
+          (max, cur) => (cur.kerugian > max.kerugian ? cur : max),
           data[0]
         )
       : null;
@@ -432,7 +438,7 @@ const Penjualan30HariPage = () => {
                 Dashboard Keuangan
               </h1>
               <p className="text-purple-100 text-base max-w-2xl">
-                Analisis lengkap penjualan, pembelian, pengeluaran, laba kotor,
+                Analisis lengkap penjualan, pembelian, pengeluaran, kerugian,
                 dan laba bersih
               </p>
             </div>
@@ -639,11 +645,11 @@ const Penjualan30HariPage = () => {
           />
 
           <StatCard
-            title="Laba Kotor"
-            value={formatNumber(totalLabaKotor)}
-            subtitle={formatRupiah(totalLabaKotor)}
-            icon={BadgeDollarSign}
-            gradient="bg-gradient-to-br from-blue-500 to-cyan-600"
+            title="Kerugian"
+            value={formatNumber(totalKerugian)}
+            subtitle={formatRupiah(totalKerugian)}
+            icon={AlertTriangle}
+            gradient="bg-gradient-to-br from-slate-700 to-slate-900"
             delay={150}
           />
 
@@ -734,15 +740,15 @@ const Penjualan30HariPage = () => {
               Pengeluaran
             </button>
             <button
-              onClick={() => toggleLine("labaKotor")}
+              onClick={() => toggleLine("kerugian")}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                visibleLines.labaKotor
-                  ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
+                visibleLines.kerugian
+                  ? "bg-slate-100 text-slate-800 border-2 border-slate-300"
                   : "bg-gray-100 text-gray-400 border-2 border-gray-200"
               }`}
             >
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
-              Laba Kotor
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-slate-700 to-slate-900" />
+              Kerugian
             </button>
             <button
               onClick={() => toggleLine("laba")}
@@ -838,7 +844,7 @@ const Penjualan30HariPage = () => {
                         />
                       </linearGradient>
                       <linearGradient
-                        id="colorLabaKotor"
+                        id="colorKerugian"
                         x1="0"
                         y1="0"
                         x2="0"
@@ -846,12 +852,12 @@ const Penjualan30HariPage = () => {
                       >
                         <stop
                           offset="5%"
-                          stopColor="#3b82f6"
+                          stopColor="#0f172a"
                           stopOpacity={0.8}
                         />
                         <stop
                           offset="95%"
-                          stopColor="#3b82f6"
+                          stopColor="#0f172a"
                           stopOpacity={0.1}
                         />
                       </linearGradient>
@@ -934,15 +940,15 @@ const Penjualan30HariPage = () => {
                       />
                     )}
 
-                    {visibleLines.labaKotor && (
+                    {visibleLines.kerugian && (
                       <Area
                         type="monotone"
-                        dataKey="labaKotor"
-                        name="Laba Kotor"
-                        stroke="#3b82f6"
+                        dataKey="kerugian"
+                        name="Kerugian"
+                        stroke="#0f172a"
                         strokeWidth={3}
-                        fill="url(#colorLabaKotor)"
-                        dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2 }}
+                        fill="url(#colorKerugian)"
+                        dot={{ r: 4, fill: "#0f172a", strokeWidth: 2 }}
                         activeDot={{ r: 7 }}
                       />
                     )}
@@ -1010,11 +1016,11 @@ const Penjualan30HariPage = () => {
                       />
                     )}
 
-                    {visibleLines.labaKotor && (
+                    {visibleLines.kerugian && (
                       <Bar
-                        dataKey="labaKotor"
-                        name="Laba Kotor"
-                        fill="#3b82f6"
+                        dataKey="kerugian"
+                        name="Kerugian"
+                        fill="#0f172a"
                         radius={[8, 8, 0, 0]}
                       />
                     )}
@@ -1038,8 +1044,8 @@ const Penjualan30HariPage = () => {
               <span className="font-bold text-purple-700">💡 Info:</span>{" "}
               Menampilkan data <strong>{getPeriodLabel().toLowerCase()}</strong>
               . Grafik menampilkan 5 metrik: Penjualan, Pembelian, Pengeluaran,
-              Laba Kotor (Harga Jual - Harga Beli), dan Laba Bersih (Laba Kotor
-              - Pengeluaran).
+              Kerugian (pengembalian barang rusak/kadaluarsa), dan Laba Bersih
+              (Laba Kotor - Pengeluaran - Kerugian).
             </p>
           </div>
         </div>
@@ -1083,29 +1089,29 @@ const Penjualan30HariPage = () => {
             )}
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200">
+          <div className="bg-gradient-to-br from-slate-50 to-slate-200 rounded-2xl p-6 border border-slate-300">
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-blue-500 rounded-xl">
-                <BadgeDollarSign className="w-5 h-5 text-white" />
+              <div className="p-2 bg-slate-800 rounded-xl">
+                <AlertTriangle className="w-5 h-5 text-white" />
               </div>
-              <h3 className="font-bold text-blue-900">Laba Kotor Tertinggi</h3>
+              <h3 className="font-bold text-slate-900">Kerugian Tertinggi</h3>
             </div>
-            {maxLabaKotor && (
+            {maxKerugian && (
               <>
-                <p className="text-2xl font-black text-blue-700 mb-1">
-                  {formatRupiah(maxLabaKotor.labaKotor)}
+                <p className="text-2xl font-black text-slate-800 mb-1">
+                  {formatRupiah(maxKerugian.kerugian)}
                 </p>
-                <p className="text-sm text-blue-600">
+                <p className="text-sm text-slate-700">
                   {period === "daily" &&
                     new Date(
-                      maxLabaKotor.date + "T00:00:00"
+                      maxKerugian.date + "T00:00:00"
                     ).toLocaleDateString("id-ID", {
                       day: "numeric",
                       month: "long",
                     })}
                   {period === "monthly" &&
                     (() => {
-                      const [year, month] = maxLabaKotor.date.split("-");
+                      const [year, month] = maxKerugian.date.split("-");
                       return new Date(
                         parseInt(year),
                         parseInt(month) - 1
@@ -1114,7 +1120,7 @@ const Penjualan30HariPage = () => {
                         year: "numeric",
                       });
                     })()}
-                  {period === "yearly" && `Tahun ${maxLabaKotor.date}`}
+                  {period === "yearly" && `Tahun ${maxKerugian.date}`}
                 </p>
               </>
             )}
