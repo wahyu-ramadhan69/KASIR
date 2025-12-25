@@ -46,7 +46,12 @@ function serializePembelian(pembelian: any) {
       barangId: item.barangId,
       hargaPokok: bigIntToNumber(item.hargaPokok),
       diskonPerItem: bigIntToNumber(item.diskonPerItem),
-      jumlahDus: bigIntToNumber(item.jumlahDus),
+      totalItem: bigIntToNumber(item.totalItem),
+      jumlahDus:
+        item.barang && bigIntToNumber(item.barang.jumlahPerKemasan) > 0
+          ? bigIntToNumber(item.totalItem) /
+            bigIntToNumber(item.barang.jumlahPerKemasan)
+          : 0,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       barang: item.barang

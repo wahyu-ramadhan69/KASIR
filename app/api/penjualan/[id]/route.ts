@@ -29,19 +29,37 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
+  const perKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / perKemasan);
+  const jumlahPcs = totalItem % perKemasan;
+  return { jumlahDus, jumlahPcs };
+}
+
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
+  if (item.totalItem !== undefined && item.totalItem !== null) {
+    return toNumber(item.totalItem);
+  }
+  const jumlahDus = toNumber(item.jumlahDus);
+  const jumlahPcs = toNumber(item.jumlahPcs);
+  return jumlahDus * jumlahPerKemasan + jumlahPcs;
+}
+
 // Helper function untuk menghitung total penjualan
 const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let subtotal = 0;
   let totalDiskonItem = 0;
 
   const calculatedItems = items.map((item) => {
-    const jumlahDus = toNumber(item.jumlahDus);
-    const jumlahPcs = toNumber(item.jumlahPcs);
     const hargaJual = toNumber(item.hargaJual);
     const diskonPerItem = toNumber(item.diskonPerItem);
     const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan || 1);
 
-    const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
+    const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+    const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+      totalPcs,
+      jumlahPerKemasan
+    );
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
       jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;

@@ -32,7 +32,12 @@ function serializePembelian(pembelian: any) {
       ...item,
       hargaPokok: bigIntToNumber(item.hargaPokok),
       diskonPerItem: bigIntToNumber(item.diskonPerItem),
-      jumlahDus: bigIntToNumber(item.jumlahDus),
+      totalItem: bigIntToNumber(item.totalItem),
+      jumlahDus:
+        item.barang && bigIntToNumber(item.barang.jumlahPerKemasan) > 0
+          ? bigIntToNumber(item.totalItem) /
+            bigIntToNumber(item.barang.jumlahPerKemasan)
+          : 0,
       barang: item.barang
         ? {
             ...item.barang,
@@ -52,7 +57,10 @@ function serializePembelian(pembelian: any) {
 function calculatePurchase(pembelian: any) {
   const items = pembelian.items.map((item: any) => {
     const hargaPokok = bigIntToNumber(item.hargaPokok);
-    const jumlahDus = bigIntToNumber(item.jumlahDus);
+    const totalItem = bigIntToNumber(item.totalItem);
+    const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+    const jumlahDus =
+      jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
     const diskonPerItem = bigIntToNumber(item.diskonPerItem);
 
     const totalHarga = hargaPokok * jumlahDus;
@@ -206,7 +214,10 @@ export async function PUT(
     // Hitung subtotal dengan BigInt conversion
     const subtotal = pembelian.items.reduce((total, item) => {
       const hargaPokok = bigIntToNumber(item.hargaPokok);
-      const jumlahDus = bigIntToNumber(item.jumlahDus);
+      const totalItem = bigIntToNumber(item.totalItem);
+      const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+      const jumlahDus =
+        jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
       const diskonPerItem = bigIntToNumber(item.diskonPerItem);
       const totalHarga = hargaPokok * jumlahDus;
       const totalDiskon = diskonPerItem * jumlahDus;

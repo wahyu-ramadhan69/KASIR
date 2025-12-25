@@ -35,6 +35,14 @@ interface PengembalianBarang {
   createdAt: string;
   updatedAt: string;
   barang: Barang;
+  perjalanan?: {
+    id: number;
+    karyawan?: {
+      id: number;
+      nama: string;
+      nik: string;
+    };
+  } | null;
 }
 
 interface Pagination {
@@ -78,7 +86,7 @@ const getKondisiMeta = (kondisi: PengembalianBarang["kondisiBarang"]) => {
   }
 };
 
-const RiwayatPengembalianPage = () => {
+const RiwayatPengembalianSalesPage = () => {
   const [pengembalianList, setPengembalianList] = useState<
     PengembalianBarang[]
   >([]);
@@ -162,7 +170,7 @@ const RiwayatPengembalianPage = () => {
     const params = new URLSearchParams();
     params.append("page", page.toString());
     params.append("limit", "20");
-    params.append("withoutPerjalanan", "true");
+    params.append("withKaryawan", "true");
 
     if (debouncedSearch) {
       params.append("search", debouncedSearch);
@@ -179,7 +187,10 @@ const RiwayatPengembalianPage = () => {
     return params.toString();
   };
 
-  const fetchPengembalian = async (page: number = 1, reset: boolean = false) => {
+  const fetchPengembalian = async (
+    page: number = 1,
+    reset: boolean = false
+  ) => {
     if (reset) {
       setLoading(true);
     } else {
@@ -209,14 +220,16 @@ const RiwayatPengembalianPage = () => {
   const fetchStats = async () => {
     try {
       const res = await fetch(
-        "/api/penjualan/pengembalian?limit=1000&withoutPerjalanan=true"
+        "/api/penjualan/pengembalian?limit=1000&withKaryawan=true"
       );
       const data = await res.json();
 
       if (data.success) {
         const list = data.data as PengembalianBarang[];
         const totalBaik = list.filter((p) => p.kondisiBarang === "BAIK").length;
-        const totalRusak = list.filter((p) => p.kondisiBarang === "RUSAK").length;
+        const totalRusak = list.filter(
+          (p) => p.kondisiBarang === "RUSAK"
+        ).length;
         const totalKadaluarsa = list.filter(
           (p) => p.kondisiBarang === "KADALUARSA"
         ).length;
@@ -306,17 +319,17 @@ const RiwayatPengembalianPage = () => {
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link
-                href="/dashboard/admin/penjualan/pengembalian"
+                href="/dashboard/admin/penjualan-sales/riwayat"
                 className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white p-2.5 rounded-lg transition-all shadow-lg"
               >
                 <ArrowLeft className="w-4 h-4" />
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-white tracking-tight">
-                  Riwayat Pengembalian
+                  Riwayat Pengembalian Sales
                 </h1>
                 <p className="text-blue-100 text-sm">
-                  Lihat riwayat pengembalian barang penjualan
+                  Lihat riwayat pengembalian barang oleh sales
                 </p>
               </div>
             </div>
@@ -522,6 +535,10 @@ const RiwayatPengembalianPage = () => {
                       Barang
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Sales
+                    </th>
+
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Jumlah
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -542,7 +559,7 @@ const RiwayatPengembalianPage = () => {
                   {pengembalianList.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
@@ -564,6 +581,9 @@ const RiwayatPengembalianPage = () => {
                             <span className="text-xs text-gray-500">
                               {item.barang?.jumlahPerKemasan || 0} pcs/dus
                             </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                            {item.perjalanan?.karyawan?.nama || "-"}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                             {item.jumlahDus > 0 && (
@@ -667,6 +687,17 @@ const RiwayatPengembalianPage = () => {
                       </p>
                     </div>
                     <div>
+                      <p className="text-sm text-gray-500">Sales</p>
+                      <p className="font-semibold">
+                        {selectedPengembalian.perjalanan?.karyawan?.nama || "-"}
+                      </p>
+                      {selectedPengembalian.perjalanan?.karyawan?.nik && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          NIK: {selectedPengembalian.perjalanan.karyawan.nik}
+                        </p>
+                      )}
+                    </div>
+                    <div>
                       <p className="text-sm text-gray-500">Tanggal</p>
                       <p className="font-semibold">
                         {new Date(
@@ -705,7 +736,8 @@ const RiwayatPengembalianPage = () => {
                           </span>
                         )}
                         <span className="block text-xs text-gray-500 mt-1">
-                          Total: {formatNumber(getTotalPcs(selectedPengembalian))} pcs
+                          Total:{" "}
+                          {formatNumber(getTotalPcs(selectedPengembalian))} pcs
                         </span>
                       </div>
                     </div>
@@ -726,4 +758,4 @@ const RiwayatPengembalianPage = () => {
   );
 };
 
-export default RiwayatPengembalianPage;
+export default RiwayatPengembalianSalesPage;

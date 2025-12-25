@@ -78,6 +78,7 @@ interface PenjualanItem {
   barangId: number;
   jumlahDus: number;
   jumlahPcs: number;
+  totalItem?: number;
   hargaJual: number;
   hargaJualPerDus?: number;
   hargaBeli: number;
@@ -177,6 +178,9 @@ const PenjualanPage = () => {
   const [loading, setLoading] = useState(false);
   const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
+  const [originalQtyByBarangId, setOriginalQtyByBarangId] = useState<{
+    [key: number]: number;
+  }>({});
   const [tanggalPenjualan, setTanggalPenjualan] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -196,12 +200,34 @@ const PenjualanPage = () => {
   const getHargaJualPerDus = (item: PenjualanItem): number =>
     item.hargaJualPerDus ?? item.barang.hargaJual;
 
+  const deriveDusPcsFromTotal = (
+    totalItem: number,
+    jumlahPerKemasan: number
+  ) => {
+    const perKemasan = Math.max(1, jumlahPerKemasan);
+    const jumlahDus = Math.floor(totalItem / perKemasan);
+    const jumlahPcs = totalItem % perKemasan;
+    return { jumlahDus, jumlahPcs };
+  };
+
+  const getTotalItemPcs = (item: PenjualanItem): number => {
+    if (item.totalItem !== undefined && item.totalItem !== null) {
+      return item.totalItem;
+    }
+    return item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
+  };
+
+  const getDerivedQty = (item: PenjualanItem) => {
+    const totalItem = getTotalItemPcs(item);
+    return deriveDusPcsFromTotal(totalItem, item.barang.jumlahPerKemasan);
+  };
+
   const getCartPcsForBarang = (barangId: number): number => {
     const item = currentPenjualan.items.find(
       (cartItem) => cartItem.barangId === barangId
     );
     if (!item) return 0;
-    return item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
+    return getTotalItemPcs(item);
   };
 
   // ... (semua useEffect dan function tetap sama)
@@ -233,6 +259,8 @@ const PenjualanPage = () => {
   useEffect(() => {
     if (editPenjualanId) {
       loadPenjualanForEdit(editPenjualanId);
+    } else {
+      setOriginalQtyByBarangId({});
     }
   }, [editPenjualanId]);
 
@@ -334,28 +362,44 @@ const PenjualanPage = () => {
         return;
       }
 
+      const originalQtyMap: { [key: number]: number } = {};
       const hydratedItems: PenjualanItem[] = penjualan.items.map((item) => {
         const hargaJualPerDus = Number(item.hargaJual);
         const totalPcs =
-          Number(item.jumlahDus) * Number(item.barang.jumlahPerKemasan) +
-          Number(item.jumlahPcs);
+          item.totalItem !== undefined && item.totalItem !== null
+            ? Number(item.totalItem)
+            : Number(item.jumlahDus) * Number(item.barang.jumlahPerKemasan) +
+              Number(item.jumlahPcs);
+        const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan);
+        const { jumlahDus, jumlahPcs } =
+          jumlahPerKemasan <= 1
+            ? { jumlahDus: 0, jumlahPcs: totalPcs }
+            : deriveDusPcsFromTotal(totalPcs, jumlahPerKemasan);
         const hargaJualPerPcs =
           hargaJualPerDus / Number(item.barang.jumlahPerKemasan);
         const hargaBeliPerPcs =
           Number(item.barang.hargaBeli) /
           Number(item.barang.jumlahPerKemasan);
         const hargaJualTotal = hargaJualPerPcs * totalPcs;
-        const diskonTotal = Number(item.diskonPerItem) * Number(item.jumlahDus);
+        const diskonTotal = Number(item.diskonPerItem) * jumlahDus;
         const hargaBeliTotal = hargaBeliPerPcs * totalPcs;
         const totalHarga = hargaJualTotal - diskonTotal;
 
         return {
           ...item,
+          jumlahDus,
+          jumlahPcs,
+          totalItem: totalPcs,
           hargaJualPerDus,
           hargaJual: totalHarga,
           hargaBeli: hargaBeliTotal,
           laba: totalHarga - hargaBeliTotal,
         };
+      });
+      hydratedItems.forEach((item) => {
+        const totalItem = getTotalItemPcs(item);
+        originalQtyMap[item.barangId] =
+          (originalQtyMap[item.barangId] || 0) + totalItem;
       });
 
       const diskonTypes: { [key: number]: "rupiah" | "persen" } = {};
@@ -368,6 +412,7 @@ const PenjualanPage = () => {
 
       setItemDiskonTypes(diskonTypes);
       setItemDiskonValues(diskonValues);
+      setOriginalQtyByBarangId(originalQtyMap);
       setSelectedCustomer(penjualan.customer || null);
       setSelectedKaryawan(penjualan.karyawan || null);
       setDiskonNotaType("rupiah");
@@ -497,6 +542,10 @@ const PenjualanPage = () => {
 
       const currentStok = Number(data.data.stok);
       const jumlahPerKemasan = Number(data.data.jumlahPerKemasan);
+      const originalQty = editPenjualanId
+        ? originalQtyByBarangId[barang.id] || 0
+        : 0;
+      const stokTersedia = currentStok + originalQty;
 
       // Hitung total yang sudah ada di keranjang untuk barang ini
       const existingItem = currentPenjualan.items.find(
@@ -505,15 +554,14 @@ const PenjualanPage = () => {
       let totalDiKeranjang = 0;
 
       if (existingItem) {
-        totalDiKeranjang =
-          existingItem.jumlahDus * jumlahPerKemasan + existingItem.jumlahPcs;
+        totalDiKeranjang = getTotalItemPcs(existingItem);
       }
 
       // Validasi 1: Cek stok terlebih dahulu (hard limit fisik)
-      const sisaStok = currentStok - totalDiKeranjang;
+      const sisaStok = stokTersedia - totalDiKeranjang;
       if (sisaStok < jumlahPerKemasan) {
         toast.error(
-          `Stok tidak mencukupi! Stok tersedia: ${currentStok} pcs, sudah di keranjang: ${totalDiKeranjang} pcs, sisa: ${sisaStok} pcs`
+          `Stok tidak mencukupi! Stok tersedia: ${stokTersedia} pcs, sudah di keranjang: ${totalDiKeranjang} pcs, sisa: ${sisaStok} pcs`
         );
         return;
       }
@@ -521,9 +569,10 @@ const PenjualanPage = () => {
       // Validasi 2: Cek limit penjualan (jika ada)
       const todaySold = getTodaySold(barang.id);
       const limitPenjualan = Number(barang.limitPenjualan || 0);
+      const effectiveSold = Math.max(0, todaySold - originalQty);
 
       if (limitPenjualan > 0) {
-        const remainingLimit = limitPenjualan - todaySold - totalDiKeranjang;
+        const remainingLimit = limitPenjualan - effectiveSold - totalDiKeranjang;
 
         if (remainingLimit <= 0) {
           toast.error(
@@ -549,8 +598,13 @@ const PenjualanPage = () => {
         const updatedItems = [...currentPenjualan.items];
 
         // Tambahkan 1 dus
-        updatedItems[existingItemIndex].jumlahDus += 1;
-        toast.success(`${barang.namaBarang} +1 ${barang.jenisKemasan}`);
+        if (jumlahPerKemasan <= 1) {
+          updatedItems[existingItemIndex].jumlahPcs += 1;
+          toast.success(`${barang.namaBarang} +1 item`);
+        } else {
+          updatedItems[existingItemIndex].jumlahDus += 1;
+          toast.success(`${barang.namaBarang} +1 ${barang.jenisKemasan}`);
+        }
 
         if (itemDiskonTypes[existingItemIndex] === undefined) {
           setItemDiskonTypes((prev) => ({
@@ -567,8 +621,9 @@ const PenjualanPage = () => {
       } else {
         const newItem: PenjualanItem = {
           barangId: barang.id,
-          jumlahDus: 1,
-          jumlahPcs: 0,
+          jumlahDus: jumlahPerKemasan > 1 ? 1 : 0,
+          jumlahPcs: jumlahPerKemasan > 1 ? 0 : 1,
+          totalItem: jumlahPerKemasan > 1 ? jumlahPerKemasan : 1,
           hargaJual: barang.hargaJual,
           hargaJualPerDus: barang.hargaJual,
           hargaBeli: barang.hargaBeli,
@@ -601,13 +656,15 @@ const PenjualanPage = () => {
     const item = items[index];
     const totalPcs =
       item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
+    item.totalItem = totalPcs;
+    const { jumlahDus } = getDerivedQty(item);
     const hargaJualPerPcs =
       getHargaJualPerDus(item) / item.barang.jumlahPerKemasan;
     const hargaBeliPerPcs =
       item.barang.hargaBeli / item.barang.jumlahPerKemasan;
 
     const hargaJualTotal = hargaJualPerPcs * totalPcs;
-    const diskonTotal = item.diskonPerItem * item.jumlahDus;
+    const diskonTotal = item.diskonPerItem * jumlahDus;
     const hargaBeliTotal = hargaBeliPerPcs * totalPcs;
 
     item.hargaJual = hargaJualTotal - diskonTotal;
@@ -620,18 +677,17 @@ const PenjualanPage = () => {
   const recalculateTotal = (items: PenjualanItem[]) => {
     // Hitung subtotal SEBELUM diskon item (harga asli)
     const subtotalSebelumDiskon = items.reduce((sum, item) => {
-      const totalPcs =
-        item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
+      const totalPcs = getTotalItemPcs(item);
       const hargaJualPerPcs =
         getHargaJualPerDus(item) / item.barang.jumlahPerKemasan;
       return sum + hargaJualPerPcs * totalPcs;
     }, 0);
 
     // Hitung total diskon item
-    const totalDiskon = items.reduce(
-      (sum, item) => sum + item.diskonPerItem * item.jumlahDus,
-      0
-    );
+    const totalDiskon = items.reduce((sum, item) => {
+      const { jumlahDus } = getDerivedQty(item);
+      return sum + item.diskonPerItem * jumlahDus;
+    }, 0);
 
     // Hitung subtotal SETELAH diskon item
     const subtotalSetelahDiskon = subtotalSebelumDiskon - totalDiskon;
@@ -660,18 +716,17 @@ const PenjualanPage = () => {
   ) => {
     // Hitung subtotal SEBELUM diskon item (harga asli)
     const subtotalSebelumDiskon = items.reduce((sum, item) => {
-      const totalPcs =
-        item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
+      const totalPcs = getTotalItemPcs(item);
       const hargaJualPerPcs =
         getHargaJualPerDus(item) / item.barang.jumlahPerKemasan;
       return sum + hargaJualPerPcs * totalPcs;
     }, 0);
 
     // Hitung total diskon item
-    const totalDiskon = items.reduce(
-      (sum, item) => sum + item.diskonPerItem * item.jumlahDus,
-      0
-    );
+    const totalDiskon = items.reduce((sum, item) => {
+      const { jumlahDus } = getDerivedQty(item);
+      return sum + item.diskonPerItem * jumlahDus;
+    }, 0);
 
     // Hitung subtotal SETELAH diskon item
     const subtotalSetelahDiskon = subtotalSebelumDiskon - totalDiskon;
@@ -732,12 +787,19 @@ const PenjualanPage = () => {
 
       const currentStok = Number(data.data.stok);
       const jumlahPerKemasan = Number(data.data.jumlahPerKemasan);
+      const originalQty = editPenjualanId
+        ? originalQtyByBarangId[barang.id] || 0
+        : 0;
+      const stokTersedia = currentStok + originalQty;
 
       // Set nilai baru
       let newJumlahDus = updatedItems[index].jumlahDus;
       let newJumlahPcs = updatedItems[index].jumlahPcs;
 
-      if (field === "jumlahDus") {
+      if (jumlahPerKemasan <= 1) {
+        newJumlahDus = 0;
+        newJumlahPcs = Math.max(0, value);
+      } else if (field === "jumlahDus") {
         newJumlahDus = Math.max(0, value);
       } else {
         newJumlahPcs = Math.max(0, value);
@@ -746,8 +808,10 @@ const PenjualanPage = () => {
       let totalSetelahUpdate = newJumlahDus * jumlahPerKemasan + newJumlahPcs;
 
       // Validasi stok
-      if (totalSetelahUpdate > currentStok) {
-        toast.error(`Stok tidak mencukupi! Stok tersedia: ${currentStok} pcs`);
+      if (totalSetelahUpdate > stokTersedia) {
+        toast.error(
+          `Stok tidak mencukupi! Stok tersedia: ${stokTersedia} pcs`
+        );
         return;
       }
 
@@ -755,16 +819,31 @@ const PenjualanPage = () => {
       const hasLimit = barang.limitPenjualan > 0;
       if (hasLimit) {
         const todaySold = getTodaySold(barang.id);
+        const effectiveSold = Math.max(0, todaySold - originalQty);
         const newTotalPcs = totalSetelahUpdate;
-        const totalIfUpdated = todaySold + newTotalPcs;
+        const totalIfUpdated = effectiveSold + newTotalPcs;
 
         if (totalIfUpdated > barang.limitPenjualan) {
           const maxAllowed = Math.max(
             0,
-            Math.min(barang.limitPenjualan - todaySold, currentStok)
+            Math.min(barang.limitPenjualan - effectiveSold, stokTersedia)
           );
-          const clampedDus = Math.floor(maxAllowed / jumlahPerKemasan);
-          const clampedPcs = maxAllowed % jumlahPerKemasan;
+          let clampedDus = newJumlahDus;
+          let clampedPcs = newJumlahPcs;
+
+          if (jumlahPerKemasan <= 1 || field === "jumlahPcs") {
+            clampedPcs = Math.min(Math.max(0, maxAllowed), newJumlahPcs);
+          } else if (field === "jumlahDus") {
+            const maxDus = Math.max(
+              0,
+              Math.floor((maxAllowed - clampedPcs) / jumlahPerKemasan)
+            );
+            clampedDus = Math.min(newJumlahDus, maxDus);
+          } else {
+            clampedDus = Math.floor(maxAllowed / jumlahPerKemasan);
+            clampedPcs = maxAllowed % jumlahPerKemasan;
+          }
+
           newJumlahDus = clampedDus;
           newJumlahPcs = clampedPcs;
           totalSetelahUpdate = newJumlahDus * jumlahPerKemasan + newJumlahPcs;
@@ -911,7 +990,10 @@ const PenjualanPage = () => {
 
     // Hitung subtotal setelah diskon item
     const totalDiskonItem = currentPenjualan.items.reduce(
-      (sum, item) => sum + item.diskonPerItem * item.jumlahDus,
+      (sum, item) => {
+        const { jumlahDus } = getDerivedQty(item);
+        return sum + item.diskonPerItem * jumlahDus;
+      },
       0
     );
     const subtotalSetelahDiskonItem =
@@ -970,6 +1052,7 @@ const PenjualanPage = () => {
             barangId: item.barangId,
             jumlahDus: item.jumlahDus,
             jumlahPcs: item.jumlahPcs,
+            totalItem: getTotalItemPcs(item),
             hargaJual: getHargaJualPerDus(item),
             diskonPerItem: item.diskonPerItem,
           })),
@@ -1036,6 +1119,7 @@ const PenjualanPage = () => {
             barangId: item.barangId,
             jumlahDus: item.jumlahDus,
             jumlahPcs: item.jumlahPcs,
+            totalItem: getTotalItemPcs(item),
             diskonPerItem: item.diskonPerItem,
           }),
         });
@@ -1186,10 +1270,10 @@ const PenjualanPage = () => {
 
   const paymentStatus = jumlahDibayar ? getPaymentStatus() : null;
 
-  const totalDiskonItem = currentPenjualan.items.reduce(
-    (sum, item) => sum + item.diskonPerItem * item.jumlahDus,
-    0
-  );
+  const totalDiskonItem = currentPenjualan.items.reduce((sum, item) => {
+    const { jumlahDus } = getDerivedQty(item);
+    return sum + item.diskonPerItem * jumlahDus;
+  }, 0);
 
   return (
     <div className="w-full min-h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] overflow-x-hidden overflow-y-auto flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100">
@@ -1622,6 +1706,7 @@ const PenjualanPage = () => {
                 <div className="grid grid-cols-2 gap-3">
                   {filteredBarang.map((barang) => {
                     const isLowStock = barang.stok < barang.jumlahPerKemasan;
+                    const isOutOfStock = barang.stok <= 0;
                     const isMediumStock =
                       barang.stok >= barang.jumlahPerKemasan &&
                       barang.stok < barang.jumlahPerKemasan * 5;
@@ -1754,7 +1839,9 @@ const PenjualanPage = () => {
                                 <div className="flex items-center gap-1.5 text-red-600 animate-in slide-in-from-left duration-300">
                                   <AlertCircle className="w-3 h-3" />
                                   <span className="text-[10px] font-bold">
-                                    Stok Menipis!
+                                    {isOutOfStock
+                                      ? "Stok Habis!"
+                                      : "Stok Menipis!"}
                                   </span>
                                 </div>
                               )}
@@ -2671,18 +2758,33 @@ const PenjualanPage = () => {
                       key={index}
                       className="text-sm pb-2 border-b last:border-b-0"
                     >
+                      {(() => {
+                        const jumlahPerKemasan =
+                          item.barang?.jumlahPerKemasan || 1;
+                        const totalItem =
+                          item.totalItem ??
+                          item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
+                        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+                          totalItem,
+                          jumlahPerKemasan
+                        );
+                        return (
+                          <>
                       <div className="flex justify-between font-bold text-gray-900">
                         <span>{item.barang?.namaBarang}</span>
                         <span>{formatRupiah(item.hargaJual)}</span>
                       </div>
                       <div className="text-xs text-gray-600 mt-1">
-                        {item.jumlahDus} dus + {item.jumlahPcs} pcs
+                        {jumlahDus} dus + {jumlahPcs} pcs
                         {item.diskonPerItem > 0 && (
                           <span className="text-red-600 ml-2">
                             (Diskon: {formatRupiah(item.diskonPerItem)})
                           </span>
                         )}
                       </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>

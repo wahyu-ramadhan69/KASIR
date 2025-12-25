@@ -27,6 +27,13 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
+  const perKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / perKemasan);
+  const jumlahPcs = totalItem % perKemasan;
+  return { jumlahDus, jumlahPcs };
+}
+
 function normalizePeriod(raw: string | null): Period {
   const value = (raw || "hari").toLowerCase();
   if (["hari", "harian", "day", "daily"].includes(value)) return "hari";
@@ -144,9 +151,15 @@ export async function GET(request: NextRequest) {
     >();
 
     for (const item of items) {
-      const jumlahPerKemasan = Math.max(1, toNumber(item.barang.jumlahPerKemasan));
-      const jumlahDus = toNumber(item.jumlahDus);
-      const jumlahPcs = toNumber(item.jumlahPcs);
+      const jumlahPerKemasan = Math.max(
+        1,
+        toNumber(item.barang.jumlahPerKemasan)
+      );
+      const totalItemTerjual = toNumber(item.totalItem);
+      const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+        totalItemTerjual,
+        jumlahPerKemasan
+      );
       const hargaJual = toNumber(item.hargaJual);
       const hargaBeli = toNumber(item.hargaBeli);
 
@@ -165,7 +178,6 @@ export async function GET(request: NextRequest) {
           ? toNumber(item.laba)
           : totalPenjualanItem - totalModalItem;
 
-      const totalItemTerjual = jumlahDus * jumlahPerKemasan + jumlahPcs; // semua pcs
       const totalKemasanTerjual = totalItemTerjual / jumlahPerKemasan; // bisa pecahan jika tidak pas kemasan
 
       if (!barangMap.has(item.barangId)) {

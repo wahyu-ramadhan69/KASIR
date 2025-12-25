@@ -4,9 +4,30 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { getAuthData, isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
+
+function toNumber(value: any): number {
+  if (typeof value === "bigint") return Number(value);
+  return Number(value || 0);
+}
+
+function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
+  const perKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / perKemasan);
+  const jumlahPcs = totalItem % perKemasan;
+  return { jumlahDus, jumlahPcs };
+}
+
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
+  if (item.totalItem !== undefined && item.totalItem !== null) {
+    return toNumber(item.totalItem);
+  }
+  const jumlahDus = toNumber(item.jumlahDus);
+  const jumlahPcs = toNumber(item.jumlahPcs);
+  return jumlahDus * jumlahPerKemasan + jumlahPcs;
+}
 
 // Deep serialize to handle all BigInt in nested objects
 function deepSerialize(obj: any): any {
@@ -45,31 +66,22 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let totalDiskonItem = 0;
 
   const calculatedItems = items.map((item) => {
-    const jumlahDus =
-      typeof item.jumlahDus === "bigint"
-        ? Number(item.jumlahDus)
-        : item.jumlahDus;
-    const jumlahPcs =
-      typeof item.jumlahPcs === "bigint"
-        ? Number(item.jumlahPcs)
-        : item.jumlahPcs;
-    const hargaJual =
-      typeof item.hargaJual === "bigint"
-        ? Number(item.hargaJual)
-        : item.hargaJual;
-    const diskonPerItem =
-      typeof item.diskonPerItem === "bigint"
-        ? Number(item.diskonPerItem)
-        : item.diskonPerItem;
-    const jumlahPerkardus =
-      typeof item.barang?.jumlahPerkardus === "bigint"
-        ? Number(item.barang.jumlahPerkardus)
-        : item.barang?.jumlahPerkardus || 1;
+    const hargaJual = toNumber(item.hargaJual);
+    const diskonPerItem = toNumber(item.diskonPerItem);
+    const jumlahPerKemasan = toNumber(
+      item.barang?.jumlahPerKemasan ?? item.barang?.jumlahPerkardus ?? 1
+    );
 
-    const totalPcs = jumlahDus * jumlahPerkardus + (jumlahPcs || 0);
+    const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+    const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+      totalPcs,
+      jumlahPerKemasan
+    );
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerkardus) * jumlahPcs) : 0;
+      jumlahPcs > 0
+        ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
+        : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
     const diskon = diskonPerItem * jumlahDus;
 
@@ -230,7 +242,9 @@ export async function POST(request: NextRequest) {
   }
   try {
     const body = await request.json();
-    const { userId, salesId } = body;
+    const { salesId } = body;
+    const authData = await getAuthData();
+    const userId = authData?.userId ? parseInt(authData.userId, 10) : undefined;
 
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
@@ -266,7 +280,7 @@ export async function POST(request: NextRequest) {
       statusTransaksi: "KERANJANG",
       statusPembayaran: "HUTANG",
       tanggalJatuhTempo,
-      userId,
+      ...(userId ? { userId } : {}),
     };
 
     // Tambahkan salesId jika ada

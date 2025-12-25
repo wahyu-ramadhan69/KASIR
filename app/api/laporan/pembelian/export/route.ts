@@ -214,7 +214,11 @@ async function exportSummary(
     let jumlahItems = pb.items.length;
 
     pb.items.forEach((item: any) => {
-      totalDus += toNumber(item.jumlahDus);
+      const totalItem = toNumber(item.totalItem);
+      const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan);
+      const jumlahDus =
+        jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
+      totalDus += jumlahDus;
     });
 
     grandTotal.subtotal += subtotal;
@@ -392,16 +396,18 @@ async function exportDetail(
     let transaksiTotal = { subtotal: 0, diskon: 0, total: 0 };
 
     pembelian.items.forEach((item: any, itemIdx: number) => {
-      const jumlahDus = toNumber(item.jumlahDus);
+      const totalItem = toNumber(item.totalItem);
       const hargaPokok = toNumber(item.hargaPokok);
       const diskonPerItem = toNumber(item.diskonPerItem);
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       const ukuran = toNumber(item.barang.ukuran);
+      const jumlahDus =
+        jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
 
       const totalHarga = hargaPokok * jumlahDus;
       const totalDiskon = diskonPerItem * jumlahDus;
       const subtotal = totalHarga - totalDiskon;
-      const totalPcs = jumlahDus * jumlahPerKemasan;
+      const totalPcs = totalItem;
 
       transaksiTotal.subtotal += totalHarga;
       transaksiTotal.diskon += totalDiskon;
@@ -653,7 +659,11 @@ async function exportYearly(year: number): Promise<NextResponse> {
 
       pb.items.forEach((item) => {
         monthTotal.items += 1;
-        monthTotal.dus += toNumber(item.jumlahDus);
+        const totalItem = toNumber(item.totalItem);
+        const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan);
+        const jumlahDus =
+          jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
+        monthTotal.dus += jumlahDus;
       });
     });
 

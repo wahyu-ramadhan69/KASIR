@@ -53,11 +53,27 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
+    const withoutPerjalanan =
+      searchParams.get("withoutPerjalanan") === "true";
+    const withKaryawan = searchParams.get("withKaryawan") === "true";
+    const karyawanId = searchParams.get("karyawanId");
 
     const where: any = {};
 
     if (barangId) {
       where.barangId = parseInt(barangId);
+    }
+
+    if (withoutPerjalanan) {
+      where.perjalananId = null;
+    } else if (withKaryawan) {
+      where.perjalananId = { not: null };
+    }
+
+    if (karyawanId) {
+      where.perjalanan = {
+        karyawanId: parseInt(karyawanId),
+      };
     }
 
     if (kondisiBarang && kondisiBarang !== "all") {
@@ -96,6 +112,20 @@ export async function GET(request: NextRequest) {
             jumlahPerKemasan: true,
           },
         },
+        ...(withKaryawan && {
+          perjalanan: {
+            select: {
+              id: true,
+              karyawan: {
+                select: {
+                  id: true,
+                  nama: true,
+                  nik: true,
+                },
+              },
+            },
+          },
+        }),
       },
       orderBy: { tanggalPengembalian: "desc" },
       skip,

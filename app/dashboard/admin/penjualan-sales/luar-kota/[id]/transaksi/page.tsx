@@ -75,6 +75,7 @@ interface TransaksiItem {
   barangId: number;
   jumlahDus: number;
   jumlahPcs: number;
+  totalItem?: number;
   hargaJual: number;
   diskonPerItem: number;
   barang: ManifestBarang["barang"];
@@ -134,6 +135,28 @@ const InputTransaksiPage = () => {
   const [customerHutangInfo, setCustomerHutangInfo] =
     useState<CustomerHutangInfo | null>(null);
   const [loadingHutangInfo, setLoadingHutangInfo] = useState(false);
+
+  const deriveDusPcsFromTotal = (
+    totalItem: number,
+    jumlahPerKemasan: number
+  ) => {
+    if (jumlahPerKemasan <= 1) {
+      return { jumlahDus: 0, jumlahPcs: totalItem };
+    }
+    const jumlahDus = Math.floor(totalItem / jumlahPerKemasan);
+    const jumlahPcs = totalItem % jumlahPerKemasan;
+    return { jumlahDus, jumlahPcs };
+  };
+
+  const getTotalItemPcs = (
+    item: Pick<TransaksiItem, "totalItem" | "jumlahDus" | "jumlahPcs">,
+    jumlahPerKemasan: number
+  ) => {
+    if (item.totalItem !== undefined && item.totalItem !== null) {
+      return Number(item.totalItem);
+    }
+    return item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
+  };
 
   useEffect(() => {
     if (id) {
@@ -241,8 +264,11 @@ const InputTransaksiPage = () => {
       ...items,
       {
         barangId: manifest.barangId,
-        jumlahDus: 0,
-        jumlahPcs: 0,
+        jumlahDus: manifest.barang.jumlahPerKemasan > 1 ? 1 : 0,
+        jumlahPcs: manifest.barang.jumlahPerKemasan > 1 ? 0 : 1,
+        totalItem: manifest.barang.jumlahPerKemasan > 1
+          ? Number(manifest.barang.jumlahPerKemasan)
+          : 1,
         hargaJual: parseInt(manifest.barang.hargaJual.toString()),
         diskonPerItem: 0,
         barang: manifest.barang,
@@ -275,7 +301,21 @@ const InputTransaksiPage = () => {
         const jumlahPerDus = Number(manifest.barang.jumlahPerKemasan) || 0;
         const maxTotalPcs = Number(manifest.totalItem); // totalItem adalah stok tersisa
 
-        const totalPcs = nextItem.jumlahDus * jumlahPerDus + nextItem.jumlahPcs;
+        let nextJumlahDus = nextItem.jumlahDus;
+        let nextJumlahPcs = nextItem.jumlahPcs;
+
+        if (jumlahPerDus <= 1) {
+          nextJumlahDus = 0;
+          if (field === "jumlahPcs") {
+            nextJumlahPcs = Math.max(0, value);
+          }
+        } else if (field === "jumlahDus") {
+          nextJumlahDus = Math.max(0, value);
+        } else {
+          nextJumlahPcs = Math.max(0, value);
+        }
+
+        const totalPcs = nextJumlahDus * jumlahPerDus + nextJumlahPcs;
 
         if (totalPcs > maxTotalPcs) {
           const maxDus = jumlahPerDus
@@ -285,12 +325,18 @@ const InputTransaksiPage = () => {
 
           return {
             ...nextItem,
-            jumlahDus: maxDus,
-            jumlahPcs: remainingPcs,
+            jumlahDus: jumlahPerDus <= 1 ? 0 : maxDus,
+            jumlahPcs: jumlahPerDus <= 1 ? maxTotalPcs : remainingPcs,
+            totalItem: maxTotalPcs,
           };
         }
 
-        return nextItem;
+        return {
+          ...nextItem,
+          jumlahDus: nextJumlahDus,
+          jumlahPcs: nextJumlahPcs,
+          totalItem: totalPcs,
+        };
       })
     );
   };
@@ -318,12 +364,13 @@ const InputTransaksiPage = () => {
       );
       if (!manifest) return total;
 
-      const totalPcs =
-        item.jumlahDus * parseInt(manifest.barang.jumlahPerKemasan.toString()) +
-        item.jumlahPcs;
-      const itemTotal = totalPcs * item.hargaJual - item.diskonPerItem;
-      return total + itemTotal;
-    }, 0);
+        const jumlahPerKemasan = parseInt(
+          manifest.barang.jumlahPerKemasan.toString()
+        );
+        const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+        const itemTotal = totalPcs * item.hargaJual - item.diskonPerItem;
+        return total + itemTotal;
+      }, 0);
   };
 
   const handleDiskonNotaChange = (value: string, type: "rupiah" | "persen") => {
@@ -372,7 +419,10 @@ const InputTransaksiPage = () => {
   };
 
   const hasItemsWithQuantity = () => {
-    return items.some((item) => item.jumlahDus > 0 || item.jumlahPcs > 0);
+    return items.some((item) => {
+      const totalPcs = getTotalItemPcs(item, item.barang.jumlahPerKemasan);
+      return totalPcs > 0;
+    });
   };
 
   const handleItemDiskonChange = (
@@ -569,6 +619,10 @@ const InputTransaksiPage = () => {
           barangId: item.barangId,
           jumlahDus: item.jumlahDus,
           jumlahPcs: item.jumlahPcs,
+          totalItem:
+            item.totalItem !== undefined && item.totalItem !== null
+              ? item.totalItem
+              : item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs,
           hargaJual: item.hargaJual,
           diskonPerItem: item.diskonPerItem,
         })),
@@ -1168,8 +1222,10 @@ const InputTransaksiPage = () => {
                       const jumlahPerDus =
                         Number(m.barang.jumlahPerKemasan) || 0;
                       const manifestTotalPcs = Number(m.totalItem);
-                      const currentTotalPcs =
-                        item.jumlahDus * jumlahPerDus + item.jumlahPcs;
+                      const currentTotalPcs = getTotalItemPcs(
+                        item,
+                        jumlahPerDus
+                      );
                       const canAddDus =
                         jumlahPerDus > 0 &&
                         currentTotalPcs + jumlahPerDus <= manifestTotalPcs;
@@ -1905,18 +1961,34 @@ const InputTransaksiPage = () => {
                       key={index}
                       className="text-sm pb-2 border-b last:border-b-0"
                     >
+                      {(() => {
+                        const jumlahPerKemasan =
+                          item.barang?.jumlahPerKemasan || 1;
+                        const totalPcs = getTotalItemPcs(
+                          item,
+                          jumlahPerKemasan
+                        );
+                        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+                          totalPcs,
+                          jumlahPerKemasan
+                        );
+                        return (
+                          <>
                       <div className="flex justify-between font-bold text-gray-900">
                         <span>{item.barang?.namaBarang}</span>
                         <span>{formatRupiah(item.hargaJual)}</span>
                       </div>
                       <div className="text-xs text-gray-600 mt-1">
-                        {item.jumlahDus} dus + {item.jumlahPcs} pcs
+                        {jumlahDus} dus + {jumlahPcs} pcs
                         {item.diskonPerItem > 0 && (
                           <span className="text-red-600 ml-2">
                             (Diskon: {formatRupiah(item.diskonPerItem)})
                           </span>
                         )}
                       </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>

@@ -70,7 +70,6 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             kodePenjualan: true,
-            namaCustomer: true,
             totalHarga: true,
             statusPembayaran: true,
             customer: {

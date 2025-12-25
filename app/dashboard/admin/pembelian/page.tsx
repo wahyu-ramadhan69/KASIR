@@ -219,15 +219,24 @@ const PembelianPage = () => {
         await fetchBarangBySupplier(pembelian.supplier.id);
       }
 
-      const newCartItems: CartItem[] = pembelian.items.map((item: any) => ({
+      const newCartItems: CartItem[] = pembelian.items.map((item: any) => {
+        const jumlahPerKemasan = Number(item.barang?.jumlahPerKemasan) || 0;
+        const derivedJumlahDus =
+          jumlahPerKemasan > 0
+            ? Math.floor(Number(item.totalItem || 0) / jumlahPerKemasan)
+            : 0;
+
+        return {
         tempId: `item-${item.id}`,
         itemId: item.id,
         barangId: item.barangId,
-        jumlahDus: Number(item.jumlahDus),
+        jumlahDus:
+          item.jumlahDus !== undefined ? Number(item.jumlahDus) : derivedJumlahDus,
         hargaPokok: Number(item.hargaPokok),
         diskonPerItem: Number(item.diskonPerItem),
         barang: item.barang,
-      }));
+        };
+      });
 
       const diskonTypes: { [key: string]: "rupiah" | "persen" } = {};
       const diskonValues: { [key: string]: string } = {};
@@ -498,7 +507,7 @@ const PembelianPage = () => {
 
   const handleOpenCheckoutModal = async () => {
     if (cartItems.length === 0) {
-      toast.error("Keranjang masih kosong");
+      toast.error("Item dibeli masih kosong");
       return;
     }
 
@@ -519,7 +528,7 @@ const PembelianPage = () => {
   // Checkout
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
-      toast.error("Keranjang masih kosong");
+      toast.error("Item dibeli masih kosong");
       return;
     }
 
@@ -543,6 +552,7 @@ const PembelianPage = () => {
             id: item.itemId,
             barangId: item.barangId,
             jumlahDus: item.jumlahDus,
+            totalItem: item.jumlahDus * item.barang.jumlahPerKemasan,
             hargaPokok: item.hargaPokok,
             diskonPerItem: item.diskonPerItem,
           })),
@@ -602,6 +612,7 @@ const PembelianPage = () => {
         const itemData = {
           barangId: item.barangId,
           jumlahDus: item.jumlahDus,
+          totalItem: item.jumlahDus * item.barang.jumlahPerKemasan,
           hargaPokok: item.hargaPokok,
           diskonPerItem: item.diskonPerItem,
         };
@@ -999,7 +1010,7 @@ const PembelianPage = () => {
                           {isInCart && (
                             <div className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-lg z-10 animate-in fade-in zoom-in duration-300">
                               <ShoppingCart className="w-2.5 h-2.5" />
-                              Di Keranjang
+                              Di Item Dibeli
                             </div>
                           )}
 
@@ -1081,13 +1092,15 @@ const PembelianPage = () => {
             </div>
           </div>
 
-          {/* Right Side - 32% Keranjang */}
+          {/* Right Side - 32% Item Dibeli */}
           <div className="w-[32%] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
             <div className="p-4 bg-gray-50 border-b flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="w-5 h-5 text-emerald-600" />
-                  <h2 className="text-sm font-bold text-gray-700">Keranjang</h2>
+                  <h2 className="text-sm font-bold text-gray-700">
+                    Item Dibeli
+                  </h2>
                 </div>
                 <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-md font-bold">
                   {cartItems.length} item
@@ -1151,6 +1164,9 @@ const PembelianPage = () => {
                                   "jumlahDus",
                                   Math.max(1, parseInt(e.target.value) || 1)
                                 )
+                              }
+                              onWheel={(e) =>
+                                (e.target as HTMLInputElement).blur()
                               }
                               className="w-12 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                               min="1"
@@ -1229,7 +1245,7 @@ const PembelianPage = () => {
                       <ShoppingCart className="w-12 h-12 text-gray-400" />
                     </div>
                     <p className="text-gray-500 font-medium">
-                      Keranjang masih kosong
+                      Item dibeli masih kosong
                     </p>
                     <p className="text-gray-400 text-xs mt-1">
                       Tambahkan produk untuk memulai

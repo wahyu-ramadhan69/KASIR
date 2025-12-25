@@ -113,7 +113,7 @@ model PembelianItem {
   pembelianId   Int
   barang        Barang          @relation(fields: [barangId], references: [id])
   barangId      Int
-  jumlahDus     BigInt          @default(0)
+  totalItem     BigInt          @default(0)
   hargaPokok    BigInt
   diskonPerItem BigInt          @default(0)
   createdAt     DateTime        @default(now())
@@ -125,17 +125,14 @@ model PenjualanHeader {
   kodePenjualan     String           @unique
   customer          Customer?        @relation(fields: [customerId], references: [id])
   customerId        Int?
-  namaCustomer      String?
   karyawan          Karyawan?        @relation(fields: [karyawanId], references: [id])
   karyawanId        Int?
-  namaSales         String?
   subtotal          BigInt           @default(0)
   diskonNota        BigInt           @default(0)
   totalHarga        BigInt           @default(0)
   jumlahDibayar     BigInt           @default(0)
   kembalian         BigInt           @default(0)
   keterangan        String?
-  rutePengiriman    String?
   metodePembayaran  MetodePembayaran @default(CASH)
   statusPembayaran  StatusPembayaran @default(HUTANG)
   statusTransaksi   StatusTransaksi  @default(KERANJANG)
@@ -153,8 +150,7 @@ model PenjualanItem {
   id            Int             @id @default(autoincrement())
   penjualanId   Int
   barangId      Int
-  jumlahDus     BigInt          @default(0)
-  jumlahPcs     BigInt          @default(0)
+  totalItem     BigInt          @default(0)
   hargaJual     BigInt
   hargaBeli     BigInt          @default(0)
   diskonPerItem BigInt          @default(0)
@@ -163,7 +159,6 @@ model PenjualanItem {
   barang        Barang          @relation(fields: [barangId], references: [id])
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-
   @@index([penjualanId])
   @@index([barangId])
 }

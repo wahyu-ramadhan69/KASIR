@@ -26,6 +26,22 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
+  const perKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / perKemasan);
+  const jumlahPcs = totalItem % perKemasan;
+  return { jumlahDus, jumlahPcs };
+}
+
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
+  if (item.totalItem !== undefined && item.totalItem !== null) {
+    return toNumber(item.totalItem);
+  }
+  const jumlahDus = toNumber(item.jumlahDus);
+  const jumlahPcs = toNumber(item.jumlahPcs);
+  return jumlahDus * jumlahPerKemasan + jumlahPcs;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -127,11 +143,14 @@ export async function GET(request: NextRequest) {
       totalPenjualan += toNumber(penjualan.totalHarga);
 
       penjualan.items.forEach((item) => {
-        const jumlahDus = toNumber(item.jumlahDus);
-        const jumlahPcs = toNumber(item.jumlahPcs);
         const hargaBeli = toNumber(item.hargaBeli);
         const laba = toNumber(item.laba);
         const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+        const totalPcsItem = getTotalItemPcs(item, jumlahPerKemasan);
+        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+          totalPcsItem,
+          jumlahPerKemasan
+        );
 
         // Calculate modal
         const modalDus = hargaBeli * jumlahDus;
@@ -147,7 +166,7 @@ export async function GET(request: NextRequest) {
         // Count items
         jumlahItem++;
         totalDus += jumlahDus;
-        totalPcs += jumlahDus * jumlahPerKemasan + jumlahPcs;
+        totalPcs += totalPcsItem;
       });
     });
 
@@ -185,11 +204,14 @@ export async function GET(request: NextRequest) {
       totalPenjualanAll += toNumber(penjualan.totalHarga);
 
       penjualan.items.forEach((item) => {
-        const jumlahDus = toNumber(item.jumlahDus);
-        const jumlahPcs = toNumber(item.jumlahPcs);
         const hargaBeli = toNumber(item.hargaBeli);
         const laba = toNumber(item.laba);
         const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+        const totalPcsItem = getTotalItemPcs(item, jumlahPerKemasan);
+        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+          totalPcsItem,
+          jumlahPerKemasan
+        );
 
         const modalDus = hargaBeli * jumlahDus;
         const modalPcs =
@@ -202,7 +224,7 @@ export async function GET(request: NextRequest) {
 
         jumlahItemAll++;
         totalDusAll += jumlahDus;
-        totalPcsAll += jumlahDus * jumlahPerKemasan + jumlahPcs;
+        totalPcsAll += totalPcsItem;
       });
     });
 

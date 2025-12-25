@@ -158,12 +158,10 @@ export async function POST(
 
     const oldQtyByBarangId = new Map<number, number>();
     for (const item of pembelian.items) {
-      const jumlahDus = bigIntToNumber(item.jumlahDus);
-      const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
-      const totalUnit = jumlahDus * jumlahPerKemasan;
+      const totalItem = bigIntToNumber(item.totalItem);
       oldQtyByBarangId.set(
         item.barangId,
-        (oldQtyByBarangId.get(item.barangId) || 0) + totalUnit
+        (oldQtyByBarangId.get(item.barangId) || 0) + totalItem
       );
     }
 
@@ -219,12 +217,14 @@ export async function POST(
         }
       }
 
-      const jumlahDus = Number(item.jumlahDus) || 0;
       const jumlahPerKemasan = bigIntToNumber(barang.jumlahPerKemasan);
-      const totalUnit = jumlahDus * jumlahPerKemasan;
+      const normalizedTotalItem =
+        item.totalItem !== undefined
+          ? Number(item.totalItem)
+          : Number(item.jumlahDus) * jumlahPerKemasan;
       newQtyByBarangId.set(
         barangId,
-        (newQtyByBarangId.get(barangId) || 0) + totalUnit
+        (newQtyByBarangId.get(barangId) || 0) + normalizedTotalItem
       );
     }
 
@@ -263,7 +263,16 @@ export async function POST(
 
     const subtotal = itemsPayload.reduce((sum: number, item: any) => {
       const hargaPokok = Number(item.hargaPokok) || 0;
-      const jumlahDus = Number(item.jumlahDus) || 0;
+      const barang = barangById.get(Number(item.barangId));
+      const jumlahPerKemasan = barang
+        ? bigIntToNumber(barang.jumlahPerKemasan)
+        : 0;
+      const normalizedTotalItem =
+        item.totalItem !== undefined
+          ? Number(item.totalItem)
+          : Number(item.jumlahDus) * jumlahPerKemasan;
+      const jumlahDus =
+        jumlahPerKemasan > 0 ? normalizedTotalItem / jumlahPerKemasan : 0;
       const diskonPerItem = Number(item.diskonPerItem) || 0;
       return sum + (hargaPokok * jumlahDus - diskonPerItem * jumlahDus);
     }, 0);
@@ -326,9 +335,16 @@ export async function POST(
       for (const item of itemsPayload) {
         const itemId = item.id ? Number(item.id) : null;
         const barangId = Number(item.barangId);
-        const jumlahDus = Number(item.jumlahDus) || 0;
         const hargaPokok = Number(item.hargaPokok) || 0;
         const diskonPerItem = Number(item.diskonPerItem) || 0;
+        const barang = barangById.get(barangId);
+        const jumlahPerKemasan = barang
+          ? bigIntToNumber(barang.jumlahPerKemasan)
+          : 0;
+        const normalizedTotalItem =
+          item.totalItem !== undefined
+            ? Number(item.totalItem)
+            : Number(item.jumlahDus) * jumlahPerKemasan;
 
         hargaPokokByBarangId.set(barangId, hargaPokok);
 
@@ -336,7 +352,7 @@ export async function POST(
           await tx.pembelianItem.update({
             where: { id: itemId },
             data: {
-              jumlahDus: BigInt(jumlahDus),
+              totalItem: BigInt(normalizedTotalItem),
               hargaPokok: BigInt(hargaPokok),
               diskonPerItem: BigInt(diskonPerItem),
             },
@@ -347,7 +363,7 @@ export async function POST(
             data: {
               pembelianId,
               barangId,
-              jumlahDus: BigInt(jumlahDus),
+              totalItem: BigInt(normalizedTotalItem),
               hargaPokok: BigInt(hargaPokok),
               diskonPerItem: BigInt(diskonPerItem),
             },
@@ -392,7 +408,9 @@ export async function POST(
       }
 
       const updateData: any = {
-        supplierId: targetSupplierId,
+        supplier: {
+          connect: { id: targetSupplierId },
+        },
         subtotal: BigInt(subtotal),
         diskonNota: BigInt(diskonNota),
         totalHarga: BigInt(totalHarga),
@@ -442,14 +460,16 @@ export async function POST(
       },
       items: updated.items.map((item) => {
         const hargaPokok = bigIntToNumber(item.hargaPokok);
-        const jumlahDus = bigIntToNumber(item.jumlahDus);
+        const totalItem = bigIntToNumber(item.totalItem);
         const diskonPerItem = bigIntToNumber(item.diskonPerItem);
         const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+        const jumlahDus =
+          jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
 
         return {
           namaBarang: item.barang.namaBarang,
           jumlahDus,
-          totalUnit: jumlahDus * jumlahPerKemasan,
+          totalUnit: totalItem,
           hargaPokok,
           diskonPerItem,
           totalHarga: hargaPokok * jumlahDus,

@@ -295,6 +295,20 @@ const LaporanPembelianPage = () => {
     }).format(number);
   };
 
+  const formatNumber = (num: number): string => {
+    const sign = num < 0 ? "-" : "";
+    const abs = Math.abs(num);
+    const formatShort = (value: number, suffix: string) => {
+      const rounded = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
+      return `${sign}${rounded} ${suffix}`;
+    };
+
+    if (abs >= 1000000000) return formatShort(abs / 1000000000, "M");
+    if (abs >= 1000000) return formatShort(abs / 1000000, "jt");
+    if (abs >= 1000) return formatShort(abs / 1000, "rb");
+    return `${num}`;
+  };
+
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString("id-ID", {
       day: "2-digit",
@@ -390,7 +404,7 @@ const LaporanPembelianPage = () => {
             <DollarSign className="w-8 h-8 text-blue-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {formatRupiah(stats.totalPembelian)}
+            Rp {formatNumber(stats.totalPembelian)}
           </p>
           <p className="text-xs text-gray-500 mt-1">
             {stats.jumlahTransaksi} transaksi
@@ -403,7 +417,7 @@ const LaporanPembelianPage = () => {
             <TrendingDown className="w-8 h-8 text-red-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {formatRupiah(stats.totalDiskon)}
+            Rp {formatNumber(stats.totalDiskon)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Potongan harga</p>
         </div>

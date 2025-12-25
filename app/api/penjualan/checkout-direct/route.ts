@@ -9,6 +9,27 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+function toNumber(value: any): number {
+  if (typeof value === "bigint") return Number(value);
+  return Number(value || 0);
+}
+
+function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
+  const perKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / perKemasan);
+  const jumlahPcs = totalItem % perKemasan;
+  return { jumlahDus, jumlahPcs };
+}
+
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
+  if (item.totalItem !== undefined && item.totalItem !== null) {
+    return toNumber(item.totalItem);
+  }
+  const jumlahDus = toNumber(item.jumlahDus);
+  const jumlahPcs = toNumber(item.jumlahPcs);
+  return jumlahDus * jumlahPerKemasan + jumlahPcs;
+}
+
 // Deep serialize to handle all BigInt in nested objects
 function deepSerialize(obj: any): any {
   if (obj === null || obj === undefined) {
@@ -122,21 +143,24 @@ export async function POST(request: NextRequest) {
           throw new Error(`Barang dengan ID ${item.barangId} tidak ditemukan`);
         }
 
-        const jumlahPerkardus = Number(barang.jumlahPerKemasan);
-        const totalStokDiperlukan =
-          item.jumlahDus * jumlahPerkardus + (item.jumlahPcs || 0);
+        const jumlahPerKemasan = Number(barang.jumlahPerKemasan);
+        const totalStokDiperlukan = getTotalItemPcs(item, jumlahPerKemasan);
+        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+          totalStokDiperlukan,
+          jumlahPerKemasan
+        );
 
         if (Number(barang.stok) < totalStokDiperlukan) {
           throw new Error(`Stok ${barang.namaBarang} tidak mencukupi`);
         }
 
-        const hargaTotal = item.hargaJual * item.jumlahDus;
+        const hargaTotal = item.hargaJual * jumlahDus;
         const hargaPcs =
-          item.jumlahPcs > 0
-            ? Math.round((item.hargaJual / jumlahPerkardus) * item.jumlahPcs)
+          jumlahPcs > 0
+            ? Math.round((item.hargaJual / jumlahPerKemasan) * jumlahPcs)
             : 0;
         const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
-        const diskon = item.diskonPerItem * item.jumlahDus;
+        const diskon = item.diskonPerItem * jumlahDus;
 
         subtotal += totalHargaSebelumDiskon;
         totalDiskonItem += diskon;
@@ -233,12 +257,13 @@ export async function POST(request: NextRequest) {
       // 2. Buat penjualan items
       const createdItems = [];
       for (const item of itemsWithCalculation) {
+        const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan);
+        const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
         const penjualanItem = await tx.penjualanItem.create({
           data: {
             penjualanId: penjualanHeader.id,
             barangId: item.barangId,
-            jumlahDus: item.jumlahDus,
-            jumlahPcs: item.jumlahPcs || 0,
+            totalItem: totalPcs,
             hargaJual: item.hargaJual,
             diskonPerItem: item.diskonPerItem || 0,
           },

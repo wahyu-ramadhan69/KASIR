@@ -49,6 +49,7 @@ interface Barang {
   hargaJual: number;
   stok: number;
   jumlahPerKemasan: number;
+  jenisKemasan?: string;
   ukuran: number;
   satuan: string;
 }
@@ -58,6 +59,7 @@ interface PenjualanItem {
   barangId: number;
   jumlahDus: number;
   jumlahPcs: number;
+  totalItem?: number;
   hargaJual: number;
   diskonPerItem: number;
   barang: Barang;
@@ -1007,18 +1009,28 @@ const RiwayatPenjualanPage = () => {
                     </thead>
                     <tbody className="divide-y">
                       {selectedPenjualan.items?.map((item) => {
+                        const jumlahPerKemasan =
+                          item.barang?.jumlahPerKemasan || 1;
+                        const labelKemasan =
+                          item.barang?.jenisKemasan || "dus";
+                        const totalItem =
+                          item.totalItem ??
+                          item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
+                        const jumlahDus = Math.floor(
+                          totalItem / jumlahPerKemasan
+                        );
+                        const jumlahPcs = totalItem % jumlahPerKemasan;
+
                         const hargaPcs =
-                          item.jumlahPcs > 0
+                          jumlahPcs > 0
                             ? Math.round(
-                                (item.hargaJual /
-                                  item.barang.jumlahPerKemasan) *
-                                  item.jumlahPcs
+                                (item.hargaJual / jumlahPerKemasan) * jumlahPcs
                               )
                             : 0;
                         const subtotal =
-                          item.hargaJual * item.jumlahDus +
+                          item.hargaJual * jumlahDus +
                           hargaPcs -
-                          item.diskonPerItem * item.jumlahDus;
+                          item.diskonPerItem * jumlahDus;
 
                         return (
                           <tr key={item.id}>
@@ -1027,28 +1039,28 @@ const RiwayatPenjualanPage = () => {
                                 {item.barang?.namaBarang}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {item.barang?.jumlahPerKemasan} pcs/dus
+                                {jumlahPerKemasan} pcs/{labelKemasan}
                               </p>
                             </td>
                             <td className="px-3 py-2 text-center">
-                              {item.jumlahDus > 0 && (
+                              {jumlahDus > 0 && (
                                 <span className="block">
-                                  {item.jumlahDus} dus
+                                  {jumlahDus} {labelKemasan}
                                 </span>
                               )}
-                              {item.jumlahPcs > 0 && (
+                              {jumlahPcs > 0 && (
                                 <span className="block text-gray-500">
-                                  +{item.jumlahPcs} pcs
+                                  +{jumlahPcs} pcs
                                 </span>
                               )}
                             </td>
                             <td className="px-3 py-2 text-right">
-                              {formatRupiah(item.hargaJual)}/dus
+                              {formatRupiah(item.hargaJual)}/{labelKemasan}
                             </td>
                             <td className="px-3 py-2 text-right text-red-500">
                               {item.diskonPerItem > 0
                                 ? `-${formatRupiah(
-                                    item.diskonPerItem * item.jumlahDus
+                                    item.diskonPerItem * jumlahDus
                                   )}`
                                 : "-"}
                             </td>

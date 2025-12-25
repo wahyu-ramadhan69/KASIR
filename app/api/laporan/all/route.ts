@@ -9,10 +9,70 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
+  const perKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / perKemasan);
+  const jumlahPcs = totalItem % perKemasan;
+  return { jumlahDus, jumlahPcs };
+}
+
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
+  if (item.totalItem !== undefined && item.totalItem !== null) {
+    return toNumber(item.totalItem);
+  }
+  const jumlahDus = toNumber(item.jumlahDus);
+  const jumlahPcs = toNumber(item.jumlahPcs);
+  return jumlahDus * jumlahPerKemasan + jumlahPcs;
+}
+
 function getCustomerOrSalesName(penjualan: any): string {
   if (penjualan.customer) return penjualan.customer.nama;
   if (penjualan.sales) return penjualan.sales.namaSales;
   return penjualan.namaCustomer || penjualan.namaSales || "-";
+}
+
+function getDijualOleh(p: any): string {
+  if (p.perjalananSalesId) return "Kanvas Luar Kota";
+  if (p.karyawanId) return "Kanvas Dalam Kota";
+  return "Toko";
+}
+
+function getPicPenjualan(p: any, userNameById: Map<number, string>): string {
+  const tipe = getDijualOleh(p);
+  if (tipe === "Toko") {
+    if (p.userId && userNameById.has(p.userId)) {
+      return userNameById.get(p.userId) || "-";
+    }
+    return "-";
+  }
+
+  return (
+    p.perjalananSales?.karyawan?.nama ||
+    p.karyawan?.nama ||
+    p.namaSales ||
+    "-"
+  );
+}
+
+async function buildUserNameMap(penjualanList: any[]) {
+  const userIds = Array.from(
+    new Set(
+      penjualanList
+        .map((penjualan) => penjualan.userId)
+        .filter((userId): userId is number => Boolean(userId))
+    )
+  );
+
+  if (userIds.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, username: true },
+  });
+
+  return new Map<number, string>(users.map((user) => [user.id, user.username]));
 }
 
 function formatDateRange(startDate?: string, endDate?: string): string {
@@ -120,6 +180,16 @@ export async function GET(request: NextRequest) {
     // ====================================
     await generateLaporanLabaBarang(workbook, dateFilter, startDate, endDate);
 
+    // ====================================
+    // SHEET 6: PENGEMBALIAN BARANG (RUSAK & KADALUARSA)
+    // ====================================
+    await generateLaporanPengembalianBarang(
+      workbook,
+      dateFilter,
+      startDate,
+      endDate
+    );
+
     const buffer = await workbook.xlsx.writeBuffer();
     const dateRange = formatDateRange(
       startDate || undefined,
@@ -146,6 +216,192 @@ export async function GET(request: NextRequest) {
     );
   } finally {
     await prisma.$disconnect();
+  }
+}
+
+// ====================================
+// PENGEMBALIAN BARANG (RUSAK & KADALUARSA)
+// ====================================
+async function generateLaporanPengembalianBarang(
+  workbook: ExcelJS.Workbook,
+  dateFilter: any,
+  startDate: string | null,
+  endDate: string | null
+) {
+  const worksheet = workbook.addWorksheet("Pengembalian Rusak");
+
+  const where: any = {
+    kondisiBarang: { in: ["RUSAK", "KADALUARSA"] },
+  };
+
+  if (Object.keys(dateFilter).length > 0) {
+    where.tanggalPengembalian = dateFilter;
+  }
+
+  const pengembalianList = await prisma.pengembalianBarang.findMany({
+    where,
+    orderBy: { tanggalPengembalian: "desc" },
+    include: {
+      barang: {
+        select: {
+          namaBarang: true,
+          jumlahPerKemasan: true,
+          satuan: true,
+        },
+      },
+      perjalanan: {
+        select: {
+          karyawan: {
+            select: {
+              nama: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // Title
+  worksheet.mergeCells("A1:I1");
+  const titleCell = worksheet.getCell("A1");
+  titleCell.value = "PENGEMBALIAN BARANG (RUSAK & KADALUARSA)";
+  titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF2196F3" },
+  };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 30;
+
+  // Periode
+  worksheet.mergeCells("A2:I2");
+  const periodeCell = worksheet.getCell("A2");
+  periodeCell.value = `Periode: ${formatDateRange(
+    startDate || undefined,
+    endDate || undefined
+  )}`;
+  periodeCell.font = { italic: true, size: 11 };
+  periodeCell.alignment = { horizontal: "center" };
+
+  worksheet.getRow(3).height = 5;
+
+  // Headers
+  const headers = [
+    "No",
+    "Tanggal",
+    "Barang",
+    "Kondisi",
+    "Dus",
+    "Pcs",
+    "Total Pcs",
+    "Keterangan",
+    "Sales",
+  ];
+  const headerRow = worksheet.getRow(4);
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF424242" },
+    };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+  });
+  headerRow.height = 20;
+
+  // Column widths
+  worksheet.getColumn(1).width = 5;
+  worksheet.getColumn(2).width = 12;
+  worksheet.getColumn(3).width = 28;
+  worksheet.getColumn(4).width = 14;
+  worksheet.getColumn(5).width = 8;
+  worksheet.getColumn(6).width = 8;
+  worksheet.getColumn(7).width = 12;
+  worksheet.getColumn(8).width = 30;
+  worksheet.getColumn(9).width = 20;
+
+  let currentRow = 5;
+  let totalDus = 0;
+  let totalPcs = 0;
+  let totalAllPcs = 0;
+
+  pengembalianList.forEach((item, index) => {
+    const jumlahDus = toNumber(item.jumlahDus);
+    const jumlahPcs = toNumber(item.jumlahPcs);
+    const perKemasan = toNumber(item.barang?.jumlahPerKemasan);
+    const totalPcsItem = jumlahDus * perKemasan + jumlahPcs;
+
+    totalDus += jumlahDus;
+    totalPcs += jumlahPcs;
+    totalAllPcs += totalPcsItem;
+
+    const row = worksheet.getRow(currentRow);
+    row.getCell(1).value = index + 1;
+    row.getCell(2).value = new Date(
+      item.tanggalPengembalian
+    ).toLocaleDateString("id-ID");
+    row.getCell(3).value = item.barang?.namaBarang || "-";
+    row.getCell(4).value = item.kondisiBarang;
+    row.getCell(5).value = jumlahDus;
+    row.getCell(6).value = jumlahPcs;
+    row.getCell(7).value = totalPcsItem;
+    row.getCell(8).value = item.keterangan || "-";
+    row.getCell(9).value = item.perjalanan?.karyawan?.nama || "-";
+
+    row.getCell(5).alignment = { horizontal: "center" };
+    row.getCell(6).alignment = { horizontal: "center" };
+    row.getCell(7).alignment = { horizontal: "center" };
+
+    for (let i = 1; i <= 9; i++) {
+      row.getCell(i).border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    }
+
+    currentRow++;
+  });
+
+  const totalRow = worksheet.getRow(currentRow);
+  worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+  totalRow.getCell(1).value = "TOTAL";
+  totalRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+  totalRow.getCell(5).value = totalDus;
+  totalRow.getCell(6).value = totalPcs;
+  totalRow.getCell(7).value = totalAllPcs;
+
+  totalRow.height = 25;
+
+  for (let i = 1; i <= 9; i++) {
+    const cell = totalRow.getCell(i);
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+    cell.border = {
+      top: { style: "medium" },
+      left: { style: "thin" },
+      bottom: { style: "medium" },
+      right: { style: "thin" },
+    };
+  }
+
+  for (let i = 10; i <= 50; i++) {
+    const cell = totalRow.getCell(i);
+    cell.style = {};
   }
 }
 
@@ -221,8 +477,8 @@ async function generateLaporanPenjualan(
     "Kode",
     "Tanggal",
     "Customer",
-    "Dus",
-    "Pcs",
+    "Kemasan",
+    "Item",
     "Penjualan",
     "Modal",
     "Laba",
@@ -276,11 +532,14 @@ async function generateLaporanPenjualan(
     let totalPcs = 0;
 
     penjualan.items.forEach((item) => {
-      const jumlahDus = toNumber(item.jumlahDus);
-      const jumlahPcs = toNumber(item.jumlahPcs);
       const hargaBeli = toNumber(item.hargaBeli);
       const laba = toNumber(item.laba);
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+      const totalItem = getTotalItemPcs(item, jumlahPerKemasan);
+      const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+        totalItem,
+        jumlahPerKemasan
+      );
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
@@ -291,10 +550,7 @@ async function generateLaporanPenjualan(
       totalModal += modalDus + modalPcs;
       totalLaba += laba;
       totalDus += jumlahDus;
-      totalPcs +=
-        jumlahPerKemasan > 0
-          ? jumlahDus * jumlahPerKemasan + jumlahPcs
-          : jumlahPcs;
+      totalPcs += totalItem;
     });
 
     const margin = totalHarga > 0 ? (totalLaba / totalHarga) * 100 : 0;
@@ -460,7 +716,7 @@ async function generateLaporanPembelian(
     "Kode",
     "Tanggal",
     "Supplier",
-    "Dus",
+    "Kemasan",
     "Pembelian",
     "Diskon",
   ];
@@ -505,8 +761,16 @@ async function generateLaporanPembelian(
     let totalDus = 0;
 
     pembelian.items.forEach((item) => {
-      const jumlahDus = toNumber(item.jumlahDus);
       const diskonPerItem = toNumber(item.diskonPerItem);
+      const jumlahPerKemasan = Math.max(
+        1,
+        toNumber(item.barang.jumlahPerKemasan)
+      );
+      const totalItem = toNumber(item.totalItem);
+      const { jumlahDus } = deriveDusPcsFromTotal(
+        totalItem,
+        jumlahPerKemasan
+      );
 
       totalDiskon += diskonPerItem * jumlahDus;
       totalDus += jumlahDus;
@@ -616,7 +880,7 @@ async function generateLaporanPengeluaran(
   });
 
   // Title
-  worksheet.mergeCells("A1:F1");
+  worksheet.mergeCells("A1:G1");
   const titleCell = worksheet.getCell("A1");
   titleCell.value = "LAPORAN PENGELUARAN";
   titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
@@ -629,7 +893,7 @@ async function generateLaporanPengeluaran(
   worksheet.getRow(1).height = 30;
 
   // Periode
-  worksheet.mergeCells("A2:F2");
+  worksheet.mergeCells("A2:G2");
   const periodeCell = worksheet.getCell("A2");
   periodeCell.value = `Periode: ${formatDateRange(
     startDate || undefined,
@@ -645,6 +909,7 @@ async function generateLaporanPengeluaran(
     "No",
     "Tanggal",
     "Nama Pengeluaran",
+    "Jenis Pengeluaran",
     "Keterangan",
     "Input By",
     "Jumlah",
@@ -673,9 +938,10 @@ async function generateLaporanPengeluaran(
   worksheet.getColumn(1).width = 5; // No
   worksheet.getColumn(2).width = 12; // Tanggal
   worksheet.getColumn(3).width = 25; // Nama Pengeluaran
-  worksheet.getColumn(4).width = 35; // Keterangan
-  worksheet.getColumn(5).width = 25; // Input By
-  worksheet.getColumn(6).width = 15; // Jumlah
+  worksheet.getColumn(4).width = 18; // Jenis Pengeluaran
+  worksheet.getColumn(5).width = 35; // Keterangan
+  worksheet.getColumn(6).width = 25; // Input By
+  worksheet.getColumn(7).width = 15; // Jumlah
 
   // Data rows
   let currentRow = 5;
@@ -691,16 +957,17 @@ async function generateLaporanPengeluaran(
       pengeluaran.tanggalInput
     ).toLocaleDateString("id-ID"); // Tanggal
     row.getCell(3).value = pengeluaran.namaPengeluaran; // Nama Pengeluaran
-    row.getCell(4).value = pengeluaran.keterangan || "-"; // Keterangan
-    row.getCell(5).value = pengeluaran.user?.email || "-"; // Input By
-    row.getCell(6).value = jumlah; // Jumlah
+    row.getCell(4).value = pengeluaran.jenisPengeluaran; // Jenis Pengeluaran
+    row.getCell(5).value = pengeluaran.keterangan || "-"; // Keterangan
+    row.getCell(6).value = pengeluaran.user?.email || "-"; // Input By
+    row.getCell(7).value = jumlah; // Jumlah
 
     // Format
-    row.getCell(6).numFmt = "#,##0";
-    row.getCell(6).alignment = { horizontal: "right" };
+    row.getCell(7).numFmt = "#,##0";
+    row.getCell(7).alignment = { horizontal: "right" };
 
     // Borders
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
       row.getCell(i).border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -714,15 +981,15 @@ async function generateLaporanPengeluaran(
 
   // Grand total row
   const totalRow = worksheet.getRow(currentRow);
-  worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+  worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
   totalRow.getCell(1).value = "TOTAL";
   totalRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-  totalRow.getCell(6).value = grandTotal;
+  totalRow.getCell(7).value = grandTotal;
 
   totalRow.height = 25;
 
-  // Apply formatting only to columns 1-6 (A-F)
-  for (let i = 1; i <= 6; i++) {
+  // Apply formatting only to columns 1-7 (A-G)
+  for (let i = 1; i <= 7; i++) {
     const cell = totalRow.getCell(i);
 
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -739,14 +1006,14 @@ async function generateLaporanPengeluaran(
     };
   }
 
-  // Clear formatting for columns beyond F (7 onwards) to prevent green bleeding
-  for (let i = 7; i <= 50; i++) {
+  // Clear formatting for columns beyond G (8 onwards) to prevent green bleeding
+  for (let i = 8; i <= 50; i++) {
     const cell = totalRow.getCell(i);
     cell.style = {};
   }
 
-  totalRow.getCell(6).alignment = { horizontal: "right", vertical: "middle" };
-  totalRow.getCell(6).numFmt = "#,##0";
+  totalRow.getCell(7).alignment = { horizontal: "right", vertical: "middle" };
+  totalRow.getCell(7).numFmt = "#,##0";
 }
 
 // ====================================
@@ -787,13 +1054,15 @@ async function generateRingkasan(
 
   // Fetch data for summary
   const wherePenjualan: any = { statusTransaksi: "SELESAI" };
-  const wherePembelian: any = {};
   const wherePengeluaran: any = {};
+  const wherePengembalian: any = {
+    kondisiBarang: { in: ["RUSAK", "KADALUARSA"] },
+  };
 
   if (Object.keys(dateFilter).length > 0) {
     wherePenjualan.tanggalTransaksi = dateFilter;
-    wherePembelian.createdAt = dateFilter;
     wherePengeluaran.tanggalInput = dateFilter;
+    wherePengembalian.tanggalPengembalian = dateFilter;
   }
 
   const penjualanList = await prisma.penjualanHeader.findMany({
@@ -807,12 +1076,20 @@ async function generateRingkasan(
     },
   });
 
-  const pembelianList = await prisma.pembelianHeader.findMany({
-    where: wherePembelian,
-  });
-
   const pengeluaranList = await prisma.pengeluaran.findMany({
     where: wherePengeluaran,
+  });
+
+  const pengembalianList = await prisma.pengembalianBarang.findMany({
+    where: wherePengembalian,
+    include: {
+      barang: {
+        select: {
+          hargaBeli: true,
+          jumlahPerKemasan: true,
+        },
+      },
+    },
   });
 
   // Calculate totals
@@ -824,11 +1101,14 @@ async function generateRingkasan(
     totalPenjualan += toNumber(penjualan.totalHarga);
 
     penjualan.items.forEach((item) => {
-      const jumlahDus = toNumber(item.jumlahDus);
-      const jumlahPcs = toNumber(item.jumlahPcs);
       const hargaBeli = toNumber(item.hargaBeli);
       const laba = toNumber(item.laba);
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+      const totalItem = getTotalItemPcs(item, jumlahPerKemasan);
+      const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+        totalItem,
+        jumlahPerKemasan
+      );
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
@@ -841,10 +1121,20 @@ async function generateRingkasan(
     });
   });
 
-  const totalPembelian = pembelianList.reduce(
-    (sum, p) => sum + toNumber(p.totalHarga),
-    0
-  );
+  const totalPengembalianRusak = pengembalianList.reduce((sum, item) => {
+    const jumlahDus = toNumber(item.jumlahDus);
+    const jumlahPcs = toNumber(item.jumlahPcs);
+    const hargaBeli = toNumber(item.barang?.hargaBeli);
+    const perKemasan = toNumber(item.barang?.jumlahPerKemasan);
+
+    const modalDus = hargaBeli * jumlahDus;
+    const modalPcs =
+      jumlahPcs > 0 && perKemasan > 0
+        ? Math.round((hargaBeli / perKemasan) * jumlahPcs)
+        : 0;
+
+    return sum + modalDus + modalPcs;
+  }, 0);
 
   const totalPengeluaran = pengeluaranList.reduce(
     (sum, p) => sum + toNumber(p.jumlah),
@@ -852,7 +1142,8 @@ async function generateRingkasan(
   );
 
   const labaKotor = totalLabaPenjualan;
-  const labaBersih = labaKotor - totalPengeluaran;
+  const labaBersih =
+    labaKotor - totalPengeluaran - totalPengembalianRusak;
   const marginRataRata =
     totalPenjualan > 0 ? (labaKotor / totalPenjualan) * 100 : 0;
 
@@ -911,10 +1202,10 @@ async function generateRingkasan(
       isBold: true,
     },
     {
-      kategori: "Pembelian",
-      jumlah: pembelianList.length,
-      total: totalPembelian,
-      keterangan: "Total pembelian barang dari supplier",
+      kategori: "Pengembalian Rusak",
+      jumlah: pengembalianList.length,
+      total: totalPengembalianRusak,
+      keterangan: "Total harga beli barang rusak & kadaluarsa",
       color: "FF2196F3",
       isBold: false,
     },
@@ -930,7 +1221,7 @@ async function generateRingkasan(
       kategori: "Laba Bersih",
       jumlah: "-",
       total: labaBersih,
-      keterangan: "Laba Kotor - Pengeluaran",
+      keterangan: "Laba Kotor - Pengeluaran - Pengembalian Rusak",
       color: "FF388E3C",
       isBold: true,
     },
@@ -991,7 +1282,7 @@ async function generateRingkasan(
   const infoRow = worksheet.getRow(currentRow);
   worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
   infoRow.getCell(1).value =
-    "Catatan: Laba Bersih = (Penjualan - Modal Penjualan) - Pengeluaran Operasional";
+    "Catatan: Laba Bersih = (Penjualan - Modal Penjualan) - Pengeluaran Operasional - Pengembalian Barang Rusak";
   infoRow.getCell(1).font = { italic: true, size: 10 };
   infoRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
   infoRow.getCell(1).fill = {
@@ -1026,6 +1317,18 @@ async function generateLaporanPenjualanDetail(
     orderBy: { tanggalTransaksi: "desc" },
     include: {
       customer: true,
+      karyawan: true,
+      perjalananSales: {
+        select: {
+          karyawan: {
+            select: {
+              id: true,
+              nama: true,
+              nik: true,
+            },
+          },
+        },
+      },
       items: {
         include: {
           barang: true,
@@ -1033,9 +1336,10 @@ async function generateLaporanPenjualanDetail(
       },
     },
   });
+  const userNameById = await buildUserNameMap(penjualanList);
 
   // Title
-  worksheet.mergeCells("A1:L1");
+  worksheet.mergeCells("A1:N1");
   const titleCell = worksheet.getCell("A1");
   titleCell.value = "LAPORAN PENJUALAN DETAIL";
   titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
@@ -1048,7 +1352,7 @@ async function generateLaporanPenjualanDetail(
   worksheet.getRow(1).height = 30;
 
   // Periode
-  worksheet.mergeCells("A2:L2");
+  worksheet.mergeCells("A2:N2");
   const periodeCell = worksheet.getCell("A2");
   periodeCell.value = `Periode: ${formatDateRange(
     startDate || undefined,
@@ -1064,11 +1368,13 @@ async function generateLaporanPenjualanDetail(
     "No",
     "Kode Penjualan",
     "Tanggal",
+    "Status Penjualan",
+    "PIC Penjualan",
     "Customer",
     "Nama Barang",
     "Ukuran",
-    "Dus",
-    "Pcs",
+    "Kemasan",
+    "Item",
     "Harga Jual",
     "Modal",
     "Laba",
@@ -1098,15 +1404,17 @@ async function generateLaporanPenjualanDetail(
   worksheet.getColumn(1).width = 5;
   worksheet.getColumn(2).width = 18;
   worksheet.getColumn(3).width = 12;
-  worksheet.getColumn(4).width = 20;
-  worksheet.getColumn(5).width = 25;
-  worksheet.getColumn(6).width = 10;
-  worksheet.getColumn(7).width = 8;
-  worksheet.getColumn(8).width = 8;
-  worksheet.getColumn(9).width = 15;
-  worksheet.getColumn(10).width = 15;
+  worksheet.getColumn(4).width = 16;
+  worksheet.getColumn(5).width = 18;
+  worksheet.getColumn(6).width = 20;
+  worksheet.getColumn(7).width = 25;
+  worksheet.getColumn(8).width = 10;
+  worksheet.getColumn(9).width = 8;
+  worksheet.getColumn(10).width = 8;
   worksheet.getColumn(11).width = 15;
-  worksheet.getColumn(12).width = 10;
+  worksheet.getColumn(12).width = 15;
+  worksheet.getColumn(13).width = 15;
+  worksheet.getColumn(14).width = 10;
 
   let currentRow = 5;
   let itemNumber = 1;
@@ -1122,13 +1430,16 @@ async function generateLaporanPenjualanDetail(
     );
 
     penjualan.items.forEach((item) => {
-      const jumlahDus = toNumber(item.jumlahDus);
-      const jumlahPcs = toNumber(item.jumlahPcs);
       const hargaBeli = toNumber(item.hargaBeli);
       const hargaJual = toNumber(item.hargaJual);
       const laba = toNumber(item.laba);
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       const ukuran = toNumber(item.barang.ukuran);
+      const totalItem = getTotalItemPcs(item, jumlahPerKemasan);
+      const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+        totalItem,
+        jumlahPerKemasan
+      );
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
@@ -1150,38 +1461,40 @@ async function generateLaporanPenjualanDetail(
       row.getCell(1).value = itemNumber;
       row.getCell(2).value = penjualan.kodePenjualan;
       row.getCell(3).value = tanggal;
-      row.getCell(4).value = customerName;
-      row.getCell(5).value = item.barang.namaBarang;
-      row.getCell(6).value = ukuran || "-";
-      row.getCell(7).value = jumlahDus;
-      row.getCell(8).value = jumlahPcs;
-      row.getCell(9).value = totalHargaJual;
-      row.getCell(10).value = totalModal;
-      row.getCell(11).value = laba;
-      row.getCell(12).value = margin;
+      row.getCell(4).value = getDijualOleh(penjualan);
+      row.getCell(5).value = getPicPenjualan(penjualan, userNameById);
+      row.getCell(6).value = customerName;
+      row.getCell(7).value = item.barang.namaBarang;
+      row.getCell(8).value = ukuran || "-";
+      row.getCell(9).value = `${jumlahDus} ${item.barang.jenisKemasan || "kemasan"}`;
+      row.getCell(10).value = `${jumlahPcs} item`;
+      row.getCell(11).value = totalHargaJual;
+      row.getCell(12).value = totalModal;
+      row.getCell(13).value = laba;
+      row.getCell(14).value = margin;
 
       // Format
-      row.getCell(7).alignment = { horizontal: "center" };
-      row.getCell(8).alignment = { horizontal: "center" };
-      row.getCell(9).alignment = { horizontal: "right" };
-      row.getCell(10).alignment = { horizontal: "right" };
+      row.getCell(9).alignment = { horizontal: "center" };
+      row.getCell(10).alignment = { horizontal: "center" };
       row.getCell(11).alignment = { horizontal: "right" };
       row.getCell(12).alignment = { horizontal: "right" };
+      row.getCell(13).alignment = { horizontal: "right" };
+      row.getCell(14).alignment = { horizontal: "right" };
 
-      row.getCell(9).numFmt = "#,##0";
-      row.getCell(10).numFmt = "#,##0";
       row.getCell(11).numFmt = "#,##0";
-      row.getCell(12).numFmt = "0.00";
+      row.getCell(12).numFmt = "#,##0";
+      row.getCell(13).numFmt = "#,##0";
+      row.getCell(14).numFmt = "0.00";
 
       // Color coding for laba
       if (laba > 0) {
-        row.getCell(11).font = { color: { argb: "FF388E3C" }, bold: true };
+        row.getCell(13).font = { color: { argb: "FF388E3C" }, bold: true };
       } else if (laba < 0) {
-        row.getCell(11).font = { color: { argb: "FFD32F2F" }, bold: true };
+        row.getCell(13).font = { color: { argb: "FFD32F2F" }, bold: true };
       }
 
       // Borders
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= 14; i++) {
         row.getCell(i).border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -1201,19 +1514,19 @@ async function generateLaporanPenjualanDetail(
 
   // Grand total row
   const totalRow = worksheet.getRow(currentRow);
-  worksheet.mergeCells(`A${currentRow}:H${currentRow}`);
+  worksheet.mergeCells(`A${currentRow}:J${currentRow}`);
   totalRow.getCell(1).value = "TOTAL";
   totalRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-  totalRow.getCell(9).value = grandTotalPenjualan;
-  totalRow.getCell(10).value = grandTotalModal;
-  totalRow.getCell(11).value = grandTotalLaba;
-  totalRow.getCell(12).value =
+  totalRow.getCell(11).value = grandTotalPenjualan;
+  totalRow.getCell(12).value = grandTotalModal;
+  totalRow.getCell(13).value = grandTotalLaba;
+  totalRow.getCell(14).value =
     grandTotalPenjualan > 0 ? (grandTotalLaba / grandTotalPenjualan) * 100 : 0;
 
   totalRow.height = 25;
 
-  // Apply formatting only to columns 1-12 (A-L)
-  for (let i = 1; i <= 12; i++) {
+  // Apply formatting only to columns 1-14 (A-N)
+  for (let i = 1; i <= 14; i++) {
     const cell = totalRow.getCell(i);
 
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -1230,21 +1543,21 @@ async function generateLaporanPenjualanDetail(
     };
   }
 
-  // Clear formatting for columns beyond L (13 onwards) to prevent green bleeding
-  for (let i = 13; i <= 50; i++) {
+  // Clear formatting for columns beyond N (15 onwards) to prevent green bleeding
+  for (let i = 15; i <= 50; i++) {
     const cell = totalRow.getCell(i);
     cell.style = {};
   }
 
-  totalRow.getCell(9).alignment = { horizontal: "right", vertical: "middle" };
-  totalRow.getCell(10).alignment = { horizontal: "right", vertical: "middle" };
   totalRow.getCell(11).alignment = { horizontal: "right", vertical: "middle" };
   totalRow.getCell(12).alignment = { horizontal: "right", vertical: "middle" };
+  totalRow.getCell(13).alignment = { horizontal: "right", vertical: "middle" };
+  totalRow.getCell(14).alignment = { horizontal: "right", vertical: "middle" };
 
-  totalRow.getCell(9).numFmt = "#,##0";
-  totalRow.getCell(10).numFmt = "#,##0";
   totalRow.getCell(11).numFmt = "#,##0";
-  totalRow.getCell(12).numFmt = "0.00";
+  totalRow.getCell(12).numFmt = "#,##0";
+  totalRow.getCell(13).numFmt = "#,##0";
+  totalRow.getCell(14).numFmt = "0.00";
 }
 
 // ====================================
@@ -1310,9 +1623,9 @@ async function generateLaporanPembelianDetail(
     "Supplier",
     "Nama Barang",
     "Ukuran",
-    "Dus",
+    "Kemasan",
     "Harga Pokok",
-    "Diskon/Dus",
+    "Diskon/Kemasan",
     "Total",
   ];
   const headerRow = worksheet.getRow(4);
@@ -1357,10 +1670,19 @@ async function generateLaporanPembelianDetail(
     const tanggal = new Date(pembelian.createdAt).toLocaleDateString("id-ID");
 
     pembelian.items.forEach((item) => {
-      const jumlahDus = toNumber(item.jumlahDus);
+      const jumlahPerKemasan = Math.max(
+        1,
+        toNumber(item.barang.jumlahPerKemasan)
+      );
+      const totalItem = toNumber(item.totalItem);
+      const { jumlahDus } = deriveDusPcsFromTotal(
+        totalItem,
+        jumlahPerKemasan
+      );
       const hargaPokok = toNumber(item.hargaPokok); // FIXED: menggunakan hargaPokok
       const diskonPerItem = toNumber(item.diskonPerItem);
       const ukuran = toNumber(item.barang.ukuran);
+      const labelKemasan = item.barang.jenisKemasan || "kemasan";
 
       const totalHarga = (hargaPokok - diskonPerItem) * jumlahDus;
       const totalDiskon = diskonPerItem * jumlahDus;
@@ -1372,7 +1694,7 @@ async function generateLaporanPembelianDetail(
       row.getCell(4).value = supplierName;
       row.getCell(5).value = item.barang.namaBarang;
       row.getCell(6).value = ukuran || "-"; // FIXED: convert BigInt to number
-      row.getCell(7).value = jumlahDus;
+      row.getCell(7).value = `${jumlahDus} ${labelKemasan}`;
       row.getCell(8).value = hargaPokok;
       row.getCell(9).value = diskonPerItem;
       row.getCell(10).value = totalHarga;
@@ -1502,8 +1824,11 @@ async function generateLaporanLabaBarang(
 
   for (const item of items) {
     const jumlahPerKemasan = Math.max(1, toNumber(item.barang.jumlahPerKemasan));
-    const jumlahDus = toNumber(item.jumlahDus);
-    const jumlahPcs = toNumber(item.jumlahPcs);
+    const totalItemTerjual = toNumber(item.totalItem);
+    const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+      totalItemTerjual,
+      jumlahPerKemasan
+    );
     const hargaJual = toNumber(item.hargaJual);
     const hargaBeli = toNumber(item.hargaBeli);
 
@@ -1522,7 +1847,6 @@ async function generateLaporanLabaBarang(
         ? toNumber(item.laba)
         : totalPenjualanItem - totalModalItem;
 
-    const totalItemTerjual = jumlahDus * jumlahPerKemasan + jumlahPcs;
     const totalKemasanTerjual = totalItemTerjual / jumlahPerKemasan;
 
     if (!barangMap.has(item.barangId)) {

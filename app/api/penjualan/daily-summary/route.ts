@@ -4,6 +4,15 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
+  if (item.totalItem !== undefined && item.totalItem !== null) {
+    return Number(item.totalItem);
+  }
+  const jumlahDus = Number(item.jumlahDus);
+  const jumlahPcs = Number(item.jumlahPcs);
+  return jumlahDus * jumlahPerKemasan + jumlahPcs;
+}
+
 // Serialize nested BigInt values safely for JSON
 function deepSerialize(obj: any): any {
   if (obj === null || obj === undefined) return obj;
@@ -68,10 +77,8 @@ export async function GET(request: NextRequest) {
     penjualan.forEach((header) => {
       header.items.forEach((item) => {
         const barangId = item.barangId;
-        const jumlahDus = Number(item.jumlahDus);
-        const jumlahPcs = Number(item.jumlahPcs);
         const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan);
-        const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
+        const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
 
         summary[barangId] = (summary[barangId] || 0) + totalPcs;
       });

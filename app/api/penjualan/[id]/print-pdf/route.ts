@@ -154,11 +154,16 @@ export async function GET(
     let subtotal = 0;
 
     for (const item of penjualan.items) {
+      const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan) || 1;
       const jumlahTotal =
-        item.jumlahDus * Number(item.barang.jumlahPerKemasan) + item.jumlahPcs;
+        item.totalItem !== undefined && item.totalItem !== null
+          ? Number(item.totalItem)
+          : item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
+      const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
+      const jumlahPcs = jumlahTotal % jumlahPerKemasan;
       const hargaSatuan = Number(item.hargaJual);
       const totalHarga = jumlahTotal * hargaSatuan;
-      const diskonTotal = Number(item.diskonPerItem) * item.jumlahDus;
+      const diskonTotal = Number(item.diskonPerItem) * jumlahDus;
       const totalSetelahDiskon = totalHarga - diskonTotal;
 
       subtotal += totalSetelahDiskon;
@@ -170,7 +175,8 @@ export async function GET(
       });
 
       // Qty
-      const qtyText = `${item.jumlahDus} dus + ${item.jumlahPcs} pcs`;
+      const labelKemasan = item.barang?.jenisKemasan || "dus";
+      const qtyText = `${jumlahDus} ${labelKemasan} + ${jumlahPcs} item`;
       doc.text(qtyText, leftCol + 115, currentY, {
         width: 40,
         align: "center",

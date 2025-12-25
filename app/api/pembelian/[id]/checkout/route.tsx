@@ -130,7 +130,10 @@ export async function POST(
     // Hitung subtotal dengan BigInt conversion
     const subtotal = pembelian.items.reduce((total, item) => {
       const hargaPokok = bigIntToNumber(item.hargaPokok);
-      const jumlahDus = bigIntToNumber(item.jumlahDus);
+      const totalItem = bigIntToNumber(item.totalItem);
+      const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+      const jumlahDus =
+        jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
       const diskonPerItem = bigIntToNumber(item.diskonPerItem);
       const totalHarga = hargaPokok * jumlahDus;
       const totalDiskon = diskonPerItem * jumlahDus;
@@ -204,15 +207,13 @@ export async function POST(
     const result = await prisma.$transaction(async (tx) => {
       // Update stok barang
       for (const item of pembelian.items) {
-        const jumlahDus = bigIntToNumber(item.jumlahDus);
-        const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
-        const totalUnit = jumlahDus * jumlahPerKemasan;
+        const totalItem = bigIntToNumber(item.totalItem);
         const hargaPokok = bigIntToNumber(item.hargaPokok);
 
         await tx.barang.update({
           where: { id: item.barangId },
           data: {
-            stok: { increment: BigInt(totalUnit) },
+            stok: { increment: BigInt(totalItem) },
             hargaBeli: BigInt(hargaPokok),
           },
         });
@@ -262,14 +263,16 @@ export async function POST(
       },
       items: result.items.map((item) => {
         const hargaPokok = bigIntToNumber(item.hargaPokok);
-        const jumlahDus = bigIntToNumber(item.jumlahDus);
+        const totalItem = bigIntToNumber(item.totalItem);
         const diskonPerItem = bigIntToNumber(item.diskonPerItem);
         const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+        const jumlahDus =
+          jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
 
         return {
           namaBarang: item.barang.namaBarang,
           jumlahDus,
-          totalUnit: jumlahDus * jumlahPerKemasan,
+          totalUnit: totalItem,
           hargaPokok,
           diskonPerItem,
           totalHarga: hargaPokok * jumlahDus,

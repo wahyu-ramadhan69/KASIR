@@ -29,6 +29,22 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
+  const perKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / perKemasan);
+  const jumlahPcs = totalItem % perKemasan;
+  return { jumlahDus, jumlahPcs };
+}
+
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
+  if (item.totalItem !== undefined && item.totalItem !== null) {
+    return toNumber(item.totalItem);
+  }
+  const jumlahDus = toNumber(item.jumlahDus);
+  const jumlahPcs = toNumber(item.jumlahPcs);
+  return jumlahDus * jumlahPerKemasan + jumlahPcs;
+}
+
 // Helper function untuk mengecek total penjualan barang hari ini
 async function getTotalPenjualanHariIni(
   barangId: number,
@@ -82,10 +98,8 @@ async function getTotalPenjualanHariIni(
 
   let totalPcs = 0;
   for (const item of items) {
-    const jumlahDus = toNumber(item.jumlahDus);
-    const jumlahPcs = toNumber(item.jumlahPcs);
     const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
-    totalPcs += jumlahDus * jumlahPerKemasan + jumlahPcs;
+    totalPcs += getTotalItemPcs(item, jumlahPerKemasan);
   }
 
   for (const manifest of manifestData) {
@@ -102,13 +116,15 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   let totalDiskonItem = 0;
 
   const calculatedItems = items.map((item) => {
-    const jumlahDus = toNumber(item.jumlahDus);
-    const jumlahPcs = toNumber(item.jumlahPcs);
     const hargaJual = toNumber(item.hargaJual);
     const diskonPerItem = toNumber(item.diskonPerItem);
     const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan || 1);
 
-    const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
+    const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+    const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+      totalPcs,
+      jumlahPerKemasan
+    );
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
       jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
@@ -225,8 +241,7 @@ export async function POST(
     const oldQtyByBarangId = new Map<number, number>();
     for (const item of penjualan.items) {
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
-      const totalPcs =
-        toNumber(item.jumlahDus) * jumlahPerKemasan + toNumber(item.jumlahPcs);
+      const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
       oldQtyByBarangId.set(
         item.barangId,
         (oldQtyByBarangId.get(item.barangId) || 0) + totalPcs
@@ -276,9 +291,7 @@ export async function POST(
       }
 
       const jumlahPerKemasan = toNumber(barang.jumlahPerKemasan);
-      const jumlahDus = toNumber(item.jumlahDus);
-      const jumlahPcs = toNumber(item.jumlahPcs);
-      const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
+      const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
       newQtyByBarangId.set(
         barangId,
         (newQtyByBarangId.get(barangId) || 0) + totalPcs
@@ -350,13 +363,16 @@ export async function POST(
       for (const item of itemsPayload) {
         const itemId = item.id ? Number(item.id) : null;
         const barangId = Number(item.barangId);
-        const jumlahDus = toNumber(item.jumlahDus);
-        const jumlahPcs = toNumber(item.jumlahPcs);
         const hargaJual = toNumber(item.hargaJual);
         const diskonPerItem = toNumber(item.diskonPerItem);
 
         const barang = barangById.get(barangId)!;
         const jumlahPerKemasan = toNumber(barang.jumlahPerKemasan);
+        const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+          totalPcs,
+          jumlahPerKemasan
+        );
 
         if (itemId) {
           const existingItem = existingItemsById.get(itemId);
@@ -380,8 +396,7 @@ export async function POST(
           await tx.penjualanItem.update({
             where: { id: itemId },
             data: {
-              jumlahDus: BigInt(jumlahDus),
-              jumlahPcs: BigInt(jumlahPcs),
+              totalItem: BigInt(totalPcs),
               hargaJual: BigInt(hargaJual),
               diskonPerItem: BigInt(diskonPerItem),
               laba: BigInt(totalLaba),
@@ -404,8 +419,7 @@ export async function POST(
             data: {
               penjualanId,
               barangId,
-              jumlahDus: BigInt(jumlahDus),
-              jumlahPcs: BigInt(jumlahPcs),
+              totalItem: BigInt(totalPcs),
               hargaJual: BigInt(hargaJual),
               hargaBeli: BigInt(hargaBeli),
               diskonPerItem: BigInt(diskonPerItem),
@@ -462,10 +476,13 @@ export async function POST(
       let totalModal = 0;
       let totalLabaSebelum = 0;
       for (const item of updatedItems) {
-        const jumlahDus = toNumber(item.jumlahDus);
-        const jumlahPcs = toNumber(item.jumlahPcs);
         const hargaBeli = toNumber(item.hargaBeli);
         const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+        const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+          totalPcs,
+          jumlahPerKemasan
+        );
 
         const modalDus = hargaBeli * jumlahDus;
         const modalPcs =
@@ -530,13 +547,21 @@ export async function POST(
       }
 
       if (body.karyawanId !== undefined) {
-        updateData.karyawanId = body.karyawanId
+        const nextKaryawanId = body.karyawanId
           ? parseInt(body.karyawanId)
           : null;
+        if (nextKaryawanId) {
+          updateData.karyawan = { connect: { id: nextKaryawanId } };
+        } else {
+          updateData.karyawan = { disconnect: true };
+        }
       }
 
-      updateData.customerId = nextCustomerId;
-      updateData.namaCustomer = nextNamaCustomer;
+      if (nextCustomerId) {
+        updateData.customer = { connect: { id: nextCustomerId } };
+      } else {
+        updateData.customer = { disconnect: true };
+      }
 
       const updatedHeader = await tx.penjualanHeader.update({
         where: { id: penjualanId },
@@ -598,7 +623,7 @@ export async function POST(
             piutang: toNumber(updated.customer.piutang),
             limit_piutang: toNumber(updated.customer.limit_piutang),
           }
-        : { nama: updated.namaCustomer, namaToko: null },
+        : { nama: nextNamaCustomer, namaToko: null },
       karyawan: updated.karyawan
         ? {
             id: updated.karyawan.id,
@@ -609,13 +634,28 @@ export async function POST(
         : null,
       items: updated.items.map((item) => ({
         namaBarang: item.barang.namaBarang,
-        jumlahDus: toNumber(item.jumlahDus),
-        jumlahPcs: toNumber(item.jumlahPcs),
+        ...deriveDusPcsFromTotal(
+          getTotalItemPcs(item, toNumber(item.barang.jumlahPerKemasan)),
+          toNumber(item.barang.jumlahPerKemasan)
+        ),
         hargaJual: toNumber(item.hargaJual),
-        diskon: toNumber(item.diskonPerItem) * toNumber(item.jumlahDus),
+        diskon:
+          toNumber(item.diskonPerItem) *
+          deriveDusPcsFromTotal(
+            getTotalItemPcs(item, toNumber(item.barang.jumlahPerKemasan)),
+            toNumber(item.barang.jumlahPerKemasan)
+          ).jumlahDus,
         subtotal:
-          toNumber(item.hargaJual) * toNumber(item.jumlahDus) -
-          toNumber(item.diskonPerItem) * toNumber(item.jumlahDus),
+          toNumber(item.hargaJual) *
+            deriveDusPcsFromTotal(
+              getTotalItemPcs(item, toNumber(item.barang.jumlahPerKemasan)),
+              toNumber(item.barang.jumlahPerKemasan)
+            ).jumlahDus -
+          toNumber(item.diskonPerItem) *
+            deriveDusPcsFromTotal(
+              getTotalItemPcs(item, toNumber(item.barang.jumlahPerKemasan)),
+              toNumber(item.barang.jumlahPerKemasan)
+            ).jumlahDus,
       })),
       subtotal: toNumber(updated.subtotal),
       diskonNota: toNumber(updated.diskonNota),

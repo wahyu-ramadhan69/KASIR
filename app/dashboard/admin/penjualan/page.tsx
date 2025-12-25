@@ -77,8 +77,9 @@ interface CartItem {
 interface PenjualanItem {
   id: number;
   barangId: number;
-  jumlahDus: number;
-  jumlahPcs: number;
+  jumlahDus?: number;
+  jumlahPcs?: number;
+  totalItem?: number;
   hargaJual: number;
   diskonPerItem: number;
   barang: Barang;
@@ -127,6 +128,20 @@ const formatRupiahInput = (value: string): string => {
 
 const parseRupiahToNumber = (value: string): number => {
   return parseInt(value.replace(/[^\d]/g, "")) || 0;
+};
+
+const getTotalItemPcs = (item: CartItem): number => {
+  return item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
+};
+
+const deriveDusPcsFromTotal = (
+  totalItem: number,
+  jumlahPerKemasan: number
+) => {
+  const safePerKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / safePerKemasan);
+  const jumlahPcs = totalItem % safePerKemasan;
+  return { jumlahDus, jumlahPcs };
 };
 
 const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
@@ -179,6 +194,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
   const [loadingEdit, setLoadingEdit] = useState<boolean>(false);
+  const [originalQtyByBarangId, setOriginalQtyByBarangId] = useState<{
+    [key: number]: number;
+  }>({});
 
   useEffect(() => {
     fetchBarang();
@@ -208,6 +226,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   useEffect(() => {
     if (editPenjualanId) {
       loadPenjualanForEdit(editPenjualanId);
+    } else {
+      setOriginalQtyByBarangId({});
     }
   }, [editPenjualanId]);
 
@@ -241,16 +261,44 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         return;
       }
 
-      const newCartItems: CartItem[] = penjualan.items.map((item) => ({
-        tempId: `item-${item.id}`,
-        itemId: item.id,
-        barangId: item.barangId,
-        jumlahDus: Number(item.jumlahDus),
-        jumlahPcs: Number(item.jumlahPcs),
-        hargaJual: Number(item.hargaJual),
-        diskonPerItem: Number(item.diskonPerItem),
-        barang: item.barang,
-      }));
+      const originalQtyMap: { [key: number]: number } = {};
+      const newCartItems: CartItem[] = penjualan.items.map((item) => {
+        const jumlahPerKemasan = Number(item.barang?.jumlahPerKemasan || 1);
+        const fallbackTotalItem =
+          item.totalItem !== undefined && item.totalItem !== null
+            ? Number(item.totalItem || 0)
+            : Number(item.jumlahDus || 0) * jumlahPerKemasan +
+              Number(item.jumlahPcs || 0);
+        const derived = deriveDusPcsFromTotal(
+          fallbackTotalItem,
+          jumlahPerKemasan
+        );
+        const useSingleItemMode = jumlahPerKemasan <= 1;
+        const jumlahDus = useSingleItemMode
+          ? 0
+          : item.jumlahDus !== undefined
+            ? Number(item.jumlahDus)
+            : derived.jumlahDus;
+        const jumlahPcs = useSingleItemMode
+          ? fallbackTotalItem
+          : item.jumlahPcs !== undefined
+            ? Number(item.jumlahPcs)
+            : derived.jumlahPcs;
+
+        originalQtyMap[item.barangId] =
+          (originalQtyMap[item.barangId] || 0) + fallbackTotalItem;
+
+        return {
+          tempId: `item-${item.id}`,
+          itemId: item.id,
+          barangId: item.barangId,
+          jumlahDus,
+          jumlahPcs,
+          hargaJual: Number(item.hargaJual),
+          diskonPerItem: Number(item.diskonPerItem),
+          barang: item.barang,
+        };
+      });
 
       const diskonTypes: { [key: string]: "rupiah" | "persen" } = {};
       const diskonValues: { [key: string]: string } = {};
@@ -265,6 +313,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       setCartItems(newCartItems);
       setItemDiskonTypes(diskonTypes);
       setItemDiskonValues(diskonValues);
+      setOriginalQtyByBarangId(originalQtyMap);
 
       if (penjualan.customer) {
         setSelectedCustomer(penjualan.customer);
@@ -373,9 +422,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const getCartPcsForBarang = (barangId: number): number => {
     const cartItem = cartItems.find((item) => item.barangId === barangId);
     if (!cartItem) return 0;
-    return (
-      cartItem.jumlahDus * cartItem.barang.jumlahPerKemasan + cartItem.jumlahPcs
-    );
+    return getTotalItemPcs(cartItem);
   };
 
   // Fungsi untuk menambahkan item ke keranjang lokal
@@ -384,21 +431,27 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     const existingItem = cartItems.find((item) => item.barangId === barang.id);
     const inCartPcs = getCartPcsForBarang(barang.id);
 
+    const originalQty = editPenjualanId
+      ? originalQtyByBarangId[barang.id] || 0
+      : 0;
+    const stokTersedia = barang.stok + originalQty;
     // Validasi stok: cek sisa stok setelah dikurangi yang di keranjang
-    const sisaStok = barang.stok - inCartPcs;
-    if (sisaStok < jumlahPerKemasan) {
+    const sisaStok = stokTersedia - inCartPcs;
+    const addPcs = jumlahPerKemasan > 1 ? jumlahPerKemasan : 1;
+    if (sisaStok < addPcs) {
       toast.error(
-        `Stok tidak mencukupi! Stok tersedia: ${barang.stok} pcs, sudah di keranjang: ${inCartPcs} pcs, sisa: ${sisaStok} pcs`
+        `Stok tidak mencukupi! Stok tersedia: ${stokTersedia} pcs, sudah di item dijual: ${inCartPcs} pcs, sisa: ${sisaStok} pcs`
       );
       return;
     }
 
     const limitPenjualan = Number(barang.limitPenjualan || 0);
     const todaySold = getTodaySold(barang.id);
+    const effectiveSold = Math.max(0, todaySold - originalQty);
 
     // Validasi limit penjualan (jika ada)
     if (limitPenjualan > 0) {
-      const remainingLimit = limitPenjualan - todaySold - inCartPcs;
+      const remainingLimit = limitPenjualan - effectiveSold - inCartPcs;
       if (remainingLimit <= 0) {
         toast.error(
           `Limit harian untuk ${barang.namaBarang} sudah tercapai (${limitPenjualan} pcs)`
@@ -406,22 +459,26 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         return;
       }
 
-      if (jumlahPerKemasan > remainingLimit) {
+      if (addPcs > remainingLimit) {
         toast.error(`Limit penjualan harian telah tercapai !`);
         return;
       }
     }
 
     if (existingItem) {
-      // Update jumlah dus jika item sudah ada
+      // Update jumlah pcs/dus jika item sudah ada
       setCartItems((prevItems) =>
         prevItems.map((item) =>
           item.tempId === existingItem.tempId
-            ? { ...item, jumlahDus: item.jumlahDus + 1 }
+            ? jumlahPerKemasan > 1
+              ? { ...item, jumlahDus: item.jumlahDus + 1 }
+              : { ...item, jumlahPcs: item.jumlahPcs + 1 }
             : item
         )
       );
-      toast.success(`${barang.namaBarang} +1 dus`);
+      toast.success(
+        `${barang.namaBarang} +1 ${jumlahPerKemasan > 1 ? "dus" : "pcs"}`
+      );
       return;
     }
 
@@ -429,8 +486,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     const newItem: CartItem = {
       tempId: `temp-${Date.now()}-${Math.random()}`,
       barangId: barang.id,
-      jumlahDus: 1,
-      jumlahPcs: 0,
+      jumlahDus: jumlahPerKemasan > 1 ? 1 : 0,
+      jumlahPcs: jumlahPerKemasan > 1 ? 0 : 1,
       hargaJual: barang.hargaJual,
       diskonPerItem: 0,
       barang: barang,
@@ -442,7 +499,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setItemDiskonTypes((prev) => ({ ...prev, [newItem.tempId]: "rupiah" }));
     setItemDiskonValues((prev) => ({ ...prev, [newItem.tempId]: "0" }));
 
-    toast.success(`${barang.namaBarang} ditambahkan ke keranjang`);
+    toast.success(`${barang.namaBarang} ditambahkan ke item dijual`);
   };
 
   // Update item di keranjang lokal
@@ -458,18 +515,41 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan);
         const totalPcs =
           updatedItem.jumlahDus * jumlahPerKemasan + updatedItem.jumlahPcs;
-        const stokTersedia = Math.max(0, Number(item.barang.stok || 0));
+        const originalQty = editPenjualanId
+          ? originalQtyByBarangId[item.barangId] || 0
+          : 0;
+        const stokTersedia = Math.max(
+          0,
+          Number(item.barang.stok || 0) + originalQty
+        );
         const todaySold = getTodaySold(item.barangId);
 
         const allowedByLimit =
           limitPenjualan > 0
-            ? Math.max(0, limitPenjualan - todaySold)
+            ? Math.max(0, limitPenjualan - Math.max(0, todaySold - originalQty))
             : Number.POSITIVE_INFINITY;
         const maxAllowed = Math.min(stokTersedia, allowedByLimit);
 
         if (totalPcs > maxAllowed) {
-          const clampedDus = Math.floor(maxAllowed / jumlahPerKemasan);
-          const clampedPcs = Math.floor(maxAllowed % jumlahPerKemasan);
+          let clampedDus = updatedItem.jumlahDus;
+          let clampedPcs = updatedItem.jumlahPcs;
+
+          if (field === "jumlahDus") {
+            const maxDus = Math.max(
+              0,
+              Math.floor((maxAllowed - clampedPcs) / jumlahPerKemasan)
+            );
+            clampedDus = Math.min(clampedDus, maxDus);
+          } else if (field === "jumlahPcs") {
+            const maxPcs = Math.max(
+              0,
+              maxAllowed - clampedDus * jumlahPerKemasan
+            );
+            clampedPcs = Math.min(clampedPcs, maxPcs);
+          } else {
+            clampedDus = Math.floor(maxAllowed / jumlahPerKemasan);
+            clampedPcs = Math.floor(maxAllowed % jumlahPerKemasan);
+          }
           const reasons = [];
 
           if (limitPenjualan > 0 && allowedByLimit <= stokTersedia) {
@@ -675,7 +755,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
-      toast.error("Keranjang masih kosong");
+      toast.error("Item dijual masih kosong");
       return;
     }
 
@@ -700,6 +780,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
             barangId: item.barangId,
             jumlahDus: item.jumlahDus,
             jumlahPcs: item.jumlahPcs,
+            totalItem: getTotalItemPcs(item),
             hargaJual: item.hargaJual,
             diskonPerItem: item.diskonPerItem,
           })),
@@ -741,54 +822,16 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         return;
       }
 
-      // Step 1: Create penjualan baru dengan status KERANJANG
-      const createData: any = {
-        customerId: selectedCustomer?.id,
-        namaCustomer: manualCustomerName || null,
-        userId,
-      };
-
-      const createRes = await fetch("/api/penjualan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(createData),
-      });
-      const createResult = await createRes.json();
-
-      if (!createResult.success) {
-        toast.error(createResult.error || "Gagal membuat penjualan");
-        setLoading(false);
-        return;
-      }
-
-      const penjualanId = createResult.data.id;
-
-      // Step 2: Tambahkan items ke penjualan
-      for (const item of cartItems) {
-        const itemData = {
+      // Checkout langsung tanpa membuat keranjang di DB
+      const checkoutData: any = {
+        items: cartItems.map((item) => ({
           barangId: item.barangId,
           jumlahDus: item.jumlahDus,
           jumlahPcs: item.jumlahPcs,
+          totalItem: getTotalItemPcs(item),
           hargaJual: item.hargaJual,
           diskonPerItem: item.diskonPerItem,
-        };
-
-        const itemRes = await fetch(`/api/penjualan/${penjualanId}/items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(itemData),
-        });
-        const itemResult = await itemRes.json();
-
-        if (!itemResult.success) {
-          toast.error(`Gagal menambah ${item.barang.namaBarang}`);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Step 3: Checkout - Selesaikan transaksi dan generate kode penjualan
-      const checkoutData: any = {
+        })),
         jumlahDibayar: parseRupiahToNumber(jumlahDibayar),
         diskonNota: diskonNotaRupiah,
         metodePembayaran,
@@ -796,8 +839,6 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
       if (selectedCustomer) {
         checkoutData.customerId = selectedCustomer.id;
-      } else {
-        checkoutData.namaCustomer = manualCustomerName;
       }
 
       if (isAdmin && tanggalTransaksi) {
@@ -808,21 +849,18 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         checkoutData.tanggalJatuhTempo = tanggalJatuhTempo;
       }
 
-      const checkoutRes = await fetch(
-        `/api/penjualan/${penjualanId}/checkout`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(checkoutData),
-        }
-      );
+      const checkoutRes = await fetch("/api/penjualan/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutData),
+      });
       const checkoutResult = await checkoutRes.json();
 
       if (checkoutResult.success) {
         // Tambahkan id ke receiptData untuk keperluan print
         setReceiptData({
           ...checkoutResult.data.receipt,
-          id: penjualanId
+          id: checkoutResult.data.penjualan.id,
         });
         setShowCheckoutModal(false);
         setShowReceiptModal(true);
@@ -842,12 +880,12 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
   const handleOpenCheckoutModal = async () => {
     if (cartItems.length === 0) {
-      toast.error("Keranjang masih kosong");
+      toast.error("Item dijual masih kosong");
       return;
     }
 
     if (hasZeroQtyItem) {
-      toast.error("Ada item dengan jumlah 0. Periksa kembali keranjang.");
+      toast.error("Ada item dengan jumlah 0. Periksa kembali item dijual.");
       return;
     }
 
@@ -1279,6 +1317,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                 <div className="grid grid-cols-2 gap-3">
                   {filteredBarang.map((barang) => {
                     const isLowStock = barang.stok < barang.jumlahPerKemasan;
+                    const isOutOfStock = barang.stok <= 0;
                     const isMediumStock =
                       barang.stok >= barang.jumlahPerKemasan &&
                       barang.stok < barang.jumlahPerKemasan * 5;
@@ -1330,7 +1369,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                         {isInCart && (
                           <div className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-lg z-10 animate-in fade-in zoom-in duration-300">
                             <ShoppingCart className="w-2.5 h-2.5" />
-                            Di Keranjang
+                            Di Item Dijual
                           </div>
                         )}
 
@@ -1450,7 +1489,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                 <div className="flex items-center gap-1.5 text-red-600 animate-in slide-in-from-left duration-300">
                                   <AlertCircle className="w-3.5 h-3.5" />
                                   <span className="text-xs font-bold">
-                                    Stok Menipis!
+                                    {isOutOfStock ? "Stok Habis!" : "Stok Menipis!"}
                                   </span>
                                 </div>
                               )}
@@ -1516,13 +1555,15 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
             </div>
           </div>
 
-          {/* Right Side - 32% Keranjang */}
+          {/* Right Side - 32% Item Dijual */}
           <div className="w-[32%] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
             <div className="p-4 bg-gray-50 border-b flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="w-5 h-5 text-blue-600" />
-                  <h2 className="text-sm font-bold text-gray-700">Keranjang</h2>
+                  <h2 className="text-sm font-bold text-gray-700">
+                    Item Dijual
+                  </h2>
                 </div>
                 <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-md font-bold">
                   {cartItems.length} item
@@ -1593,6 +1634,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                       Math.max(0, parseInt(e.target.value) || 0)
                                     )
                                   }
+                                  onWheel={(e) =>
+                                    (e.target as HTMLInputElement).blur()
+                                  }
                                   className="w-12 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                   min="0"
                                 />
@@ -1644,6 +1688,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                       "jumlahPcs",
                                       Math.max(0, parseInt(e.target.value) || 0)
                                     )
+                                  }
+                                  onWheel={(e) =>
+                                    (e.target as HTMLInputElement).blur()
                                   }
                                   className="w-12 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                   min="0"
@@ -1698,6 +1745,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     "jumlahPcs",
                                     Math.max(0, parseInt(e.target.value) || 0)
                                   )
+                                }
+                                onWheel={(e) =>
+                                  (e.target as HTMLInputElement).blur()
                                 }
                                 className="w-12 text-center text-sm border-2 border-gray-300 rounded-lg px-1 py-1 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                 min="0"
@@ -1782,7 +1832,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                       <ShoppingCart className="w-12 h-12 text-gray-400" />
                     </div>
                     <p className="text-gray-500 font-medium">
-                      Keranjang masih kosong
+                      Item dijual masih kosong
                     </p>
                     <p className="text-gray-400 text-xs mt-1">
                       Tambahkan produk untuk memulai

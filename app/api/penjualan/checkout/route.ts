@@ -1,7 +1,7 @@
-// app/api/penjualan/[id]/checkout/route.ts
+// app/api/penjualan/checkout/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { getAuthData, isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -47,8 +47,7 @@ function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
 
 // Helper untuk total penjualan harian termasuk manifest terjual
 async function getTotalPenjualanHariIni(
-  barangId: number,
-  excludePenjualanId?: number
+  barangId: number
 ): Promise<number> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -64,7 +63,6 @@ async function getTotalPenjualanHariIni(
           gte: today,
           lt: tomorrow,
         },
-        ...(excludePenjualanId ? { NOT: { id: excludePenjualanId } } : {}),
       },
     },
     include: {
@@ -126,9 +124,7 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
     );
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      jumlahPcs > 0
-        ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
-        : 0;
+      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
     const diskon = diskonPerItem * jumlahDus;
 
@@ -157,20 +153,16 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
   };
 };
 
-// POST: Checkout penjualan
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// POST: Checkout penjualan langsung (tanpa keranjang di DB)
+export async function POST(request: NextRequest) {
   const auth = await isAuthenticated();
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const { id } = await params;
-    const penjualanId = parseInt(id);
     const body = await request.json();
     const {
+      items = [],
       jumlahDibayar,
       diskonNota = 0,
       metodePembayaran = "CASH",
@@ -181,41 +173,58 @@ export async function POST(
       tanggalTransaksi,
     } = body;
 
-    // Validasi penjualan
-    const penjualan = await prisma.penjualanHeader.findUnique({
-      where: { id: penjualanId },
-      include: {
-        customer: true,
-        karyawan: true,
-        items: {
-          include: { barang: true },
-        },
-      },
-    });
-
-    if (!penjualan) {
-      return NextResponse.json(
-        { success: false, error: "Penjualan tidak ditemukan" },
-        { status: 404 }
-      );
-    }
-
-    if (penjualan.statusTransaksi !== "KERANJANG") {
-      return NextResponse.json(
-        { success: false, error: "Penjualan sudah diproses sebelumnya" },
-        { status: 400 }
-      );
-    }
-
-    if (penjualan.items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { success: false, error: "Keranjang masih kosong" },
         { status: 400 }
       );
     }
 
+    const barangIds = items.map((item) => item.barangId).filter(Boolean);
+    const uniqueBarangIds = Array.from(new Set(barangIds));
+    if (uniqueBarangIds.length !== barangIds.length) {
+      return NextResponse.json(
+        { success: false, error: "Barang duplikat di keranjang" },
+        { status: 400 }
+      );
+    }
+
+    const barangList = await prisma.barang.findMany({
+      where: { id: { in: uniqueBarangIds } },
+    });
+
+    const barangMap = new Map(barangList.map((b) => [b.id, b]));
+    for (const item of items) {
+      if (!barangMap.has(item.barangId)) {
+        return NextResponse.json(
+          { success: false, error: "Barang tidak ditemukan" },
+          { status: 404 }
+        );
+      }
+    }
+
+    const normalizedItems = items.map((item) => {
+      const barang = barangMap.get(item.barangId);
+      const jumlahPerKemasan = toNumber(barang?.jumlahPerKemasan || 1);
+      const totalItem = getTotalItemPcs(item, jumlahPerKemasan);
+      const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+        totalItem,
+        jumlahPerKemasan
+      );
+
+      return {
+        ...item,
+        totalItem,
+        jumlahDus,
+        jumlahPcs,
+        hargaJual: item.hargaJual,
+        diskonPerItem: Number(item.diskonPerItem || 0),
+        barang,
+      };
+    });
+
     // Validasi limit pembelian per hari untuk setiap item
-    for (const item of penjualan.items) {
+    for (const item of normalizedItems) {
       const limitPenjualan = toNumber(item.barang.limitPenjualan);
 
       if (limitPenjualan > 0) {
@@ -223,8 +232,7 @@ export async function POST(
         const totalPcsItem = getTotalItemPcs(item, jumlahPerKemasan);
 
         const totalTerjualHariIni = await getTotalPenjualanHariIni(
-          item.barangId,
-          penjualanId
+          item.barangId
         );
         const totalSetelahCheckout = totalTerjualHariIni + totalPcsItem;
 
@@ -242,7 +250,7 @@ export async function POST(
     }
 
     // Calculate totals
-    const calculation = calculatePenjualan(penjualan.items, diskonNota);
+    const calculation = calculatePenjualan(normalizedItems, diskonNota);
     const totalHarga = calculation.ringkasan.totalHarga;
 
     // Determine payment status
@@ -252,36 +260,20 @@ export async function POST(
     const sisaHutang =
       statusPembayaran === "HUTANG" ? totalHarga - jumlahDibayar : 0;
 
-    // Deteksi tipe penjualan berdasarkan data yang ada
-    const isPenjualanSales = penjualan.karyawanId !== null;
+    const isPenjualanSales = Boolean(salesId);
 
     // Validasi hutang untuk sales
     if (statusPembayaran === "HUTANG" && isPenjualanSales) {
-      if (!penjualan.karyawanId) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Transaksi dengan hutang harus menggunakan sales terdaftar",
-          },
-          { status: 400 }
-        );
-      }
-
       const karyawan = await prisma.karyawan.findUnique({
-        where: { id: penjualan.karyawanId },
+        where: { id: salesId },
       });
 
       if (!karyawan || karyawan.jenis !== "SALES") {
         return NextResponse.json(
-          {
-            success: false,
-            error: "Sales tidak ditemukan atau bukan jenis SALES",
-          },
+          { success: false, error: "Sales tidak ditemukan atau bukan jenis SALES" },
           { status: 404 }
         );
       }
-
-      // Note: Karyawan tidak memiliki limit hutang, jadi skip validasi limit
     }
 
     // Validasi piutang customer untuk penjualan toko dengan hutang
@@ -354,7 +346,7 @@ export async function POST(
     }
 
     // Cek stok sebelum checkout
-    for (const item of penjualan.items) {
+    for (const item of normalizedItems) {
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       const stokTersedia = toNumber(item.barang.stok);
 
@@ -382,11 +374,104 @@ export async function POST(
       }
     }
 
+    const authData = await getAuthData();
+    const userId = authData?.userId ? parseInt(authData.userId, 10) : undefined;
+
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Calculate total modal first
+      const transaksiDate = tanggalTransaksi
+        ? new Date(tanggalTransaksi)
+        : new Date();
+      const dateStr = transaksiDate.toISOString().slice(0, 10).replace(/-/g, "");
+
+      const lastPenjualan = await tx.penjualanHeader.findFirst({
+        where: {
+          kodePenjualan: {
+            startsWith: `PJ-${dateStr}`,
+          },
+        },
+        orderBy: {
+          kodePenjualan: "desc",
+        },
+      });
+
+      let nextNumber = 1;
+      if (lastPenjualan) {
+        const lastNumber = parseInt(lastPenjualan.kodePenjualan.split("-")[2]);
+        nextNumber = lastNumber + 1;
+      }
+
+      const kodePenjualan = `PJ-${dateStr}-${String(nextNumber).padStart(
+        4,
+        "0"
+      )}`;
+
+      const createData: any = {
+        kodePenjualan,
+        statusTransaksi: "KERANJANG",
+        statusPembayaran: "HUTANG",
+        ...(userId ? { userId } : {}),
+      };
+
+      if (customerId) {
+        createData.customerId = customerId;
+      }
+
+      if (salesId) {
+        createData.karyawanId = salesId;
+      }
+
+      if (namaSales) {
+        createData.namaSales = namaSales;
+      }
+
+      const penjualan = await tx.penjualanHeader.create({
+        data: createData,
+      });
+
+      for (const item of normalizedItems) {
+        const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan || 1);
+        const hargaBeliBarang = toNumber(item.barang.hargaBeli);
+        const hargaJualFinal =
+          item.hargaJual || toNumber(item.barang.hargaJual);
+        const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+          totalPcs,
+          jumlahPerKemasan
+        );
+
+        const hargaBeliPerPcs = Math.round(hargaBeliBarang / jumlahPerKemasan);
+        const hargaJualPerPcs = Math.round(hargaJualFinal / jumlahPerKemasan);
+
+        const labaPerDus = hargaJualFinal - item.diskonPerItem - hargaBeliBarang;
+        const labaFromDus = labaPerDus * jumlahDus;
+
+        const labaPerPcs = hargaJualPerPcs - hargaBeliPerPcs;
+        const labaFromPcs = labaPerPcs * jumlahPcs;
+
+        const totalLaba = labaFromDus + labaFromPcs;
+
+        await tx.penjualanItem.create({
+          data: {
+            penjualanId: penjualan.id,
+            barangId: item.barangId,
+            totalItem: BigInt(totalPcs),
+            hargaJual: BigInt(hargaJualFinal),
+            hargaBeli: item.barang.hargaBeli,
+            diskonPerItem: BigInt(item.diskonPerItem),
+            laba: BigInt(totalLaba),
+          },
+        });
+      }
+
+      const createdItems = await tx.penjualanItem.findMany({
+        where: { penjualanId: penjualan.id },
+        include: { barang: true },
+      });
+
+      // Calculate total modal
       let totalModal = 0;
-      for (const item of penjualan.items) {
+      for (const item of createdItems) {
         const hargaBeli = toNumber(item.hargaBeli);
         const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
         const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
@@ -403,19 +488,17 @@ export async function POST(
         totalModal += modalDus + modalPcs;
       }
 
-      // Recalculate laba after diskonNota
-      const totalLabaSebelum = penjualan.items.reduce(
+      const totalLabaSebelum = createdItems.reduce(
         (sum, item) => sum + toNumber(item.laba),
         0
       );
 
       const totalLabaSesudah = totalHarga - totalModal;
 
-      // Update each item's laba proportionally if diskonNota > 0
       if (diskonNota > 0 && totalLabaSebelum > 0) {
         const adjustmentFactor = totalLabaSesudah / totalLabaSebelum;
 
-        for (const item of penjualan.items) {
+        for (const item of createdItems) {
           const labaOriginal = toNumber(item.laba);
           const labaAdjusted = Math.round(labaOriginal * adjustmentFactor);
 
@@ -427,7 +510,7 @@ export async function POST(
       }
 
       // Kurangi stok barang
-      for (const item of penjualan.items) {
+      for (const item of createdItems) {
         const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
         const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
 
@@ -439,9 +522,6 @@ export async function POST(
         });
       }
 
-      // Note: Karyawan tidak memiliki field hutang, jadi tidak perlu update
-      // Jika perlu tracking hutang sales, harus dihandle di tempat lain
-
       // Update piutang customer jika penjualan toko dengan HUTANG
       if (statusPembayaran === "HUTANG" && customerId && !salesId) {
         await tx.customer.update({
@@ -452,7 +532,6 @@ export async function POST(
         });
       }
 
-      // Prepare update data
       const updateData: any = {
         subtotal: BigInt(calculation.ringkasan.subtotal),
         diskonNota: BigInt(diskonNota),
@@ -462,26 +541,12 @@ export async function POST(
         metodePembayaran,
         statusPembayaran,
         statusTransaksi: "SELESAI",
-        tanggalTransaksi: tanggalTransaksi
-          ? new Date(tanggalTransaksi)
-          : new Date(),
+        tanggalTransaksi: transaksiDate,
         tanggalJatuhTempo: finalTanggalJatuhTempo,
       };
 
-      // Deteksi tipe penjualan dari data yang sudah ada di penjualan
-      // Jika ada karyawanId (sudah di-set via PATCH), berarti penjualan sales
-      if (penjualan.karyawanId) {
-        // Penjualan sales - pertahankan karyawanId dan customerId yang sudah ada
-        // Tidak perlu update karena sudah di-set via PATCH sebelumnya
-      }
-      // Jika ada customerId tapi tidak ada karyawanId, berarti penjualan toko
-      else if (penjualan.customerId || customerId) {
-        updateData.customerId = customerId || penjualan.customerId;
-      }
-
-      // Update penjualan header
       const updated = await tx.penjualanHeader.update({
-        where: { id: penjualanId },
+        where: { id: penjualan.id },
         data: updateData,
         include: {
           customer: true,
@@ -495,7 +560,6 @@ export async function POST(
       return updated;
     });
 
-    // Generate receipt
     const receipt = {
       kodePenjualan: result.kodePenjualan,
       tanggal: result.tanggalTransaksi,
@@ -512,6 +576,8 @@ export async function POST(
             id: result.karyawan.id,
             nama: result.karyawan.nama,
           }
+        : result.namaSales
+        ? { nama: result.namaSales }
         : null,
       items: result.items.map((item) => ({
         namaBarang: item.barang.namaBarang,

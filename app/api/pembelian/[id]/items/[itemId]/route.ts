@@ -14,11 +14,19 @@ function bigIntToNumber(value: bigint | number): number {
 
 // Helper to serialize data
 function serializeItem(item: any) {
+  const totalItem = bigIntToNumber(item.totalItem);
+  const jumlahPerKemasan = item.barang
+    ? bigIntToNumber(item.barang.jumlahPerKemasan)
+    : 0;
+  const jumlahDus =
+    jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
+
   return {
     ...item,
     hargaPokok: bigIntToNumber(item.hargaPokok),
     diskonPerItem: bigIntToNumber(item.diskonPerItem),
-    jumlahDus: bigIntToNumber(item.jumlahDus),
+    totalItem,
+    jumlahDus,
     barang: item.barang
       ? {
           ...item.barang,
@@ -56,11 +64,15 @@ function serializePembelian(pembelian: any) {
 async function updatePembelianTotals(pembelianId: number) {
   const items = await prisma.pembelianItem.findMany({
     where: { pembelianId },
+    include: { barang: true },
   });
 
   const subtotal = items.reduce((total, item) => {
     const hargaPokok = bigIntToNumber(item.hargaPokok);
-    const jumlahDus = bigIntToNumber(item.jumlahDus);
+    const totalItem = bigIntToNumber(item.totalItem);
+    const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+    const jumlahDus =
+      jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
     const diskonPerItem = bigIntToNumber(item.diskonPerItem);
     const totalHarga = hargaPokok * jumlahDus;
     const totalDiskon = diskonPerItem * jumlahDus;
@@ -97,7 +109,7 @@ export async function PUT(
     const pembelianId = parseInt(id);
     const pembelianItemId = parseInt(itemId);
     const body = await request.json();
-    const { jumlahDus, hargaPokok, diskonPerItem } = body;
+    const { jumlahDus, totalItem, hargaPokok, diskonPerItem } = body;
 
     // Cek pembelian
     const pembelian = await prisma.pembelianHeader.findUnique({
@@ -124,6 +136,7 @@ export async function PUT(
     // Cek item
     const existingItem = await prisma.pembelianItem.findFirst({
       where: { id: pembelianItemId, pembelianId },
+      include: { barang: true },
     });
 
     if (!existingItem) {
@@ -135,7 +148,16 @@ export async function PUT(
 
     // Update item dengan BigInt conversion
     const updateData: any = {};
-    if (jumlahDus !== undefined) updateData.jumlahDus = BigInt(jumlahDus);
+    if (jumlahDus !== undefined || totalItem !== undefined) {
+      const jumlahPerKemasan = bigIntToNumber(
+        existingItem.barang.jumlahPerKemasan
+      );
+      const normalizedTotalItem =
+        totalItem !== undefined
+          ? Number(totalItem)
+          : Number(jumlahDus) * jumlahPerKemasan;
+      updateData.totalItem = BigInt(normalizedTotalItem);
+    }
     if (hargaPokok !== undefined) updateData.hargaPokok = BigInt(hargaPokok);
     if (diskonPerItem !== undefined)
       updateData.diskonPerItem = BigInt(diskonPerItem);

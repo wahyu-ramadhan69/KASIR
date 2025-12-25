@@ -44,6 +44,20 @@ const formatRupiah = (number: number): string =>
     minimumFractionDigits: 0,
   }).format(number || 0);
 
+const formatNumber = (num: number): string => {
+  const sign = num < 0 ? "-" : "";
+  const abs = Math.abs(num);
+  const formatShort = (value: number, suffix: string) => {
+    const rounded = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
+    return `${sign}${rounded} ${suffix}`;
+  };
+
+  if (abs >= 1000000000) return formatShort(abs / 1000000000, "M");
+  if (abs >= 1000000) return formatShort(abs / 1000000, "jt");
+  if (abs >= 1000) return formatShort(abs / 1000, "rb");
+  return `${num}`;
+};
+
 const formatDate = (dateString: string): string =>
   new Date(dateString).toLocaleDateString("id-ID", {
     day: "2-digit",
@@ -149,7 +163,9 @@ const LaporanLabaBarangPage = () => {
         params.set("statusPembayaran", statusPembayaran);
       }
 
-      const res = await fetch(`/api/laporan/barang/export?${params.toString()}`);
+      const res = await fetch(
+        `/api/laporan/barang/export?${params.toString()}`
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error || res.statusText);
@@ -227,9 +243,7 @@ const LaporanLabaBarangPage = () => {
         <div className="mt-4 bg-black/10 rounded-lg px-4 py-2 text-sm text-blue-100">
           Periode:{" "}
           <span className="font-semibold text-white">
-            {startDate
-              ? `${formatDate(startDate)}`
-              : "Semua waktu"}
+            {startDate ? `${formatDate(startDate)}` : "Semua waktu"}
             {endDate ? ` s/d ${formatDate(endDate)}` : ""}
           </span>{" "}
           | Status:{" "}
@@ -251,7 +265,7 @@ const LaporanLabaBarangPage = () => {
             <DollarSign className="w-8 h-8 text-blue-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {formatRupiah(summary.totalPenjualan)}
+            Rp {formatNumber(summary.totalPenjualan)}
           </p>
           <p className="text-xs text-gray-500 mt-1">
             {summary.jumlahBarang} barang
@@ -264,7 +278,7 @@ const LaporanLabaBarangPage = () => {
             <Package className="w-8 h-8 text-orange-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {formatRupiah(summary.totalModal)}
+            Rp {formatNumber(summary.totalModal)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Biaya pokok</p>
         </div>
@@ -275,7 +289,7 @@ const LaporanLabaBarangPage = () => {
             <TrendingUp className="w-8 h-8 text-green-500" />
           </div>
           <p className="text-2xl font-bold text-green-600">
-            {formatRupiah(summary.totalLaba)}
+            Rp {formatNumber(summary.totalLaba)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Akumulasi profit</p>
         </div>

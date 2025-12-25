@@ -1779,6 +1779,9 @@ const DataBarangPage = () => {
                       <input
                         type="number"
                         name="ukuran"
+                        onWheel={(e) =>
+                          (e.target as HTMLInputElement).blur()
+                        }
                         className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
                         placeholder="1"
                         required
@@ -1835,6 +1838,9 @@ const DataBarangPage = () => {
                       <input
                         type="number"
                         name="jumlahPerKemasan"
+                        onWheel={(e) =>
+                          (e.target as HTMLInputElement).blur()
+                        }
                         className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
                         placeholder="24"
                         required
@@ -1874,6 +1880,9 @@ const DataBarangPage = () => {
                         value={addFormLimitPenjualan}
                         onChange={(e) =>
                           setAddFormLimitPenjualan(e.target.value)
+                        }
+                        onWheel={(e) =>
+                          (e.target as HTMLInputElement).blur()
                         }
                         className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
                         placeholder="Contoh: 100"
@@ -2086,6 +2095,9 @@ const DataBarangPage = () => {
                         name="ukuran"
                         value={editingBarang.data.ukuran}
                         onChange={handleInputChange}
+                        onWheel={(e) =>
+                          (e.target as HTMLInputElement).blur()
+                        }
                         className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
                         required
                       />
@@ -2149,6 +2161,9 @@ const DataBarangPage = () => {
                         name="jumlahPerKemasan"
                         value={editingBarang.data.jumlahPerKemasan}
                         onChange={handleInputChange}
+                        onWheel={(e) =>
+                          (e.target as HTMLInputElement).blur()
+                        }
                         className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
                         required
                       />
@@ -2186,6 +2201,9 @@ const DataBarangPage = () => {
                         name="limitPenjualan"
                         value={editingBarang.data.limitPenjualan}
                         onChange={handleInputChange}
+                        onWheel={(e) =>
+                          (e.target as HTMLInputElement).blur()
+                        }
                         className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
                         placeholder="Contoh: 100"
                         min="0"

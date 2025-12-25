@@ -14,6 +14,13 @@ function bigIntToNumber(value: bigint | number): number {
 
 // Helper to serialize data
 function serializeItem(item: any) {
+  const totalItem = bigIntToNumber(item.totalItem);
+  const jumlahPerKemasan = item.barang
+    ? bigIntToNumber(item.barang.jumlahPerKemasan)
+    : 0;
+  const jumlahDus =
+    jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
+
   return {
     ...item,
     id: Number(item.id),
@@ -21,7 +28,8 @@ function serializeItem(item: any) {
     barangId: Number(item.barangId),
     hargaPokok: bigIntToNumber(item.hargaPokok),
     diskonPerItem: bigIntToNumber(item.diskonPerItem),
-    jumlahDus: bigIntToNumber(item.jumlahDus),
+    totalItem,
+    jumlahDus,
     barang: item.barang
       ? {
           ...item.barang,
@@ -65,11 +73,15 @@ function serializePembelian(p: any) {
 async function updatePembelianTotals(pembelianId: number) {
   const items = await prisma.pembelianItem.findMany({
     where: { pembelianId },
+    include: { barang: true },
   });
 
   const subtotal = items.reduce((total, item) => {
     const hargaPokok = bigIntToNumber(item.hargaPokok);
-    const jumlahDus = bigIntToNumber(item.jumlahDus);
+    const totalItem = bigIntToNumber(item.totalItem);
+    const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+    const jumlahDus =
+      jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
     const diskonPerItem = bigIntToNumber(item.diskonPerItem);
     const totalHarga = hargaPokok * jumlahDus;
     const totalDiskon = diskonPerItem * jumlahDus;
@@ -113,7 +125,10 @@ export async function GET(
 
     const itemsWithCalc = items.map((item) => {
       const hargaPokok = bigIntToNumber(item.hargaPokok);
-      const jumlahDus = bigIntToNumber(item.jumlahDus);
+      const totalItem = bigIntToNumber(item.totalItem);
+      const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+      const jumlahDus =
+        jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
       const diskonPerItem = bigIntToNumber(item.diskonPerItem);
       const totalHarga = hargaPokok * jumlahDus;
       const totalDiskon = diskonPerItem * jumlahDus;
@@ -151,14 +166,15 @@ export async function POST(
     const { id } = await params;
     const pembelianId = parseInt(id);
     const body = await request.json();
-    const { barangId, jumlahDus, hargaPokok, diskonPerItem = 0 } = body;
+    const { barangId, jumlahDus, totalItem, hargaPokok, diskonPerItem = 0 } =
+      body;
 
     // Validasi input
-    if (!barangId || !jumlahDus || hargaPokok === undefined) {
+    if (!barangId || (jumlahDus === undefined && totalItem === undefined) || hargaPokok === undefined) {
       return NextResponse.json(
         {
           success: false,
-          error: "barangId, jumlahDus, dan hargaPokok wajib diisi",
+          error: "barangId, totalItem/jumlahDus, dan hargaPokok wajib diisi",
         },
         { status: 400 }
       );
@@ -205,6 +221,12 @@ export async function POST(
       );
     }
 
+    const jumlahPerKemasan = bigIntToNumber(barang.jumlahPerKemasan);
+    const normalizedTotalItem =
+      totalItem !== undefined
+        ? Number(totalItem)
+        : Number(jumlahDus) * jumlahPerKemasan;
+
     // Cek apakah barang sudah ada di keranjang
     const existingItem = await prisma.pembelianItem.findFirst({
       where: { pembelianId, barangId },
@@ -215,11 +237,12 @@ export async function POST(
 
     if (existingItem) {
       // Update jumlah jika sudah ada
-      const newJumlahDus = bigIntToNumber(existingItem.jumlahDus) + jumlahDus;
+      const newTotalItem =
+        bigIntToNumber(existingItem.totalItem) + normalizedTotalItem;
       item = await prisma.pembelianItem.update({
         where: { id: existingItem.id },
         data: {
-          jumlahDus: BigInt(newJumlahDus),
+          totalItem: BigInt(newTotalItem),
           hargaPokok: BigInt(hargaPokok),
           diskonPerItem: BigInt(diskonPerItem),
         },
@@ -232,7 +255,7 @@ export async function POST(
         data: {
           pembelianId,
           barangId,
-          jumlahDus: BigInt(jumlahDus),
+          totalItem: BigInt(normalizedTotalItem),
           hargaPokok: BigInt(hargaPokok),
           diskonPerItem: BigInt(diskonPerItem),
         },
@@ -261,7 +284,10 @@ export async function POST(
     if (updatedPembelian) {
       const items = updatedPembelian.items.map((item: any) => {
         const hargaPokok = bigIntToNumber(item.hargaPokok);
-        const jumlahDus = bigIntToNumber(item.jumlahDus);
+        const totalItem = bigIntToNumber(item.totalItem);
+        const jumlahPerKemasan = bigIntToNumber(item.barang.jumlahPerKemasan);
+        const jumlahDus =
+          jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
         const diskonPerItem = bigIntToNumber(item.diskonPerItem);
         const totalHarga = hargaPokok * jumlahDus;
         const totalDiskon = diskonPerItem * jumlahDus;
@@ -272,6 +298,7 @@ export async function POST(
           barangId: item.barangId,
           namaBarang: item.barang.namaBarang,
           jumlahDus,
+          totalItem,
           hargaPokok,
           totalHarga,
           diskonPerItem,

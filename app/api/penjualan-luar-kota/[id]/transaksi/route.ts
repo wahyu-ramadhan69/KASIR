@@ -110,9 +110,7 @@ export async function POST(
     const kodePenjualan = await prisma.$transaction(
       async (tx) => {
         // Acquire advisory lock - ini akan block sampai lock didapat
-        await tx.$executeRawUnsafe(
-          `SELECT pg_advisory_xact_lock(${lockKey})`
-        );
+        await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${lockKey})`);
 
         // Cari kode penjualan terakhir hari ini
         const lastPenjualan = await tx.penjualanHeader.findFirst({
@@ -253,8 +251,10 @@ export async function POST(
       }
 
       const totalPcs =
-        Number(item.jumlahDus) * Number(barang.jumlahPerKemasan) +
-        Number(item.jumlahPcs);
+        item.totalItem !== undefined && item.totalItem !== null
+          ? Number(item.totalItem)
+          : Number(item.jumlahDus) * Number(barang.jumlahPerKemasan) +
+            Number(item.jumlahPcs);
       const manifest = manifestMap.get(item.barangId);
 
       if (manifest) {
@@ -286,8 +286,7 @@ export async function POST(
 
       itemsData.push({
         barangId: item.barangId,
-        jumlahDus: BigInt(item.jumlahDus),
-        jumlahPcs: BigInt(item.jumlahPcs),
+        totalItem: BigInt(totalPcs),
         hargaJual: BigInt(hargaPerPcs),
         hargaBeli: BigInt(Math.floor(hargaBeliPerPcs)),
         diskonPerItem: BigInt(diskon),
@@ -308,11 +307,13 @@ export async function POST(
     const penjualan = await prisma.penjualanHeader.create({
       data: {
         kodePenjualan,
-        perjalananSalesId: perjalananId,
-        customerId: customerId || null,
-        namaCustomer: body.namaCustomer || null,
-        karyawanId: perjalanan.karyawanId,
-        namaSales: perjalanan.karyawan.nama,
+        perjalananSales: {
+          connect: { id: perjalananId },
+        },
+        ...(customerId ? { customer: { connect: { id: customerId } } } : {}),
+        karyawan: {
+          connect: { id: perjalanan.karyawanId },
+        },
         subtotal: BigInt(subtotal),
         diskonNota: BigInt(diskonNota),
         totalHarga: BigInt(totalHarga),
@@ -378,8 +379,10 @@ export async function POST(
       if (!barang) continue;
 
       const totalPcsJual =
-        Number(item.jumlahDus) * Number(barang.jumlahPerKemasan) +
-        Number(item.jumlahPcs);
+        item.totalItem !== undefined && item.totalItem !== null
+          ? Number(item.totalItem)
+          : Number(item.jumlahDus) * Number(barang.jumlahPerKemasan) +
+            Number(item.jumlahPcs);
       const currentStokPcs = Number(barang.stok);
       const newStokPcs = currentStokPcs - totalPcsJual;
 
@@ -399,7 +402,9 @@ export async function POST(
       if (!manifest) continue;
       const jumlahPerDus = Number(manifest.barang.jumlahPerKemasan) || 1;
       const totalPcsJual =
-        Number(item.jumlahDus) * jumlahPerDus + Number(item.jumlahPcs);
+        item.totalItem !== undefined && item.totalItem !== null
+          ? Number(item.totalItem)
+          : Number(item.jumlahDus) * jumlahPerDus + Number(item.jumlahPcs);
       const sisaSebelumnya = Number(manifest.totalItem);
       const sisaBaru = Math.max(0, sisaSebelumnya - totalPcsJual);
 
@@ -488,7 +493,9 @@ export async function GET(
 
     const transaksi = await prisma.penjualanHeader.findMany({
       where: {
-        perjalananSalesId: perjalananId,
+        perjalananSales: {
+          id: perjalananId,
+        },
       },
       include: {
         items: {

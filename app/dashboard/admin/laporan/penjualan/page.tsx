@@ -25,8 +25,9 @@ interface Barang {
 interface PenjualanItem {
   id: number;
   barangId: number;
-  jumlahDus: number;
-  jumlahPcs: number;
+  totalItem?: number;
+  jumlahDus?: number;
+  jumlahPcs?: number;
   hargaJual: number;
   hargaBeli: number;
   diskonPerItem: number;
@@ -326,6 +327,20 @@ const LaporanPenjualanPage = () => {
     }).format(number);
   };
 
+  const formatNumber = (num: number): string => {
+    const sign = num < 0 ? "-" : "";
+    const abs = Math.abs(num);
+    const formatShort = (value: number, suffix: string) => {
+      const rounded = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
+      return `${sign}${rounded} ${suffix}`;
+    };
+
+    if (abs >= 1000000000) return formatShort(abs / 1000000000, "M");
+    if (abs >= 1000000) return formatShort(abs / 1000000, "jt");
+    if (abs >= 1000) return formatShort(abs / 1000, "rb");
+    return `${num}`;
+  };
+
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString("id-ID", {
       day: "2-digit",
@@ -344,6 +359,26 @@ const LaporanPenjualanPage = () => {
     });
   };
 
+  const getTotalItemPcs = (item: PenjualanItem): number => {
+    if (item.totalItem !== undefined && item.totalItem !== null) {
+      return Number(item.totalItem || 0);
+    }
+    const perKemasan = Math.max(1, item.barang.jumlahPerKemasan || 1);
+    const jumlahDus = Number(item.jumlahDus || 0);
+    const jumlahPcs = Number(item.jumlahPcs || 0);
+    return jumlahDus * perKemasan + jumlahPcs;
+  };
+
+  const deriveDusPcsFromTotal = (
+    totalItem: number,
+    jumlahPerKemasan: number
+  ) => {
+    const perKemasan = Math.max(1, jumlahPerKemasan || 1);
+    const jumlahDus = Math.floor(totalItem / perKemasan);
+    const jumlahPcs = totalItem % perKemasan;
+    return { jumlahDus, jumlahPcs };
+  };
+
   const getTotalLabaPenjualan = (penjualan: PenjualanHeader): number => {
     return penjualan.items?.reduce((sum, item) => sum + item.laba, 0) || 0;
   };
@@ -351,11 +386,16 @@ const LaporanPenjualanPage = () => {
   const getTotalModalPenjualan = (penjualan: PenjualanHeader): number => {
     return (
       penjualan.items?.reduce((sum, item) => {
-        const modalDus = item.hargaBeli * item.jumlahDus;
+        const totalItem = getTotalItemPcs(item);
+        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+          totalItem,
+          item.barang.jumlahPerKemasan
+        );
+        const modalDus = item.hargaBeli * jumlahDus;
         const modalPcs =
-          item.jumlahPcs > 0
+          jumlahPcs > 0
             ? Math.round(
-                (item.hargaBeli / item.barang.jumlahPerKemasan) * item.jumlahPcs
+                (item.hargaBeli / item.barang.jumlahPerKemasan) * jumlahPcs
               )
             : 0;
         return sum + modalDus + modalPcs;
@@ -444,7 +484,7 @@ const LaporanPenjualanPage = () => {
             <DollarSign className="w-8 h-8 text-blue-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {formatRupiah(stats.totalPenjualan)}
+            Rp {formatNumber(stats.totalPenjualan)}
           </p>
           <p className="text-xs text-gray-500 mt-1">
             {stats.jumlahTransaksi} transaksi
@@ -457,7 +497,7 @@ const LaporanPenjualanPage = () => {
             <Package className="w-8 h-8 text-orange-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {formatRupiah(stats.totalModal)}
+            Rp {formatNumber(stats.totalModal)}
           </p>
           <p className="text-xs text-gray-500 mt-1">{stats.jumlahItem} item</p>
         </div>
@@ -468,7 +508,7 @@ const LaporanPenjualanPage = () => {
             <TrendingUp className="w-8 h-8 text-green-500" />
           </div>
           <p className="text-2xl font-bold text-green-600">
-            {formatRupiah(stats.totalLaba)}
+            Rp {formatNumber(stats.totalLaba)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Keuntungan bersih</p>
         </div>
@@ -493,7 +533,7 @@ const LaporanPenjualanPage = () => {
             {stats.totalDus?.toLocaleString() || 0} dus
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {stats.totalPcs?.toLocaleString() || 0} pcs
+            {stats.totalPcs?.toLocaleString() || 0} item
           </p>
         </div>
       </div>
@@ -792,12 +832,17 @@ const LaporanPenjualanPage = () => {
                   </thead>
                   <tbody className="divide-y">
                     {selectedPenjualan.items?.map((item) => {
-                      const modalDus = item.hargaBeli * item.jumlahDus;
+                      const totalItem = getTotalItemPcs(item);
+                      const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+                        totalItem,
+                        item.barang.jumlahPerKemasan
+                      );
+                      const modalDus = item.hargaBeli * jumlahDus;
                       const modalPcs =
-                        item.jumlahPcs > 0
+                        jumlahPcs > 0
                           ? Math.round(
                               (item.hargaBeli / item.barang.jumlahPerKemasan) *
-                                item.jumlahPcs
+                                jumlahPcs
                             )
                           : 0;
                       const totalModal = modalDus + modalPcs;
@@ -810,13 +855,15 @@ const LaporanPenjualanPage = () => {
                             </p>
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {item.jumlahDus > 0 && (
-                              <span>{item.jumlahDus} dus</span>
+                            {jumlahDus > 0 && (
+                              <span>
+                                {jumlahDus} {item.barang?.satuan || "kemasan"}
+                              </span>
                             )}
-                            {item.jumlahPcs > 0 && (
+                            {jumlahPcs > 0 && (
                               <span className="text-gray-500">
                                 {" "}
-                                +{item.jumlahPcs} pcs
+                                +{jumlahPcs} item
                               </span>
                             )}
                           </td>

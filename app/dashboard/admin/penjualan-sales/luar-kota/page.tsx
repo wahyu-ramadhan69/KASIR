@@ -477,11 +477,12 @@ const CreatePerjalananPage = () => {
 
             <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
               <div className="grid grid-cols-2 gap-3">
-                {filteredBarang.map((barang) => {
-                  const isLowStock = barang.stok < barang.jumlahPerKemasan;
-                  const isMediumStock =
-                    barang.stok >= barang.jumlahPerKemasan &&
-                    barang.stok < barang.jumlahPerKemasan * 5;
+                  {filteredBarang.map((barang) => {
+                    const isLowStock = barang.stok < barang.jumlahPerKemasan;
+                    const isOutOfStock = barang.stok <= 0;
+                    const isMediumStock =
+                      barang.stok >= barang.jumlahPerKemasan &&
+                      barang.stok < barang.jumlahPerKemasan * 5;
                   const isInManifest = manifestItems.some(
                     (item) => item.barangId === barang.id
                   );
@@ -606,7 +607,9 @@ const CreatePerjalananPage = () => {
                               <div className="flex items-center gap-1.5 text-red-600 animate-in slide-in-from-left duration-300">
                                 <AlertCircle className="w-3 h-3" />
                                 <span className="text-[10px] font-bold">
-                                  Stok Menipis!
+                                  {isOutOfStock
+                                    ? "Stok Habis!"
+                                    : "Stok Menipis!"}
                                 </span>
                               </div>
                             )}

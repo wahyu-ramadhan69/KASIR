@@ -286,22 +286,26 @@ export async function GET(
 
     ${penjualan.items
       .map((item) => {
+        const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan) || 1;
         const jumlahTotal =
-          Number(item.jumlahDus) * Number(item.barang.jumlahPerKemasan) +
-          Number(item.jumlahPcs || 0);
+          item.totalItem !== undefined && item.totalItem !== null
+            ? Number(item.totalItem)
+            : Number(item.jumlahDus) * jumlahPerKemasan +
+              Number(item.jumlahPcs || 0);
+        const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
+        const jumlahPcs = jumlahTotal % jumlahPerKemasan;
         const hargaSatuan = Number(item.hargaJual || item.barang.hargaJual);
         const totalHarga = jumlahTotal * hargaSatuan;
-        const diskonTotal = Number(item.diskonPerItem) * Number(item.jumlahDus);
+        const diskonTotal = Number(item.diskonPerItem) * jumlahDus;
         const totalSetelahDiskon = totalHarga - diskonTotal;
+        const labelKemasan = item.barang?.jenisKemasan || "dus";
 
         return `
     <div class="item-row">
       <div class="item-name">${item.barang.namaBarang}</div>
       <div class="item-details">
         <span>${formatRupiah(hargaSatuan)}</span>
-        <span style="text-align: center;">${Number(item.jumlahDus)} dus + ${
-          Number(item.jumlahPcs || 0)
-        } pcs</span>
+        <span style="text-align: center;">${jumlahDus} ${labelKemasan} + ${jumlahPcs} item</span>
         <span style="text-align: right;">${formatRupiah(
           totalSetelahDiskon
         )}</span>

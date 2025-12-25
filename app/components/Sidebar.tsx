@@ -151,6 +151,11 @@ const transactionLinks = [
         href: "/dashboard/admin/penjualan-sales/luar-kota/riwayat",
         icon: <History className="w-4 h-4" />,
       },
+      {
+        label: "Pengembalian Kanvas",
+        href: "/dashboard/admin/penjualan-sales/riwayat/pengembalian",
+        icon: <History className="w-4 h-4" />,
+      },
     ],
   },
   {

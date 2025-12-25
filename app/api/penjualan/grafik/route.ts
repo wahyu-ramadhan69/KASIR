@@ -5,6 +5,22 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
+  const perKemasan = Math.max(1, jumlahPerKemasan);
+  const jumlahDus = Math.floor(totalItem / perKemasan);
+  const jumlahPcs = totalItem % perKemasan;
+  return { jumlahDus, jumlahPcs };
+}
+
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
+  if (item.totalItem !== undefined && item.totalItem !== null) {
+    return Number(item.totalItem);
+  }
+  const jumlahDus = Number(item.jumlahDus);
+  const jumlahPcs = Number(item.jumlahPcs);
+  return jumlahDus * jumlahPerKemasan + jumlahPcs;
+}
+
 // Deep serialize to handle all BigInt in nested objects
 function deepSerialize(obj: any): any {
   if (obj === null || obj === undefined) {
@@ -124,8 +140,12 @@ export async function GET(request: Request) {
       select: {
         hargaJual: true,
         hargaBeli: true,
-        jumlahDus: true,
-        jumlahPcs: true,
+        totalItem: true,
+        barang: {
+          select: {
+            jumlahPerKemasan: true,
+          },
+        },
         penjualan: {
           select: { tanggalTransaksi: true },
         },
@@ -289,7 +309,13 @@ export async function GET(request: Request) {
       }
 
       // Laba Kotor = (hargaJual - hargaBeli) * total quantity
-      const totalQty = Number(item.jumlahDus) + Number(item.jumlahPcs);
+      const jumlahPerKemasan = Number(item.barang?.jumlahPerKemasan || 1);
+      const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+      const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+        totalPcs,
+        jumlahPerKemasan
+      );
+      const totalQty = jumlahDus + jumlahPcs;
       const labaKotorPerItem =
         (Number(item.hargaJual) - Number(item.hargaBeli)) * totalQty;
       dataMap[key].labaKotor += labaKotorPerItem;

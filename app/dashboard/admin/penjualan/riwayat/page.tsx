@@ -52,6 +52,7 @@ interface Barang {
   hargaJual: number;
   stok: number;
   jumlahPerKemasan: number;
+  jenisKemasan?: string;
   ukuran: number;
   satuan: string;
 }
@@ -61,6 +62,7 @@ interface PenjualanItem {
   barangId: number;
   jumlahDus: number;
   jumlahPcs: number;
+  totalItem?: number;
   hargaJual: number;
   diskonPerItem: number;
   barang: Barang;
@@ -668,7 +670,7 @@ const RiwayatPenjualanPage = () => {
                       Kode
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Customer/Sales
+                      Customer
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Tanggal
@@ -976,18 +978,34 @@ const RiwayatPenjualanPage = () => {
                     </thead>
                     <tbody className="divide-y">
                       {selectedPenjualan.items?.map((item) => {
+                        const jumlahPerKemasan =
+                          item.barang?.jumlahPerKemasan || 1;
+                        const totalItem =
+                          item.totalItem ??
+                          item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
+                        const jumlahKemasan = Math.floor(
+                          totalItem / jumlahPerKemasan
+                        );
+                        const jumlahSisa = totalItem % jumlahPerKemasan;
                         const hargaPcs =
-                          item.jumlahPcs > 0
+                          jumlahSisa > 0
                             ? Math.round(
-                                (item.hargaJual /
-                                  item.barang.jumlahPerKemasan) *
-                                  item.jumlahPcs
+                                (item.hargaJual / jumlahPerKemasan) *
+                                  jumlahSisa
                               )
                             : 0;
                         const subtotal =
-                          item.hargaJual * item.jumlahDus +
+                          item.hargaJual * jumlahKemasan +
                           hargaPcs -
-                          item.diskonPerItem * item.jumlahDus;
+                          item.diskonPerItem * jumlahKemasan;
+                        const labelKemasan =
+                          item.barang?.jenisKemasan || "dus";
+                        const qtyText =
+                          jumlahKemasan > 0 && jumlahSisa > 0
+                            ? `${jumlahKemasan} ${labelKemasan} & ${jumlahSisa} item`
+                            : jumlahKemasan > 0
+                            ? `${jumlahKemasan} ${labelKemasan}`
+                            : `${jumlahSisa} item`;
 
                         return (
                           <tr key={item.id}>
@@ -996,28 +1014,19 @@ const RiwayatPenjualanPage = () => {
                                 {item.barang?.namaBarang}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {item.barang?.jumlahPerKemasan} pcs/dus
+                                {jumlahPerKemasan} pcs/{labelKemasan}
                               </p>
                             </td>
                             <td className="px-3 py-2 text-center">
-                              {item.jumlahDus > 0 && (
-                                <span className="block">
-                                  {item.jumlahDus} dus
-                                </span>
-                              )}
-                              {item.jumlahPcs > 0 && (
-                                <span className="block text-gray-500">
-                                  +{item.jumlahPcs} pcs
-                                </span>
-                              )}
+                              <span className="block">{qtyText}</span>
                             </td>
                             <td className="px-3 py-2 text-right">
-                              {formatRupiah(item.hargaJual)}/dus
+                              {formatRupiah(item.hargaJual)}/{labelKemasan}
                             </td>
                             <td className="px-3 py-2 text-right text-red-500">
                               {item.diskonPerItem > 0
                                 ? `-${formatRupiah(
-                                    item.diskonPerItem * item.jumlahDus
+                                    item.diskonPerItem * jumlahKemasan
                                   )}`
                                 : "-"}
                             </td>

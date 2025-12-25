@@ -119,7 +119,10 @@ export async function GET(request: NextRequest) {
       totalDiskon += diskonNota;
 
       pembelian.items.forEach((item) => {
-        const jumlahDus = toNumber(item.jumlahDus);
+        const totalItem = toNumber(item.totalItem);
+        const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan);
+        const jumlahDus =
+          jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
         jumlahItem += 1;
         totalDus += jumlahDus;
       });
@@ -129,7 +132,11 @@ export async function GET(request: NextRequest) {
     const allPembelian = await prisma.pembelianHeader.findMany({
       where,
       include: {
-        items: true,
+        items: {
+          include: {
+            barang: true,
+          },
+        },
       },
     });
 
@@ -144,17 +151,39 @@ export async function GET(request: NextRequest) {
 
       pembelian.items.forEach((item) => {
         jumlahItemAll += 1;
-        totalDusAll += toNumber(item.jumlahDus);
+        const totalItem = toNumber(item.totalItem);
+        const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan);
+        const jumlahDus =
+          jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
+        totalDusAll += jumlahDus;
       });
     });
 
     const totalPages = Math.ceil(totalCount / limit);
     const hasMore = page < totalPages;
 
+    const serializedPembelian = pembelianList.map((pembelian) => ({
+      ...pembelian,
+      items: pembelian.items.map((item: any) => {
+        const totalItem = toNumber(item.totalItem);
+        const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan);
+        const jumlahDus =
+          jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
+
+        return {
+          ...item,
+          totalItem,
+          jumlahDus,
+          hargaPokok: toNumber(item.hargaPokok),
+          diskonPerItem: toNumber(item.diskonPerItem),
+        };
+      }),
+    }));
+
     return NextResponse.json(
       deepSerialize({
         success: true,
-        data: pembelianList,
+        data: serializedPembelian,
         pagination: {
           page,
           limit,
