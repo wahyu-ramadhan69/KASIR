@@ -32,7 +32,7 @@ export default async function RootLayout({
           </div>
         </div>
         <div className="text-blue-gray-600">
-          <footer className="py-2"></footer>
+          {/* <footer className="py-2"></footer> */}
         </div>
       </div>
     </div>

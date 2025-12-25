@@ -47,10 +47,7 @@ function getPicPenjualan(p: any, userNameById: Map<number, string>): string {
   }
 
   return (
-    p.perjalananSales?.karyawan?.nama ||
-    p.karyawan?.nama ||
-    p.namaSales ||
-    "-"
+    p.perjalananSales?.karyawan?.nama || p.karyawan?.nama || p.namaSales || "-"
   );
 }
 
@@ -477,8 +474,8 @@ async function generateLaporanPenjualan(
     "Kode",
     "Tanggal",
     "Customer",
-    "Kemasan",
-    "Item",
+    "Qty Kemasan",
+    "Qty Item",
     "Penjualan",
     "Modal",
     "Laba",
@@ -767,10 +764,7 @@ async function generateLaporanPembelian(
         toNumber(item.barang.jumlahPerKemasan)
       );
       const totalItem = toNumber(item.totalItem);
-      const { jumlahDus } = deriveDusPcsFromTotal(
-        totalItem,
-        jumlahPerKemasan
-      );
+      const { jumlahDus } = deriveDusPcsFromTotal(totalItem, jumlahPerKemasan);
 
       totalDiskon += diskonPerItem * jumlahDus;
       totalDus += jumlahDus;
@@ -1142,8 +1136,7 @@ async function generateRingkasan(
   );
 
   const labaKotor = totalLabaPenjualan;
-  const labaBersih =
-    labaKotor - totalPengeluaran - totalPengembalianRusak;
+  const labaBersih = labaKotor - totalPengeluaran - totalPengembalianRusak;
   const marginRataRata =
     totalPenjualan > 0 ? (labaKotor / totalPenjualan) * 100 : 0;
 
@@ -1373,8 +1366,8 @@ async function generateLaporanPenjualanDetail(
     "Customer",
     "Nama Barang",
     "Ukuran",
-    "Kemasan",
-    "Item",
+    "Qty Kemasan",
+    "Qty Item",
     "Harga Jual",
     "Modal",
     "Laba",
@@ -1423,8 +1416,7 @@ async function generateLaporanPenjualanDetail(
   let grandTotalLaba = 0;
 
   penjualanList.forEach((penjualan) => {
-    const customerName =
-      penjualan.customer?.nama || penjualan.namaCustomer || "-";
+    const customerName = penjualan.customer?.nama || "-";
     const tanggal = new Date(penjualan.tanggalTransaksi).toLocaleDateString(
       "id-ID"
     );
@@ -1466,7 +1458,9 @@ async function generateLaporanPenjualanDetail(
       row.getCell(6).value = customerName;
       row.getCell(7).value = item.barang.namaBarang;
       row.getCell(8).value = ukuran || "-";
-      row.getCell(9).value = `${jumlahDus} ${item.barang.jenisKemasan || "kemasan"}`;
+      row.getCell(9).value = `${jumlahDus} ${
+        item.barang.jenisKemasan || "kemasan"
+      }`;
       row.getCell(10).value = `${jumlahPcs} item`;
       row.getCell(11).value = totalHargaJual;
       row.getCell(12).value = totalModal;
@@ -1623,9 +1617,9 @@ async function generateLaporanPembelianDetail(
     "Supplier",
     "Nama Barang",
     "Ukuran",
-    "Kemasan",
+    "QTY Kemasan",
     "Harga Pokok",
-    "Diskon/Kemasan",
+    "Diskon",
     "Total",
   ];
   const headerRow = worksheet.getRow(4);
@@ -1675,10 +1669,7 @@ async function generateLaporanPembelianDetail(
         toNumber(item.barang.jumlahPerKemasan)
       );
       const totalItem = toNumber(item.totalItem);
-      const { jumlahDus } = deriveDusPcsFromTotal(
-        totalItem,
-        jumlahPerKemasan
-      );
+      const { jumlahDus } = deriveDusPcsFromTotal(totalItem, jumlahPerKemasan);
       const hargaPokok = toNumber(item.hargaPokok); // FIXED: menggunakan hargaPokok
       const diskonPerItem = toNumber(item.diskonPerItem);
       const ukuran = toNumber(item.barang.ukuran);
@@ -1823,7 +1814,10 @@ async function generateLaporanLabaBarang(
   >();
 
   for (const item of items) {
-    const jumlahPerKemasan = Math.max(1, toNumber(item.barang.jumlahPerKemasan));
+    const jumlahPerKemasan = Math.max(
+      1,
+      toNumber(item.barang.jumlahPerKemasan)
+    );
     const totalItemTerjual = toNumber(item.totalItem);
     const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
       totalItemTerjual,
@@ -1834,12 +1828,16 @@ async function generateLaporanLabaBarang(
 
     const modalDus = hargaBeli * jumlahDus;
     const modalPcs =
-      jumlahPcs > 0 ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs) : 0;
+      jumlahPcs > 0
+        ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
+        : 0;
     const totalModalItem = modalDus + modalPcs;
 
     const penjualanDus = hargaJual * jumlahDus;
     const penjualanPcs =
-      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
+      jumlahPcs > 0
+        ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
+        : 0;
     const totalPenjualanItem = penjualanDus + penjualanPcs;
 
     const labaItem =
@@ -1960,7 +1958,9 @@ async function generateLaporanLabaBarang(
     const excelRow = worksheet.getRow(rowIndex);
     excelRow.getCell("A").value = idx + 1;
     excelRow.getCell("B").value = row.namaBarang;
-    excelRow.getCell("C").value = `${row.jumlahPerKemasan} item/${row.jenisKemasan}`;
+    excelRow.getCell(
+      "C"
+    ).value = `${row.jumlahPerKemasan} item/${row.jenisKemasan}`;
     excelRow.getCell("D").value = row.totalKemasan;
     excelRow.getCell("E").value = row.totalItem;
     excelRow.getCell("F").value = row.totalPenjualan;
