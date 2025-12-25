@@ -168,6 +168,7 @@ export async function POST(request: NextRequest) {
       metodePembayaran = "CASH",
       tanggalJatuhTempo,
       customerId,
+      namaCustomer,
       salesId,
       namaSales,
       tanggalTransaksi,
@@ -324,7 +325,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Validasi customer untuk transaksi LUNAS toko
-    if (statusPembayaran === "LUNAS" && !isPenjualanSales && !customerId) {
+    if (
+      statusPembayaran === "LUNAS" &&
+      !isPenjualanSales &&
+      !customerId &&
+      !namaCustomer
+    ) {
       return NextResponse.json(
         { success: false, error: "Customer harus diisi" },
         { status: 400 }
@@ -415,6 +421,8 @@ export async function POST(request: NextRequest) {
 
       if (customerId) {
         createData.customerId = customerId;
+      } else if (namaCustomer) {
+        createData.namaCustomer = namaCustomer;
       }
 
       if (salesId) {
@@ -560,17 +568,26 @@ export async function POST(request: NextRequest) {
       return updated;
     });
 
+    const receiptCustomer = result.customer
+      ? {
+          nama: result.customer.nama,
+          namaToko: result.customer.namaToko,
+          piutang: toNumber(result.customer.piutang),
+          limit_piutang: toNumber(result.customer.limit_piutang),
+        }
+      : result.namaCustomer
+      ? {
+          nama: result.namaCustomer,
+          namaToko: "",
+          piutang: 0,
+          limit_piutang: 0,
+        }
+      : null;
+
     const receipt = {
       kodePenjualan: result.kodePenjualan,
       tanggal: result.tanggalTransaksi,
-      customer: result.customer
-        ? {
-            nama: result.customer.nama,
-            namaToko: result.customer.namaToko,
-            piutang: toNumber(result.customer.piutang),
-            limit_piutang: toNumber(result.customer.limit_piutang),
-          }
-        : null,
+      customer: receiptCustomer,
       karyawan: result.karyawan
         ? {
             id: result.karyawan.id,

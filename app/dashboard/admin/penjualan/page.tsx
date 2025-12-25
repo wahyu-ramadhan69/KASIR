@@ -839,6 +839,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
       if (selectedCustomer) {
         checkoutData.customerId = selectedCustomer.id;
+      } else if (manualCustomerName) {
+        checkoutData.namaCustomer = manualCustomerName;
       }
 
       if (isAdmin && tanggalTransaksi) {

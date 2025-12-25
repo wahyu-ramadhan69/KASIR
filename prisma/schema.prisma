@@ -125,6 +125,7 @@ model PenjualanHeader {
   kodePenjualan     String           @unique
   customer          Customer?        @relation(fields: [customerId], references: [id])
   customerId        Int?
+  namaCustomer      String?
   karyawan          Karyawan?        @relation(fields: [karyawanId], references: [id])
   karyawanId        Int?
   subtotal          BigInt           @default(0)
