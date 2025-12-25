@@ -17,9 +17,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const auth = await isAuthenticated();
-  if (!auth) {
-    redirect("/");
-  }
+  // if (!auth) {
+  //   redirect("/");
+  // }
   return (
     <div className="min-h-screen bg-gray-50/50">
       <Toaster position="top-right" />

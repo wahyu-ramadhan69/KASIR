@@ -521,6 +521,7 @@ async function generateDetailReport(
               namaBarang: true,
               ukuran: true,
               satuan: true,
+              jenisKemasan: true,
               jumlahPerKemasan: true,
             },
           },
@@ -531,7 +532,7 @@ async function generateDetailReport(
   const userNameById = await buildUserNameMap(penjualanList);
 
   // Title
-  worksheet.mergeCells("A1:R1");
+  worksheet.mergeCells("A1:S1");
   const titleCell = worksheet.getCell("A1");
   titleCell.value = "LAPORAN PENJUALAN DETAIL";
   titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
@@ -544,7 +545,7 @@ async function generateDetailReport(
   worksheet.getRow(1).height = 30;
 
   // Periode
-  worksheet.mergeCells("A2:R2");
+  worksheet.mergeCells("A2:S2");
   const periodeCell = worksheet.getCell("A2");
   periodeCell.value = `Periode: ${formatDateRange(
     filters.startDate || undefined,
@@ -554,7 +555,7 @@ async function generateDetailReport(
   periodeCell.alignment = { horizontal: "center" };
 
   // Total transaksi
-  worksheet.mergeCells("A3:R3");
+  worksheet.mergeCells("A3:S3");
   const totalCell = worksheet.getCell("A3");
   totalCell.value = `Total Transaksi: ${penjualanList.length}`;
   totalCell.font = { bold: true };
@@ -571,14 +572,15 @@ async function generateDetailReport(
   worksheet.getColumn(8).width = 14; // Kode Barang
   worksheet.getColumn(9).width = 22; // Nama Barang
   worksheet.getColumn(10).width = 12; // Ukuran
-  worksheet.getColumn(11).width = 12; // Qty
-  worksheet.getColumn(12).width = 12; // Harga Jual
-  worksheet.getColumn(13).width = 12; // Harga Beli
-  worksheet.getColumn(14).width = 12; // Diskon
-  worksheet.getColumn(15).width = 12; // Subtotal
-  worksheet.getColumn(16).width = 12; // Modal
-  worksheet.getColumn(17).width = 12; // Laba
-  worksheet.getColumn(18).width = 10; // Margin %
+  worksheet.getColumn(11).width = 14; // Qty kemasan
+  worksheet.getColumn(12).width = 14; // Qty total item
+  worksheet.getColumn(13).width = 12; // Harga Jual
+  worksheet.getColumn(14).width = 12; // Harga Beli
+  worksheet.getColumn(15).width = 12; // Diskon
+  worksheet.getColumn(16).width = 12; // Subtotal
+  worksheet.getColumn(17).width = 12; // Modal
+  worksheet.getColumn(18).width = 12; // Laba
+  worksheet.getColumn(19).width = 10; // Margin %
 
   let currentRow = 5;
   let grandTotalPenjualan = 0;
@@ -598,7 +600,8 @@ async function generateDetailReport(
       "Kode",
       "Nama Barang",
       "Ukuran",
-      "Qty",
+      "QTY Kemasan",
+      "QTY Total Item",
       "Harga Jual",
       "Harga Beli",
       "Diskon",
@@ -679,33 +682,34 @@ async function generateDetailReport(
       row.getCell(8).value = `BRG-${item.barang.id}`;
       row.getCell(9).value = item.barang.namaBarang;
       row.getCell(10).value = `${item.barang.ukuran} ${item.barang.satuan}`;
-      row.getCell(11).value = `${jumlahDus} (${totalPcs})`;
-      row.getCell(12).value = hargaJual;
-      row.getCell(13).value = hargaBeli;
-      row.getCell(14).value = totalDiskon;
-      row.getCell(15).value = subtotal;
-      row.getCell(16).value = totalModalItem;
-      row.getCell(17).value = laba;
-      row.getCell(18).value = marginItem;
+      row.getCell(11).value = `${jumlahDus} ${item.barang.jenisKemasan}`;
+      row.getCell(12).value = `${totalPcs} item`;
+      row.getCell(13).value = hargaJual;
+      row.getCell(14).value = hargaBeli;
+      row.getCell(15).value = totalDiskon;
+      row.getCell(16).value = subtotal;
+      row.getCell(17).value = totalModalItem;
+      row.getCell(18).value = laba;
+      row.getCell(19).value = marginItem;
 
       // Format
-      row.getCell(12).numFmt = "#,##0";
       row.getCell(13).numFmt = "#,##0";
       row.getCell(14).numFmt = "#,##0";
       row.getCell(15).numFmt = "#,##0";
       row.getCell(16).numFmt = "#,##0";
       row.getCell(17).numFmt = "#,##0";
-      row.getCell(18).numFmt = "0.00";
+      row.getCell(18).numFmt = "#,##0";
+      row.getCell(19).numFmt = "0.00";
 
       // Color laba
       if (laba > 0) {
-        row.getCell(17).font = { color: { argb: "FF388E3C" } };
+        row.getCell(18).font = { color: { argb: "FF388E3C" } };
       } else if (laba < 0) {
-        row.getCell(17).font = { color: { argb: "FFD32F2F" } };
+        row.getCell(18).font = { color: { argb: "FFD32F2F" } };
       }
 
       // Borders
-      for (let i = 1; i <= 18; i++) {
+      for (let i = 1; i <= 19; i++) {
         row.getCell(i).border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -721,30 +725,30 @@ async function generateDetailReport(
     const diskonNota = toNumber(penjualan.diskonNota);
     if (diskonNota > 0) {
       const diskonRow = worksheet.getRow(currentRow);
-      worksheet.mergeCells(`A${currentRow}:K${currentRow}`);
+      worksheet.mergeCells(`A${currentRow}:L${currentRow}`);
       diskonRow.getCell(1).value = "Diskon Nota:";
       diskonRow.getCell(1).alignment = { horizontal: "right" };
-      diskonRow.getCell(15).value = -diskonNota;
-      diskonRow.getCell(15).numFmt = "#,##0";
-      diskonRow.getCell(15).font = { color: { argb: "FFD32F2F" } };
+      diskonRow.getCell(16).value = -diskonNota;
+      diskonRow.getCell(16).numFmt = "#,##0";
+      diskonRow.getCell(16).font = { color: { argb: "FFD32F2F" } };
       subtotalPenjualan -= diskonNota;
       currentRow++;
     }
 
     // Subtotal per transaction
     const subtotalRow = worksheet.getRow(currentRow);
-    worksheet.mergeCells(`A${currentRow}:K${currentRow}`);
+    worksheet.mergeCells(`A${currentRow}:L${currentRow}`);
     subtotalRow.getCell(1).value = "SUBTOTAL:";
     subtotalRow.getCell(1).font = { bold: true };
     subtotalRow.getCell(1).alignment = { horizontal: "right" };
-    subtotalRow.getCell(15).value = subtotalPenjualan;
-    subtotalRow.getCell(16).value = subtotalModal;
-    subtotalRow.getCell(17).value = subtotalLaba;
-    subtotalRow.getCell(18).value =
+    subtotalRow.getCell(16).value = subtotalPenjualan;
+    subtotalRow.getCell(17).value = subtotalModal;
+    subtotalRow.getCell(18).value = subtotalLaba;
+    subtotalRow.getCell(19).value =
       subtotalPenjualan > 0 ? (subtotalLaba / subtotalPenjualan) * 100 : 0;
 
     subtotalRow.font = { bold: true };
-    for (let i = 1; i <= 18; i++) {
+    for (let i = 1; i <= 19; i++) {
       subtotalRow.getCell(i).fill = {
         type: "pattern",
         pattern: "solid",
@@ -752,10 +756,10 @@ async function generateDetailReport(
       };
     }
 
-    subtotalRow.getCell(15).numFmt = "#,##0";
     subtotalRow.getCell(16).numFmt = "#,##0";
     subtotalRow.getCell(17).numFmt = "#,##0";
-    subtotalRow.getCell(18).numFmt = "0.00";
+    subtotalRow.getCell(18).numFmt = "#,##0";
+    subtotalRow.getCell(19).numFmt = "0.00";
 
     grandTotalPenjualan += subtotalPenjualan;
     grandTotalModal += subtotalModal;
@@ -766,7 +770,7 @@ async function generateDetailReport(
 
   // Grand total
   const grandTotalRow = worksheet.getRow(currentRow);
-  worksheet.mergeCells(`A${currentRow}:K${currentRow}`);
+  worksheet.mergeCells(`A${currentRow}:L${currentRow}`);
   grandTotalRow.getCell(1).value = "GRAND TOTAL:";
   grandTotalRow.getCell(1).font = {
     bold: true,
@@ -774,14 +778,14 @@ async function generateDetailReport(
     color: { argb: "FFFFFFFF" },
   };
   grandTotalRow.getCell(1).alignment = { horizontal: "right" };
-  grandTotalRow.getCell(15).value = grandTotalPenjualan;
-  grandTotalRow.getCell(16).value = grandTotalModal;
-  grandTotalRow.getCell(17).value = grandTotalLaba;
-  grandTotalRow.getCell(18).value =
+  grandTotalRow.getCell(16).value = grandTotalPenjualan;
+  grandTotalRow.getCell(17).value = grandTotalModal;
+  grandTotalRow.getCell(18).value = grandTotalLaba;
+  grandTotalRow.getCell(19).value =
     grandTotalPenjualan > 0 ? (grandTotalLaba / grandTotalPenjualan) * 100 : 0;
 
   grandTotalRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  for (let i = 1; i <= 18; i++) {
+  for (let i = 1; i <= 19; i++) {
     grandTotalRow.getCell(i).fill = {
       type: "pattern",
       pattern: "solid",
@@ -789,12 +793,12 @@ async function generateDetailReport(
     };
   }
 
-  grandTotalRow.getCell(15).numFmt = "#,##0";
   grandTotalRow.getCell(16).numFmt = "#,##0";
   grandTotalRow.getCell(17).numFmt = "#,##0";
-  grandTotalRow.getCell(18).numFmt = "0.00";
+  grandTotalRow.getCell(18).numFmt = "#,##0";
+  grandTotalRow.getCell(19).numFmt = "0.00";
 
-  for (let i = 1; i <= 18; i++) {
+  for (let i = 1; i <= 19; i++) {
     grandTotalRow.getCell(i).border = {
       top: { style: "medium" },
       left: { style: "thin" },
