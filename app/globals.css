@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+/* Tambahkan CSS ini ke globals.css Anda */
+
+/* Sidebar content adjustment */
+@media (min-width: 1280px) {
+  /* Default state - sidebar expanded */
+  .sidebar-content {
+    margin-left: 20rem;
+    transition: margin-left 0.3s ease-in-out;
+  }
+
+  /* Collapsed state - akan dikontrol oleh JavaScript */
+  body.sidebar-collapsed .sidebar-content {
+    margin-left: 5rem;
+  }
+}
+
+@media (max-width: 1279px) {
+  .sidebar-content {
+    margin-left: 0;
+  }
+}

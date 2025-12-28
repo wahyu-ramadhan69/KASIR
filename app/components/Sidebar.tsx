@@ -13,7 +13,6 @@ import {
   ShoppingCart,
   ShoppingBag,
   ChevronDown,
-  ChevronRight,
   History,
   FileText,
   DollarSign,
@@ -30,6 +29,8 @@ import {
   Calendar1,
   CalendarDays,
   Undo2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 const navLinks = [
@@ -140,7 +141,6 @@ const transactionLinks = [
         href: "/dashboard/admin/penjualan-sales/kanvas",
         icon: <Truck className="w-4 h-4" />,
       },
-
       {
         label: "Riwayat Penjualan",
         href: "/dashboard/admin/penjualan-sales/riwayat",
@@ -236,28 +236,53 @@ const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Auto-expand menu jika ada submenu yang aktif
   useEffect(() => {
-    // Check master data links
-    masterDataLinks.forEach((link) => {
-      if (isSubMenuActive(link.subMenu) && !openMenus.includes(link.label)) {
-        setOpenMenus((prev) => [...prev, link.label]);
-      }
-    });
+    if (!isCollapsed) {
+      masterDataLinks.forEach((link) => {
+        if (isSubMenuActive(link.subMenu) && !openMenus.includes(link.label)) {
+          setOpenMenus((prev) => [...prev, link.label]);
+        }
+      });
 
-    // Check transaction links
-    transactionLinks.forEach((link) => {
-      if (isSubMenuActive(link.subMenu) && !openMenus.includes(link.label)) {
-        setOpenMenus((prev) => [...prev, link.label]);
-      }
-    });
-  }, [pathname]);
+      transactionLinks.forEach((link) => {
+        if (isSubMenuActive(link.subMenu) && !openMenus.includes(link.label)) {
+          setOpenMenus((prev) => [...prev, link.label]);
+        }
+      });
+    }
+  }, [pathname, isCollapsed]);
 
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileOpen(false);
   }, [pathname]);
+
+  // Close all menus when sidebar is collapsed
+  useEffect(() => {
+    if (isCollapsed) {
+      setOpenMenus([]);
+    }
+  }, [isCollapsed]);
+
+  // Update body class for layout adjustment
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (isCollapsed) {
+        document.body.classList.add("sidebar-collapsed");
+      } else {
+        document.body.classList.remove("sidebar-collapsed");
+      }
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        document.body.classList.remove("sidebar-collapsed");
+      }
+    };
+  }, [isCollapsed]);
 
   const handleLogout = async () => {
     try {
@@ -271,14 +296,17 @@ const Sidebar: React.FC = () => {
   };
 
   const toggleMenu = (label: string) => {
-    setOpenMenus((prev) =>
-      prev.includes(label)
-        ? prev.filter((item) => item !== label)
-        : [...prev, label]
-    );
+    if (!isCollapsed) {
+      setOpenMenus((prev) =>
+        prev.includes(label)
+          ? prev.filter((item) => item !== label)
+          : [...prev, label]
+      );
+    }
   };
 
-  const isMenuOpen = (label: string) => openMenus.includes(label);
+  const isMenuOpen = (label: string) =>
+    openMenus.includes(label) && !isCollapsed;
 
   const isSubMenuActive = (subMenu: { href: string }[]) =>
     subMenu.some((item) => pathname === item.href);
@@ -308,49 +336,83 @@ const Sidebar: React.FC = () => {
 
       {/* Sidebar */}
       <aside
-        className={`bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 fixed inset-0 z-50 my-4 ml-4 h-[calc(100vh-32px)] w-72 rounded-xl transition-transform duration-300 shadow-2xl border border-white/10 ${
-          isMobileOpen ? "translate-x-0" : "-translate-x-80"
-        } xl:translate-x-0`}
+        className={`bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 fixed inset-0 z-40 my-4 ml-4 h-[calc(100vh-32px)] rounded-xl transition-all duration-300 shadow-2xl border border-white/10 ${
+          isMobileOpen ? "translate-x-0 w-72" : "-translate-x-80 w-72"
+        } xl:translate-x-0 ${isCollapsed ? "xl:w-20" : "xl:w-72"}`}
       >
         {/* Header */}
         <div className="relative border-b border-white/10 bg-gradient-to-r from-blue-600/10 to-purple-600/10">
-          <Link
-            className="flex items-center gap-3 py-6 px-6 group"
-            href="/dashboard/admin"
+          <div
+            className={`flex items-center py-6 px-6 ${
+              isCollapsed ? "flex-col gap-4" : "justify-between"
+            }`}
           >
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow">
-              <LayoutDashboard className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h6 className="block font-sans text-sm font-bold text-white tracking-wide">
-                ADMIN
-              </h6>
-              <p className="text-xs text-gray-400">Dashboard</p>
-            </div>
-          </Link>
+            <Link
+              className={`flex items-center gap-3 group ${
+                isCollapsed ? "justify-center w-full" : "flex-1"
+              }`}
+              href="/dashboard/admin"
+            >
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow flex-shrink-0">
+                <LayoutDashboard className="w-5 h-5 text-white" />
+              </div>
+              {!isCollapsed && (
+                <div className="overflow-hidden">
+                  <h6 className="block font-sans text-sm font-bold text-white tracking-wide whitespace-nowrap">
+                    ADMIN
+                  </h6>
+                  <p className="text-xs text-gray-400 whitespace-nowrap">
+                    Dashboard
+                  </p>
+                </div>
+              )}
+            </Link>
+
+            {/* Toggle Button - Desktop Only */}
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className={`hidden xl:flex p-2 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 items-center justify-center group border border-white/10 ${
+                isCollapsed ? "w-full" : ""
+              }`}
+              type="button"
+              title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <ChevronLeft className="w-4 h-4" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}
-        <div className="px-4 py-4 h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
+        <div
+          className={`py-4 h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar ${
+            isCollapsed ? "px-2" : "px-4"
+          }`}
+        >
           {/* Menu Utama */}
           <div className="mb-6">
-            <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Menu Utama
-            </h3>
+            {!isCollapsed && (
+              <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                Menu Utama
+              </h3>
+            )}
             <ul className="flex flex-col gap-1">
               {navLinks.map((link) => (
-                <li key={link.href}>
+                <li key={link.href} className="relative group">
                   <Link href={link.href} scroll={false}>
                     <button
-                      className={`group w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
                         pathname === link.href
                           ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
                           : "text-gray-300 hover:bg-white/5 hover:text-white"
-                      }`}
+                      } ${isCollapsed ? "justify-center" : ""}`}
                       type="button"
                     >
                       <span
-                        className={`${
+                        className={`flex-shrink-0 ${
                           pathname === link.href
                             ? "text-white"
                             : "text-gray-400 group-hover:text-white"
@@ -358,9 +420,14 @@ const Sidebar: React.FC = () => {
                       >
                         {link.icon}
                       </span>
-                      <span>{link.label}</span>
+                      {!isCollapsed && <span>{link.label}</span>}
                     </button>
                   </Link>
+                  {isCollapsed && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
+                      {link.label}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -368,24 +435,25 @@ const Sidebar: React.FC = () => {
 
           {/* Master Data */}
           <div className="mb-6">
-            <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Data
-            </h3>
+            {!isCollapsed && (
+              <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                Data
+              </h3>
+            )}
             <ul className="flex flex-col gap-1">
               {masterDataLinks.map((link) => (
-                <li key={link.label}>
-                  {/* Parent Menu Button */}
+                <li key={link.label} className="relative group">
                   <button
                     onClick={() => toggleMenu(link.label)}
-                    className={`group w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
                       isSubMenuActive(link.subMenu)
                         ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
                         : "text-gray-300 hover:bg-white/5 hover:text-white"
-                    }`}
+                    } ${isCollapsed ? "justify-center" : ""}`}
                     type="button"
                   >
                     <span
-                      className={`${
+                      className={`flex-shrink-0 ${
                         isSubMenuActive(link.subMenu)
                           ? "text-white"
                           : "text-gray-400 group-hover:text-white"
@@ -393,50 +461,63 @@ const Sidebar: React.FC = () => {
                     >
                       {link.icon}
                     </span>
-                    <span className="flex-1 text-left">{link.label}</span>
-                    <span
-                      className={`transform transition-transform duration-200 ${
-                        isMenuOpen(link.label) ? "rotate-180" : ""
-                      }`}
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </span>
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{link.label}</span>
+                        <span
+                          className={`transform transition-transform duration-200 ${
+                            isMenuOpen(link.label) ? "rotate-180" : ""
+                          }`}
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </span>
+                      </>
+                    )}
                   </button>
 
+                  {/* Tooltip for collapsed state */}
+                  {isCollapsed && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
+                      {link.label}
+                    </div>
+                  )}
+
                   {/* Sub Menu */}
-                  <ul
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isMenuOpen(link.label)
-                        ? "max-h-96 opacity-100 mt-1"
-                        : "max-h-0 opacity-0"
-                    }`}
-                  >
-                    {link.subMenu.map((subItem) => (
-                      <li key={subItem.href}>
-                        <Link href={subItem.href} scroll={false}>
-                          <button
-                            className={`group w-full flex items-center gap-3 pl-12 pr-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
-                              pathname === subItem.href
-                                ? "text-blue-400 bg-blue-500/10"
-                                : "text-gray-400 hover:text-white hover:bg-white/5"
-                            }`}
-                            type="button"
-                          >
-                            <span
-                              className={`${
+                  {!isCollapsed && (
+                    <ul
+                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                        isMenuOpen(link.label)
+                          ? "max-h-96 opacity-100 mt-1"
+                          : "max-h-0 opacity-0"
+                      }`}
+                    >
+                      {link.subMenu.map((subItem) => (
+                        <li key={subItem.href}>
+                          <Link href={subItem.href} scroll={false}>
+                            <button
+                              className={`group w-full flex items-center gap-3 pl-12 pr-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
                                 pathname === subItem.href
-                                  ? "text-blue-400"
-                                  : "text-gray-500 group-hover:text-gray-300"
+                                  ? "text-blue-400 bg-blue-500/10"
+                                  : "text-gray-400 hover:text-white hover:bg-white/5"
                               }`}
+                              type="button"
                             >
-                              {subItem.icon}
-                            </span>
-                            <span className="text-xs">{subItem.label}</span>
-                          </button>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                              <span
+                                className={`${
+                                  pathname === subItem.href
+                                    ? "text-blue-400"
+                                    : "text-gray-500 group-hover:text-gray-300"
+                                }`}
+                              >
+                                {subItem.icon}
+                              </span>
+                              <span className="text-xs">{subItem.label}</span>
+                            </button>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
@@ -444,24 +525,25 @@ const Sidebar: React.FC = () => {
 
           {/* Transaksi */}
           <div className="mb-6">
-            <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Transaksi
-            </h3>
+            {!isCollapsed && (
+              <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                Transaksi
+              </h3>
+            )}
             <ul className="flex flex-col gap-1">
               {transactionLinks.map((link) => (
-                <li key={link.label}>
-                  {/* Parent Menu Button */}
+                <li key={link.label} className="relative group">
                   <button
                     onClick={() => toggleMenu(link.label)}
-                    className={`group w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
                       isSubMenuActive(link.subMenu)
                         ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
                         : "text-gray-300 hover:bg-white/5 hover:text-white"
-                    }`}
+                    } ${isCollapsed ? "justify-center" : ""}`}
                     type="button"
                   >
                     <span
-                      className={`${
+                      className={`flex-shrink-0 ${
                         isSubMenuActive(link.subMenu)
                           ? "text-white"
                           : "text-gray-400 group-hover:text-white"
@@ -469,50 +551,63 @@ const Sidebar: React.FC = () => {
                     >
                       {link.icon}
                     </span>
-                    <span className="flex-1 text-left">{link.label}</span>
-                    <span
-                      className={`transform transition-transform duration-200 ${
-                        isMenuOpen(link.label) ? "rotate-180" : ""
-                      }`}
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </span>
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{link.label}</span>
+                        <span
+                          className={`transform transition-transform duration-200 ${
+                            isMenuOpen(link.label) ? "rotate-180" : ""
+                          }`}
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </span>
+                      </>
+                    )}
                   </button>
 
+                  {/* Tooltip for collapsed state */}
+                  {isCollapsed && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
+                      {link.label}
+                    </div>
+                  )}
+
                   {/* Sub Menu */}
-                  <ul
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isMenuOpen(link.label)
-                        ? "max-h-96 opacity-100 mt-1"
-                        : "max-h-0 opacity-0"
-                    }`}
-                  >
-                    {link.subMenu.map((subItem) => (
-                      <li key={subItem.href}>
-                        <Link href={subItem.href} scroll={false}>
-                          <button
-                            className={`group w-full flex items-center gap-3 pl-12 pr-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
-                              pathname === subItem.href
-                                ? "text-blue-400 bg-blue-500/10"
-                                : "text-gray-400 hover:text-white hover:bg-white/5"
-                            }`}
-                            type="button"
-                          >
-                            <span
-                              className={`${
+                  {!isCollapsed && (
+                    <ul
+                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                        isMenuOpen(link.label)
+                          ? "max-h-96 opacity-100 mt-1"
+                          : "max-h-0 opacity-0"
+                      }`}
+                    >
+                      {link.subMenu.map((subItem) => (
+                        <li key={subItem.href}>
+                          <Link href={subItem.href} scroll={false}>
+                            <button
+                              className={`group w-full flex items-center gap-3 pl-12 pr-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
                                 pathname === subItem.href
-                                  ? "text-blue-400"
-                                  : "text-gray-500 group-hover:text-gray-300"
+                                  ? "text-blue-400 bg-blue-500/10"
+                                  : "text-gray-400 hover:text-white hover:bg-white/5"
                               }`}
+                              type="button"
                             >
-                              {subItem.icon}
-                            </span>
-                            <span className="text-xs">{subItem.label}</span>
-                          </button>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                              <span
+                                className={`${
+                                  pathname === subItem.href
+                                    ? "text-blue-400"
+                                    : "text-gray-500 group-hover:text-gray-300"
+                                }`}
+                              >
+                                {subItem.icon}
+                              </span>
+                              <span className="text-xs">{subItem.label}</span>
+                            </button>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
@@ -520,19 +615,30 @@ const Sidebar: React.FC = () => {
 
           {/* Account */}
           <div className="pt-4 border-t border-white/10">
-            <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Account
-            </h3>
-            <button
-              onClick={handleLogout}
-              className="group w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
-              type="button"
-            >
-              <span className="text-gray-400 group-hover:text-red-400">
-                <LogOut className="w-5 h-5" />
-              </span>
-              <span>Sign Out</span>
-            </button>
+            {!isCollapsed && (
+              <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                Account
+              </h3>
+            )}
+            <div className="relative group">
+              <button
+                onClick={handleLogout}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 ${
+                  isCollapsed ? "justify-center" : ""
+                }`}
+                type="button"
+              >
+                <span className="text-gray-400 group-hover:text-red-400 flex-shrink-0">
+                  <LogOut className="w-5 h-5" />
+                </span>
+                {!isCollapsed && <span>Sign Out</span>}
+              </button>
+              {isCollapsed && (
+                <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
+                  Sign Out
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </aside>

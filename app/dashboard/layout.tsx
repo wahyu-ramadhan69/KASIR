@@ -17,14 +17,14 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const auth = await isAuthenticated();
-  // if (!auth) {
-  //   redirect("/");
-  // }
+  if (!auth) {
+    redirect("/");
+  }
   return (
     <div className="min-h-screen bg-gray-50/50">
       <Toaster position="top-right" />
       <Sidebar />
-      <div className="p-4 xl:ml-80">
+      <div className="p-4 transition-all duration-300 xl:ml-80 sidebar-content">
         <Navbar />
         <div className="mt-2">
           <div className="flex justify-center mb-4 grid-cols-1 gap-6 xl:grid-cols-3">

@@ -134,10 +134,7 @@ const getTotalItemPcs = (item: CartItem): number => {
   return item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
 };
 
-const deriveDusPcsFromTotal = (
-  totalItem: number,
-  jumlahPerKemasan: number
-) => {
+const deriveDusPcsFromTotal = (totalItem: number, jumlahPerKemasan: number) => {
   const safePerKemasan = Math.max(1, jumlahPerKemasan);
   const jumlahDus = Math.floor(totalItem / safePerKemasan);
   const jumlahPcs = totalItem % safePerKemasan;
@@ -187,6 +184,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     [key: string]: "rupiah" | "persen";
   }>({});
   const [itemDiskonValues, setItemDiskonValues] = useState<{
+    [key: string]: string;
+  }>({});
+  const [itemHargaValues, setItemHargaValues] = useState<{
     [key: string]: string;
   }>({});
 
@@ -277,13 +277,13 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         const jumlahDus = useSingleItemMode
           ? 0
           : item.jumlahDus !== undefined
-            ? Number(item.jumlahDus)
-            : derived.jumlahDus;
+          ? Number(item.jumlahDus)
+          : derived.jumlahDus;
         const jumlahPcs = useSingleItemMode
           ? fallbackTotalItem
           : item.jumlahPcs !== undefined
-            ? Number(item.jumlahPcs)
-            : derived.jumlahPcs;
+          ? Number(item.jumlahPcs)
+          : derived.jumlahPcs;
 
         originalQtyMap[item.barangId] =
           (originalQtyMap[item.barangId] || 0) + fallbackTotalItem;
@@ -302,10 +302,14 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
       const diskonTypes: { [key: string]: "rupiah" | "persen" } = {};
       const diskonValues: { [key: string]: string } = {};
+      const hargaValues: { [key: string]: string } = {};
 
       newCartItems.forEach((item) => {
         diskonTypes[item.tempId] = "rupiah";
         diskonValues[item.tempId] = Number(item.diskonPerItem).toLocaleString(
+          "id-ID"
+        );
+        hargaValues[item.tempId] = Number(item.hargaJual).toLocaleString(
           "id-ID"
         );
       });
@@ -313,6 +317,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       setCartItems(newCartItems);
       setItemDiskonTypes(diskonTypes);
       setItemDiskonValues(diskonValues);
+      setItemHargaValues(hargaValues);
       setOriginalQtyByBarangId(originalQtyMap);
 
       if (penjualan.customer) {
@@ -328,9 +333,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
       setDiskonNotaType("rupiah");
       setDiskonNota(Number(penjualan.diskonNota).toLocaleString("id-ID"));
-      setJumlahDibayar(
-        Number(penjualan.jumlahDibayar).toLocaleString("id-ID")
-      );
+      setJumlahDibayar(Number(penjualan.jumlahDibayar).toLocaleString("id-ID"));
       setMetodePembayaran(penjualan.metodePembayaran);
 
       const transaksiDate = penjualan.tanggalTransaksi
@@ -498,6 +501,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     // Initialize diskon state untuk item baru
     setItemDiskonTypes((prev) => ({ ...prev, [newItem.tempId]: "rupiah" }));
     setItemDiskonValues((prev) => ({ ...prev, [newItem.tempId]: "0" }));
+    setItemHargaValues((prev) => ({
+      ...prev,
+      [newItem.tempId]: formatRupiahInput(String(newItem.hargaJual)),
+    }));
 
     toast.success(`${barang.namaBarang} ditambahkan ke item dijual`);
   };
@@ -659,6 +666,32 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     }
   };
 
+  const handleItemHargaChange = (item: CartItem, value: string) => {
+    const displayValue = value === "" ? "" : formatRupiahInput(value);
+    const hargaJual = parseRupiahToNumber(value);
+
+    setItemHargaValues((prev) => ({
+      ...prev,
+      [item.tempId]: displayValue,
+    }));
+
+    setCartItems((prevItems) =>
+      prevItems.map((cartItem) =>
+        cartItem.tempId === item.tempId ? { ...cartItem, hargaJual } : cartItem
+      )
+    );
+  };
+
+  const getItemHargaDisplayValue = (item: CartItem): string => {
+    const storedValue = itemHargaValues[item.tempId];
+
+    if (storedValue !== undefined) {
+      return storedValue;
+    }
+
+    return item.hargaJual.toLocaleString("id-ID");
+  };
+
   const handleDeleteItem = (tempId: string) => {
     setCartItems((prevItems) =>
       prevItems.filter((item) => item.tempId !== tempId)
@@ -671,6 +704,11 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       return newTypes;
     });
     setItemDiskonValues((prev) => {
+      const newValues = { ...prev };
+      delete newValues[tempId];
+      return newValues;
+    });
+    setItemHargaValues((prev) => {
       const newValues = { ...prev };
       delete newValues[tempId];
       return newValues;
@@ -797,11 +835,14 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           updatePayload.namaCustomer = manualCustomerName;
         }
 
-        const updateRes = await fetch(`/api/penjualan/${editPenjualanId}/edit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatePayload),
-        });
+        const updateRes = await fetch(
+          `/api/penjualan/${editPenjualanId}/edit`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatePayload),
+          }
+        );
 
         const updateResult = await updateRes.json();
 
@@ -913,6 +954,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setTanggalJatuhTempo("");
     setItemDiskonTypes({});
     setItemDiskonValues({});
+    setItemHargaValues({});
     setSearchCustomer("");
     if (editPenjualanId) {
       setEditPenjualanId(null);
@@ -1491,7 +1533,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                 <div className="flex items-center gap-1.5 text-red-600 animate-in slide-in-from-left duration-300">
                                   <AlertCircle className="w-3.5 h-3.5" />
                                   <span className="text-xs font-bold">
-                                    {isOutOfStock ? "Stok Habis!" : "Stok Menipis!"}
+                                    {isOutOfStock
+                                      ? "Stok Habis!"
+                                      : "Stok Menipis!"}
                                   </span>
                                 </div>
                               )}
@@ -1589,7 +1633,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                             {item.barang.namaBarang}
                           </h4>
                           <p className="text-xs text-gray-600 font-semibold truncate bg-gray-100 px-2 py-0.5 rounded-md inline-block">
-                            {formatRupiah(item.hargaJual)}/dus
+                            Harga default {formatRupiah(item.barang.hargaJual)}{" "}
+                            / {item.barang.jenisKemasan}
                           </p>
                         </div>
                         <button
@@ -1598,6 +1643,37 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                      </div>
+
+                      {/* Harga Jual */}
+                      <div className="my-2 space-y-1">
+                        <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 p-2 rounded-xl border border-blue-200">
+                          <span className="text-xs font-bold text-gray-700 uppercase">
+                            Harga:
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-extrabold text-blue-700">
+                              Rp
+                            </span>
+                            <input
+                              type="text"
+                              value={getItemHargaDisplayValue(item)}
+                              onChange={(e) =>
+                                handleItemHargaChange(item, e.target.value)
+                              }
+                              className="w-24 text-right text-xs border-2 border-blue-300 rounded-lg px-2 py-1 font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                              placeholder={formatRupiahInput(
+                                String(item.barang.hargaJual)
+                              )}
+                            />
+                          </div>
+                        </div>
+                        {item.hargaJual < item.barang.hargaJual && (
+                          <p className="text-xs text-red-600 font-semibold">
+                            Harga di bawah default, berpotensi menimbulkan
+                            kerugian.
+                          </p>
+                        )}
                       </div>
 
                       {/* Quantity Controls - Enhanced */}
@@ -2237,7 +2313,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   ) : (
                     <>
                       <Check className="w-5 h-5" />
-                      {editPenjualanId ? "Simpan Perubahan" : "Selesaikan Pembayaran"}
+                      {editPenjualanId
+                        ? "Simpan Perubahan"
+                        : "Selesaikan Pembayaran"}
                     </>
                   )}
                 </button>
