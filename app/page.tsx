@@ -80,7 +80,7 @@ export default function LoginPage() {
           <div className="cursor-pointer flex items-center">
             <div>
               <Image
-                src="/ara2.png"
+                src="/sembako.png"
                 alt="logo"
                 width={40}
                 height={40}
@@ -209,7 +209,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex items-center justify-center bg-indigo-100 flex-1 h-screen">
         <div className="max-w-xs transform duration-200 hover:scale-150 cursor-pointer">
           <Image
-            src="/ara2.png"
+            src="/sembako.png"
             className="w-full h-full object-cover"
             alt="logo"
             width={200}
