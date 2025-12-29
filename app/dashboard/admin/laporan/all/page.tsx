@@ -6,14 +6,30 @@ import {
   Download,
   TrendingUp,
   ShoppingCart,
-  DollarSign,
   Loader2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
+const toInputDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getDefaultEndDate = (): string => toInputDate(new Date());
+
+const getDefaultStartDate = (): string => {
+  const start = new Date();
+  start.setMonth(start.getMonth() - 3);
+  return toInputDate(start);
+};
+
 const LaporanLengkapPage = () => {
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>(() =>
+    getDefaultStartDate()
+  );
+  const [endDate, setEndDate] = useState<string>(() => getDefaultEndDate());
   const [mode, setMode] = useState<"summary" | "detail">("summary");
   const [exporting, setExporting] = useState<boolean>(false);
 
@@ -101,14 +117,14 @@ const LaporanLengkapPage = () => {
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-green-500">
+        <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-purple-500">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+              <FileSpreadsheet className="w-6 h-6 text-purple-600" />
             </div>
             <div>
               <p className="text-sm text-gray-500">Sheet 1</p>
-              <p className="font-semibold text-gray-900">Laporan Penjualan</p>
+              <p className="font-semibold text-gray-900">Ringkasan</p>
             </div>
           </div>
         </div>
@@ -125,14 +141,14 @@ const LaporanLengkapPage = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-orange-500">
+        <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-green-500">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-orange-600" />
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
             <div>
               <p className="text-sm text-gray-500">Sheet 3</p>
-              <p className="font-semibold text-gray-900">Laporan Pengeluaran</p>
+              <p className="font-semibold text-gray-900">Laporan Penjualan</p>
             </div>
           </div>
         </div>
@@ -251,8 +267,8 @@ const LaporanLengkapPage = () => {
             {!startDate && !endDate && (
               <div className="mt-4 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
                 <p className="text-sm text-gray-600">
-                  <span className="font-semibold">Catatan:</span> Jika tidak
-                  memilih tanggal, laporan akan mencakup semua periode
+                  <span className="font-semibold">Catatan:</span> Default
+                  periode adalah 3 bulan terakhir dari hari ini
                 </p>
               </div>
             )}
@@ -271,10 +287,10 @@ const LaporanLengkapPage = () => {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900 text-sm">
-                    Sheet 1: Laporan Penjualan
+                    Sheet 1: Ringkasan
                   </p>
                   <p className="text-xs text-gray-600">
-                    Detail transaksi penjualan dengan laba & margin
+                    Summary keuangan & laba bersih
                   </p>
                 </div>
               </div>
@@ -299,10 +315,10 @@ const LaporanLengkapPage = () => {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900 text-sm">
-                    Sheet 3: Laporan Pengeluaran
+                    Sheet 3: Laporan Penjualan
                   </p>
                   <p className="text-xs text-gray-600">
-                    Detail pengeluaran operasional
+                    Detail transaksi penjualan dengan laba & margin
                   </p>
                 </div>
               </div>
@@ -313,10 +329,10 @@ const LaporanLengkapPage = () => {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900 text-sm">
-                    Sheet 4: Ringkasan
+                    Sheet 4: Laporan Pengeluaran
                   </p>
                   <p className="text-xs text-gray-600">
-                    Summary keuangan & laba bersih
+                    Detail pengeluaran operasional
                   </p>
                 </div>
               </div>
@@ -326,7 +342,20 @@ const LaporanLengkapPage = () => {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900 text-sm">
-                    Sheet 5: Laba Barang
+                    Sheet 5: Barang Rusak
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    Pengembalian barang rusak & kadaluarsa
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-green-600 text-xs font-bold">✓</span>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">
+                    Sheet 6: Laba Per Barang
                   </p>
                   <p className="text-xs text-gray-600">
                     Summary dari laba per barang
@@ -363,7 +392,7 @@ const LaporanLengkapPage = () => {
             <div>
               <p className="text-sm text-amber-800">
                 <span className="font-semibold">Tips:</span> File Excel yang
-                dihasilkan berisi 5 sheet berbeda. Anda dapat membuka dan
+                dihasilkan berisi 6 sheet berbeda. Anda dapat membuka dan
                 menganalisis setiap sheet secara terpisah di Microsoft Excel
                 atau Google Sheets.
               </p>

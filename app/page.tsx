@@ -10,26 +10,66 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isTwoFA, setIsTwoFA] = useState(false);
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
   const router = useRouter();
 
   async function handleLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ username, password }),
-      headers: { "Content-Type": "application/json" },
-    });
 
-    if (res.ok) {
-      router.push("/dashboard/admin");
-      setUsername("");
-      setUsername("");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        if (data?.twoFARequired) {
+          toast.success("Masukkan kode OTP dari Authenticator");
+          setIsTwoFA(true);
+          setCode("");
+        } else {
+          router.push("/dashboard/admin");
+          setUsername("");
+          setPassword("");
+        }
+      } else {
+        toast.error(data?.error || "Terjadi kesalahan login");
+      }
+    } catch (err) {
+      toast.error("Gagal menghubungi server");
+    } finally {
       setLoading(false);
-    } else {
-      const data = await res.json();
-      toast.error(data?.error || "Terjadi kesalahan login");
-      setLoading(false);
+    }
+  }
+
+  async function handleVerify(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setVerifying(true);
+
+    try {
+      const res = await fetch("/api/auth/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        router.push("/dashboard/admin");
+      } else {
+        toast.error(data?.error || "Kode OTP salah");
+      }
+    } catch {
+      toast.error("Gagal menghubungi server");
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -54,77 +94,114 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-10 px-12 sm:px-24 md:px-48 lg:px-12 lg:mt-16 xl:px-24 xl:max-w-2xl">
-          <h2 className="text-center text-4xl text-indigo-900 font-display font-semibold lg:text-left xl:text-5xl xl:text-bold">
-            Log in
-          </h2>
+          {!isTwoFA ? (
+            <>
+              <h2 className="text-center text-4xl text-indigo-900 font-display font-semibold lg:text-left xl:text-5xl xl:text-bold">
+                Log in
+              </h2>
 
-          <div className="mt-12">
-            <form onSubmit={handleLogin}>
-              <div className="mt-8">
-                <div className="text-sm font-bold text-gray-700 tracking-wide">
-                  Username
-                </div>
+              <div className="mt-12">
+                <form onSubmit={handleLogin}>
+                  <div className="mt-8">
+                    <div className="text-sm font-bold text-gray-700 tracking-wide">
+                      Username
+                    </div>
+                    <input
+                      className="w-full text-lg py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500"
+                      type="text"
+                      placeholder="Enter your username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="mt-8">
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm font-bold text-gray-700 tracking-wide">
+                        Password
+                      </div>
+                    </div>
+                    <input
+                      className="w-full text-lg py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="mt-10">
+                    {loading ? (
+                      <div className="bg-indigo-500 text-gray-100 p-4 w-full rounded-full tracking-wide font-semibold font-display focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg flex justify-center items-center">
+                        <svg
+                          className="animate-spin h-7 w-7 text-purple-100"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                          ></path>
+                        </svg>
+                      </div>
+                    ) : (
+                      <button
+                        className="bg-indigo-500 text-gray-100 p-4 w-full rounded-full tracking-wide font-semibold font-display focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg"
+                        type="submit"
+                      >
+                        Log In
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-center text-4xl text-indigo-900 font-display font-semibold lg:text-left xl:text-5xl xl:text-bold">
+                Verifikasi 2FA
+              </h2>
+              <p className="text-gray-600 mt-4">
+                Masukkan kode 6 digit dari aplikasi Authenticator.
+              </p>
+
+              <form onSubmit={handleVerify} className="mt-6">
                 <input
                   className="w-full text-lg py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  value={code}
+                  onChange={(e) =>
+                    setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
                   required
                 />
-              </div>
 
-              <div className="mt-8">
-                <div className="flex justify-between items-center">
-                  <div className="text-sm font-bold text-gray-700 tracking-wide">
-                    Password
-                  </div>
-                </div>
-                <input
-                  className="w-full text-lg py-2 border-b border-gray-300 focus:outline-none focus:border-indigo-500"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="mt-10">
-                {loading ? (
-                  <div className="bg-indigo-500 text-gray-100 p-4 w-full rounded-full tracking-wide font-semibold font-display focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg flex justify-center items-center">
-                    <svg
-                      className="animate-spin h-7 w-7 text-purple-100"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      ></path>
-                    </svg>
-                  </div>
-                ) : (
+                <div className="mt-10">
                   <button
-                    className="bg-indigo-500 text-gray-100 p-4 w-full rounded-full tracking-wide font-semibold font-display focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg"
                     type="submit"
+                    disabled={verifying}
+                    className="bg-indigo-500 text-gray-100 p-4 w-full rounded-full tracking-wide font-semibold font-display focus:outline-none focus:shadow-outline hover:bg-indigo-600 shadow-lg disabled:opacity-60"
                   >
-                    Log In
+                    {verifying ? "Memverifikasi..." : "Verifikasi"}
                   </button>
-                )}
-              </div>
-            </form>
-          </div>
+                </div>
+              </form>
+            </>
+          )}
         </div>
       </div>
 

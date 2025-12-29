@@ -135,18 +135,9 @@ export async function GET(request: NextRequest) {
     }
 
     // ====================================
-    // SHEET 1: LAPORAN PENJUALAN
+    // SHEET 1: RINGKASAN
     // ====================================
-    if (mode === "detail") {
-      await generateLaporanPenjualanDetail(
-        workbook,
-        dateFilter,
-        startDate,
-        endDate
-      );
-    } else {
-      await generateLaporanPenjualan(workbook, dateFilter, startDate, endDate);
-    }
+    await generateRingkasan(workbook, dateFilter, startDate, endDate);
 
     // ====================================
     // SHEET 2: LAPORAN PEMBELIAN
@@ -163,22 +154,26 @@ export async function GET(request: NextRequest) {
     }
 
     // ====================================
-    // SHEET 3: LAPORAN PENGELUARAN
+    // SHEET 3: LAPORAN PENJUALAN
+    // ====================================
+    if (mode === "detail") {
+      await generateLaporanPenjualanDetail(
+        workbook,
+        dateFilter,
+        startDate,
+        endDate
+      );
+    } else {
+      await generateLaporanPenjualan(workbook, dateFilter, startDate, endDate);
+    }
+
+    // ====================================
+    // SHEET 4: LAPORAN PENGELUARAN
     // ====================================
     await generateLaporanPengeluaran(workbook, dateFilter, startDate, endDate);
 
     // ====================================
-    // SHEET 4: RINGKASAN
-    // ====================================
-    await generateRingkasan(workbook, dateFilter, startDate, endDate);
-
-    // ====================================
-    // SHEET 5: LABA PER BARANG
-    // ====================================
-    await generateLaporanLabaBarang(workbook, dateFilter, startDate, endDate);
-
-    // ====================================
-    // SHEET 6: PENGEMBALIAN BARANG (RUSAK & KADALUARSA)
+    // SHEET 5: BARANG RUSAK
     // ====================================
     await generateLaporanPengembalianBarang(
       workbook,
@@ -186,6 +181,11 @@ export async function GET(request: NextRequest) {
       startDate,
       endDate
     );
+
+    // ====================================
+    // SHEET 6: LABA PER BARANG
+    // ====================================
+    await generateLaporanLabaBarang(workbook, dateFilter, startDate, endDate);
 
     const buffer = await workbook.xlsx.writeBuffer();
     const dateRange = formatDateRange(
@@ -225,7 +225,7 @@ async function generateLaporanPengembalianBarang(
   startDate: string | null,
   endDate: string | null
 ) {
-  const worksheet = workbook.addWorksheet("Pengembalian Rusak");
+  const worksheet = workbook.addWorksheet("Barang Rusak");
 
   const where: any = {
     kondisiBarang: { in: ["RUSAK", "KADALUARSA"] },
@@ -261,7 +261,7 @@ async function generateLaporanPengembalianBarang(
   // Title
   worksheet.mergeCells("A1:I1");
   const titleCell = worksheet.getCell("A1");
-  titleCell.value = "PENGEMBALIAN BARANG (RUSAK & KADALUARSA)";
+  titleCell.value = "BARANG RUSAK (RUSAK & KADALUARSA)";
   titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
   titleCell.fill = {
     type: "pattern",
@@ -1191,7 +1191,8 @@ async function generateRingkasan(
       jumlah: "-",
       total: labaKotor,
       keterangan: `Penjualan - Modal (Margin: ${marginRataRata.toFixed(2)}%)`,
-      color: labaKotor >= 0 ? "FF388E3C" : "FFD32F2F",
+      color: labaKotor >= 0 ? "FFFFFFFF" : "FFD32F2F",
+      textColor: labaKotor >= 0 ? "FF000000" : "FFFFFFFF",
       isBold: true,
     },
     {
@@ -1240,7 +1241,10 @@ async function generateRingkasan(
       // Apply formatting only to columns 1-4 (A-D)
       for (let i = 1; i <= 4; i++) {
         const cell = row.getCell(i);
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.font = {
+          bold: true,
+          color: { argb: data.textColor || "FFFFFFFF" },
+        };
         cell.fill = {
           type: "pattern",
           pattern: "solid",
@@ -2000,7 +2004,6 @@ async function generateLaporanLabaBarang(
 
   const totalRow = worksheet.getRow(rowIndex + 1);
   totalRow.getCell("B").value = "TOTAL";
-  totalRow.getCell("B").font = { bold: true };
   totalRow.getCell("D").value = totalKemasan;
   totalRow.getCell("E").value = totalItem;
   totalRow.getCell("F").value = totalPenjualan;
@@ -2010,14 +2013,30 @@ async function generateLaporanLabaBarang(
     ? (totalLaba / totalPenjualan) * 100
     : 0;
 
+  totalRow.height = 25;
+  for (let i = 1; i <= 9; i++) {
+    const cell = totalRow.getCell(i);
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+    cell.border = {
+      top: { style: "medium" },
+      left: { style: "thin" },
+      bottom: { style: "medium" },
+      right: { style: "thin" },
+    };
+  }
+
+  totalRow.getCell("B").alignment = {
+    horizontal: "center",
+    vertical: "middle",
+  };
   ["D", "E", "F", "G", "H", "I"].forEach((key) => {
     const cell = totalRow.getCell(key);
-    cell.font = { bold: true };
-    cell.alignment = { horizontal: "right" };
+    cell.alignment = { horizontal: "right", vertical: "middle" };
     cell.numFmt = key === "I" ? "0.00" : "#,##0";
-    cell.border = {
-      top: { style: "double" },
-      bottom: { style: "double" },
-    };
   });
 }

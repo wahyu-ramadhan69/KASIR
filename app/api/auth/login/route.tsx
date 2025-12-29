@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs"; // atau "bcrypt"
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -17,10 +17,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 🔍 Cari user di database berdasarkan username
-    const user = await prisma.user.findUnique({
-      where: { username },
-    });
+    const user = await prisma.user.findUnique({ where: { username } });
 
     if (!user) {
       return NextResponse.json(
@@ -36,9 +33,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 🔐 Verifikasi password (asumsi password di-hash dengan bcrypt)
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: "Username atau password salah" },
@@ -46,7 +41,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // ✅ Buat JWT token dengan role
+    // ✅ jika 2FA aktif → pending token dulu
+    if (user.twoFAEnabled) {
+      const pendingToken = jwt.sign(
+        { userId: user.id, purpose: "2fa" },
+        JWT_SECRET,
+        { expiresIn: "5m" }
+      );
+
+      const response = NextResponse.json({
+        success: true,
+        twoFARequired: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+        },
+      });
+
+      response.cookies.set({
+        name: "2fa_pending",
+        value: pendingToken,
+        httpOnly: true,
+        sameSite: "strict",
+        path: "/",
+        maxAge: 5 * 60,
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      return response;
+    }
+
+    // ✅ normal login (tanpa 2FA)
     const payload = {
       userId: user.id,
       username: user.username,
@@ -59,6 +86,7 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json({
       success: true,
+      twoFARequired: false,
       user: {
         id: user.id,
         username: user.username,
@@ -74,7 +102,7 @@ export async function POST(request: Request) {
       sameSite: "strict",
       path: "/",
       maxAge: 12 * 60 * 60,
-      secure: process.env.NODE_ENV === "production", // HTTPS di production
+      secure: process.env.NODE_ENV === "production",
     });
 
     return response;
