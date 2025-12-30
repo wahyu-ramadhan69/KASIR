@@ -39,6 +39,8 @@ function serializeItem(item: any) {
           stok: bigIntToNumber(item.barang.stok),
           jumlahPerKemasan: bigIntToNumber(item.barang.jumlahPerKemasan),
           ukuran: bigIntToNumber(item.barang.ukuran),
+          berat: bigIntToNumber(item.barang.berat),
+          limitStok: bigIntToNumber(item.barang.limitStok),
           limitPenjualan: bigIntToNumber(item.barang.limitPenjualan),
         }
       : undefined,

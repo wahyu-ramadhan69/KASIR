@@ -56,6 +56,7 @@ interface Barang {
   ukuran: number;
   satuan: string;
   supplierId: number;
+  berat: number;
   limitPenjualan: number;
   createdAt: string;
   updatedAt: string;
@@ -71,6 +72,7 @@ interface BarangFormData {
   ukuran: string;
   satuan: string;
   supplierId: string;
+  berat: string;
   limitPenjualan: string;
 }
 
@@ -133,6 +135,7 @@ const DataBarangPage = () => {
     useState<boolean>(false);
   const [addFormLimitPenjualan, setAddFormLimitPenjualan] =
     useState<string>("0");
+  const [addFormBerat, setAddFormBerat] = useState<string>("");
   const [showEditLimitPenjualan, setShowEditLimitPenjualan] =
     useState<boolean>(false);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -185,6 +188,27 @@ const DataBarangPage = () => {
     return numbers === "" ? 0 : parseInt(numbers);
   };
 
+  const normalizeDecimalInput = (value: string): string => {
+    const cleaned = value.replace(/[^0-9,\.]/g, "");
+    const normalized = cleaned.replace(/\./g, ",");
+    const [whole, ...rest] = normalized.split(",");
+    return rest.length > 0 ? `${whole},${rest.join("")}` : whole;
+  };
+
+  const parseKgToGrams = (value: string): number => {
+    const normalized = normalizeDecimalInput(value);
+    const numberValue = Number(normalized.replace(",", "."));
+    if (!Number.isFinite(numberValue)) return 0;
+    return Math.round(numberValue * 1000);
+  };
+
+  const formatGramsToKg = (grams: number): string => {
+    if (!Number.isFinite(grams)) return "";
+    const kg = grams / 1000;
+    const formatted = kg.toFixed(3).replace(/\.?0+$/, "");
+    return formatted.replace(".", ",");
+  };
+
   const fetchSuppliers = async () => {
     try {
       const res = await fetch("/api/supplier");
@@ -226,6 +250,7 @@ const DataBarangPage = () => {
         ukuran: barang.ukuran.toString(),
         satuan: barang.satuan,
         supplierId: barang.supplierId.toString(),
+        berat: formatGramsToKg(barang.berat || 0),
         limitPenjualan: limitValue.toString(),
       },
     });
@@ -273,6 +298,15 @@ const DataBarangPage = () => {
             [name]: formattedValue,
           },
         });
+      } else if (name === "berat") {
+        const formattedValue = normalizeDecimalInput(value);
+        setEditingBarang({
+          ...editingBarang,
+          data: {
+            ...editingBarang.data,
+            berat: formattedValue,
+          },
+        });
       } else {
         setEditingBarang({
           ...editingBarang,
@@ -314,6 +348,7 @@ const DataBarangPage = () => {
           ukuran: parseInt(formData.get("ukuran") as string),
           satuan: formData.get("satuan"),
           supplierId: parseInt(selectedSupplierId),
+          berat: parseKgToGrams(addFormBerat),
           limitPenjualan: showAddLimitPenjualan
             ? parseInt(addFormLimitPenjualan)
             : 0,
@@ -330,6 +365,7 @@ const DataBarangPage = () => {
         setSelectedSupplierName("");
         setAddFormHargaBeli("");
         setAddFormHargaJual("");
+        setAddFormBerat("");
         setShowAddLimitPenjualan(false);
         setAddFormLimitPenjualan("0");
         fetchBarang();
@@ -365,6 +401,7 @@ const DataBarangPage = () => {
           ukuran: parseInt(editingBarang.data.ukuran),
           satuan: editingBarang.data.satuan,
           supplierId: parseInt(editingBarang.data.supplierId),
+          berat: parseKgToGrams(editingBarang.data.berat),
           limitPenjualan: showEditLimitPenjualan
             ? parseInt(editingBarang.data.limitPenjualan)
             : 0,
@@ -1473,7 +1510,7 @@ const DataBarangPage = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
                     <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Harga Beli Perkemasan
+                      Harga Beli
                     </p>
                     <p className="text-gray-900 text-xl font-bold">
                       {formatRupiah(selectedBarang.hargaBeli)}
@@ -1482,7 +1519,7 @@ const DataBarangPage = () => {
 
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
                     <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Harga Jual Perkemasan
+                      Harga Jual
                     </p>
                     <p className="text-blue-600 text-xl font-bold">
                       {formatRupiah(selectedBarang.hargaJual)}
@@ -1548,30 +1585,39 @@ const DataBarangPage = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Stok
-                    </p>
-                    <p className="text-gray-900 text-xl font-bold">
-                      {selectedBarang.stok} pcs
-                    </p>
-                  </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
+                  <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
+                    Stok
+                  </p>
+                  <p className="text-gray-900 text-xl font-bold">
+                    {selectedBarang.stok} pcs
+                  </p>
+                </div>
 
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Ukuran
-                    </p>
-                    <p className="text-gray-900 text-xl font-bold">
-                      {selectedBarang.ukuran} {selectedBarang.satuan}
-                    </p>
-                  </div>
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
+                  <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
+                    Ukuran
+                  </p>
+                  <p className="text-gray-900 text-xl font-bold">
+                    {selectedBarang.ukuran} {selectedBarang.satuan}
+                  </p>
+                </div>
 
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
-                    <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-2">
-                      Kemasan
-                    </p>
-                    <p className="text-purple-900 text-xl font-bold">
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
+                  <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
+                    Berat
+                  </p>
+                  <p className="text-gray-900 text-xl font-bold">
+                    {formatGramsToKg(selectedBarang.berat)} kg
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
+                  <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-2">
+                    Kemasan
+                  </p>
+                  <p className="text-purple-900 text-xl font-bold">
                       {selectedBarang.jumlahPerKemasan} pcs
                     </p>
                     <p className="text-xs text-purple-600 mt-1">
@@ -1645,6 +1691,7 @@ const DataBarangPage = () => {
                       setSelectedSupplierName("");
                       setAddFormHargaBeli("");
                       setAddFormHargaJual("");
+                      setAddFormBerat("");
                       setShowAddLimitPenjualan(false);
                       setAddFormLimitPenjualan("0");
                     }}
@@ -1734,8 +1781,7 @@ const DataBarangPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <TrendingDown className="w-4 h-4 text-red-600" />
-                        Harga Beli Perkemasan{" "}
-                        <span className="text-red-500">*</span>
+                        Harga Beli <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1753,7 +1799,7 @@ const DataBarangPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <TrendingUp className="w-4 h-4 text-green-600" />
-                        Harga Jual Perkemasan
+                        Harga Jual
                         <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -1770,7 +1816,26 @@ const DataBarangPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div className="group">
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                        <Box className="w-4 h-4 text-blue-600" />
+                        Berat (KG) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="berat"
+                        value={addFormBerat}
+                        onChange={(e) =>
+                          setAddFormBerat(normalizeDecimalInput(e.target.value))
+                        }
+                        inputMode="decimal"
+                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
+                        placeholder="1,5"
+                        required
+                      />
+                    </div>
+
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <Box className="w-4 h-4 text-blue-600" />
@@ -1901,6 +1966,7 @@ const DataBarangPage = () => {
                       setSelectedSupplierName("");
                       setAddFormHargaBeli("");
                       setAddFormHargaJual("");
+                      setAddFormBerat("");
                       setShowAddLimitPenjualan(false);
                       setAddFormLimitPenjualan("0");
                     }}
@@ -2079,7 +2145,23 @@ const DataBarangPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div className="group">
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                        <Box className="w-4 h-4 text-yellow-600" />
+                        Berat (KG) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="berat"
+                        value={editingBarang.data.berat}
+                        onChange={handleInputChange}
+                        inputMode="decimal"
+                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
+                        required
+                      />
+                    </div>
+
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <Box className="w-4 h-4 text-yellow-600" />

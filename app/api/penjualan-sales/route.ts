@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { getAuthData } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -100,8 +100,8 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
 
 // GET: Ambil penjualan sales (dengan karyawan jenis SALES) dengan filter dan pagination
 export async function GET(request: NextRequest) {
-  const auth = await isAuthenticated();
-  if (!auth) {
+  const authData = await getAuthData();
+  if (!authData) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -117,28 +117,34 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
+    const summary = searchParams.get("summary") === "1";
 
-    const where: any = {
+    const baseWhere: any = {
       // Filter hanya penjualan dengan karyawan jenis SALES
       karyawan: {
         jenis: "SALES",
       },
+      isDeleted: false,
     };
+    const userId = Number(authData.userId);
+    if (authData.role !== "ADMIN" && !Number.isNaN(userId)) {
+      baseWhere.userId = userId;
+    }
 
     if (status && status !== "all") {
-      where.statusTransaksi = status;
+      baseWhere.statusTransaksi = status;
     }
 
     if (pembayaran && pembayaran !== "all") {
-      where.statusPembayaran = pembayaran;
+      baseWhere.statusPembayaran = pembayaran;
     }
 
     if (karyawanId) {
-      where.karyawanId = parseInt(karyawanId);
+      baseWhere.karyawanId = parseInt(karyawanId);
     }
 
     if (search) {
-      where.OR = [
+      baseWhere.OR = [
         { kodePenjualan: { contains: search, mode: "insensitive" } },
         { namaCustomer: { contains: search, mode: "insensitive" } },
         { namaSales: { contains: search, mode: "insensitive" } },
@@ -149,18 +155,94 @@ export async function GET(request: NextRequest) {
     }
 
     if (startDate || endDate) {
-      where.tanggalTransaksi = {};
+      baseWhere.tanggalTransaksi = {};
       if (startDate) {
-        where.tanggalTransaksi.gte = new Date(startDate);
+        baseWhere.tanggalTransaksi.gte = new Date(startDate);
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        where.tanggalTransaksi.lte = end;
+        baseWhere.tanggalTransaksi.lte = end;
       }
     }
 
-    const totalCount = await prisma.penjualanHeader.count({ where });
+    if (summary) {
+      const totalTransaksi = await prisma.penjualanHeader.count({
+        where: baseWhere,
+      });
+      const totalHutangTransaksi = await prisma.penjualanHeader.count({
+        where: { ...baseWhere, statusPembayaran: "HUTANG" },
+      });
+      const totalLunas = await prisma.penjualanHeader.count({
+        where: { ...baseWhere, statusPembayaran: "LUNAS" },
+      });
+      const hutangList = await prisma.penjualanHeader.findMany({
+        where: { ...baseWhere, statusPembayaran: "HUTANG" },
+        select: { totalHarga: true, jumlahDibayar: true },
+      });
+      const totalHutang = hutangList.reduce(
+        (sum, item) =>
+          sum +
+          (Number(item.totalHarga || 0) - Number(item.jumlahDibayar || 0)),
+        0
+      );
+      const jatuhTempoLimit = new Date();
+      jatuhTempoLimit.setDate(jatuhTempoLimit.getDate() + 7);
+      const hutangJatuhTempo = await prisma.penjualanHeader.count({
+        where: {
+          ...baseWhere,
+          statusPembayaran: "HUTANG",
+          tanggalJatuhTempo: { lte: jatuhTempoLimit },
+        },
+      });
+      let totalPembayaran = 0;
+      const pembayaranPenjualanWhere: any = { ...baseWhere };
+      delete pembayaranPenjualanWhere.tanggalTransaksi;
+      const pembayaranIds = await prisma.penjualanHeader.findMany({
+        where: pembayaranPenjualanWhere,
+        select: { id: true },
+      });
+      const idList = pembayaranIds.map((row) => row.id);
+      if (idList.length > 0) {
+        const pembayaranWhere: any = { penjualanId: { in: idList } };
+        if (startDate || endDate) {
+          pembayaranWhere.tanggalBayar = {};
+          if (startDate) {
+            pembayaranWhere.tanggalBayar.gte = new Date(startDate);
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            pembayaranWhere.tanggalBayar.lte = end;
+          }
+        }
+        const pembayaranRows = await prisma.pembayaranPenjualan.findMany({
+          where: pembayaranWhere,
+          select: { nominal: true },
+        });
+        totalPembayaran = pembayaranRows.reduce(
+          (sum, row) => sum + Number(row.nominal || 0),
+          0
+        );
+      }
+
+      return NextResponse.json(
+        deepSerialize({
+          success: true,
+          data: [],
+          summary: {
+            totalTransaksi,
+            totalPembayaran,
+            totalHutang,
+            totalHutangTransaksi,
+            totalLunas,
+            hutangJatuhTempo,
+          },
+        })
+      );
+    }
+
+    const totalCount = await prisma.penjualanHeader.count({ where: baseWhere });
 
     let orderBy: any;
     if (pembayaran === "HUTANG") {
@@ -174,7 +256,7 @@ export async function GET(request: NextRequest) {
     }
 
     const penjualan = await prisma.penjualanHeader.findMany({
-      where,
+      where: baseWhere,
       include: {
         customer: true,
         karyawan: true,
@@ -222,7 +304,5 @@ export async function GET(request: NextRequest) {
       { success: false, error: "Gagal mengambil data penjualan sales" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

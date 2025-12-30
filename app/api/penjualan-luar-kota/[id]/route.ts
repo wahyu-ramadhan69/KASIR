@@ -112,10 +112,7 @@ export async function GET(
       for (const penjualan of perjalanan.penjualanHeaders) {
         for (const item of penjualan.items) {
           if (item.barangId === manifest.barangId) {
-            const pcs =
-              Number(item.jumlahDus) * Number(item.barang.jumlahPerKemasan) +
-              Number(item.jumlahPcs);
-            totalTerjualPcs += pcs;
+            totalTerjualPcs += Number(item.totalItem);
           }
         }
       }
@@ -375,8 +372,11 @@ export async function DELETE(
         }
       }
 
-      await tx.perjalananSales.delete({
+      await tx.perjalananSales.update({
         where: { id },
+        data: {
+          isDeleted: true,
+        },
       });
     });
 

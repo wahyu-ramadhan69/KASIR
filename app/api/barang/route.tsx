@@ -22,6 +22,8 @@ function serializeBarang(barang: any) {
     stok: bigIntToNumber(barang.stok),
     jumlahPerKemasan: bigIntToNumber(barang.jumlahPerKemasan),
     ukuran: bigIntToNumber(barang.ukuran),
+    berat: bigIntToNumber(barang.berat),
+    limitStok: bigIntToNumber(barang.limitStok),
     limitPenjualan: bigIntToNumber(barang.limitPenjualan),
     supplier: barang.supplier
       ? {
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
       ukuran,
       satuan,
       supplierId,
+      berat,
       limitPenjualan,
     } = body;
 
@@ -82,6 +85,7 @@ export async function POST(request: NextRequest) {
         ukuran: BigInt(ukuran),
         satuan: String(satuan).trim(),
         supplierId: Number(supplierId),
+        berat: berat != null ? BigInt(berat) : BigInt(0),
         limitPenjualan: limitPenjualan != null ? BigInt(limitPenjualan) : BigInt(0),
       },
       include: {

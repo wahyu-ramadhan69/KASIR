@@ -244,6 +244,10 @@ export async function POST(
     // Calculate totals
     const calculation = calculatePenjualan(penjualan.items, diskonNota);
     const totalHarga = calculation.ringkasan.totalHarga;
+    const totalBerat = penjualan.items.reduce(
+      (sum, item) => sum + toNumber(item.berat),
+      0
+    );
 
     // Determine payment status
     const kembalian =
@@ -458,6 +462,7 @@ export async function POST(
         diskonNota: BigInt(diskonNota),
         totalHarga: BigInt(totalHarga),
         jumlahDibayar: BigInt(jumlahDibayar),
+        beratTotal: BigInt(totalBerat),
         kembalian: BigInt(kembalian),
         metodePembayaran,
         statusPembayaran,
@@ -491,6 +496,48 @@ export async function POST(
           },
         },
       });
+
+      if (jumlahDibayar > 0) {
+        const pembayaranDate = tanggalTransaksi
+          ? new Date(tanggalTransaksi)
+          : new Date();
+        const pembayaranDateStr = pembayaranDate
+          .toISOString()
+          .slice(0, 10)
+          .replace(/-/g, "");
+        const lastPembayaran = await tx.pembayaranPenjualan.findFirst({
+          where: {
+            kodePembayaran: {
+              startsWith: `BYR-${pembayaranDateStr}`,
+            },
+          },
+          orderBy: {
+            kodePembayaran: "desc",
+          },
+        });
+
+        let nextPembayaranNumber = 1;
+        if (lastPembayaran) {
+          const lastNumber = parseInt(
+            lastPembayaran.kodePembayaran.split("-")[2]
+          );
+          nextPembayaranNumber = lastNumber + 1;
+        }
+
+        const kodePembayaran = `BYR-${pembayaranDateStr}-${String(
+          nextPembayaranNumber
+        ).padStart(4, "0")}`;
+
+        await tx.pembayaranPenjualan.create({
+          data: {
+            kodePembayaran,
+            penjualanId,
+            tanggalBayar: pembayaranDate,
+            nominal: BigInt(jumlahDibayar),
+            metode: metodePembayaran,
+          },
+        });
+      }
 
       return updated;
     });

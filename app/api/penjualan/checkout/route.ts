@@ -208,6 +208,11 @@ export async function POST(request: NextRequest) {
       const barang = barangMap.get(item.barangId);
       const jumlahPerKemasan = toNumber(barang?.jumlahPerKemasan || 1);
       const totalItem = getTotalItemPcs(item, jumlahPerKemasan);
+      const beratPerItem = toNumber(barang?.berat || 0);
+      const beratItem =
+        item.berat !== undefined && item.berat !== null
+          ? Number(item.berat)
+          : beratPerItem * totalItem;
       const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
         totalItem,
         jumlahPerKemasan
@@ -218,6 +223,7 @@ export async function POST(request: NextRequest) {
         totalItem,
         jumlahDus,
         jumlahPcs,
+        berat: beratItem,
         hargaJual: item.hargaJual,
         diskonPerItem: Number(item.diskonPerItem || 0),
         barang,
@@ -464,6 +470,7 @@ export async function POST(request: NextRequest) {
             penjualanId: penjualan.id,
             barangId: item.barangId,
             totalItem: BigInt(totalPcs),
+            berat: BigInt(item.berat || 0),
             hargaJual: BigInt(hargaJualFinal),
             hargaBeli: item.barang.hargaBeli,
             diskonPerItem: BigInt(item.diskonPerItem),
@@ -476,6 +483,10 @@ export async function POST(request: NextRequest) {
         where: { penjualanId: penjualan.id },
         include: { barang: true },
       });
+      const totalBerat = createdItems.reduce(
+        (sum, item) => sum + toNumber(item.berat),
+        0
+      );
 
       // Calculate total modal
       let totalModal = 0;
@@ -545,6 +556,7 @@ export async function POST(request: NextRequest) {
         diskonNota: BigInt(diskonNota),
         totalHarga: BigInt(totalHarga),
         jumlahDibayar: BigInt(jumlahDibayar),
+        beratTotal: BigInt(totalBerat),
         kembalian: BigInt(kembalian),
         metodePembayaran,
         statusPembayaran,
@@ -564,6 +576,47 @@ export async function POST(request: NextRequest) {
           },
         },
       });
+
+      if (jumlahDibayar > 0) {
+        const pembayaranDate = transaksiDate;
+        const pembayaranDateStr = pembayaranDate
+          .toISOString()
+          .slice(0, 10)
+          .replace(/-/g, "");
+        const lastPembayaran = await tx.pembayaranPenjualan.findFirst({
+          where: {
+            kodePembayaran: {
+              startsWith: `BYR-${pembayaranDateStr}`,
+            },
+          },
+          orderBy: {
+            kodePembayaran: "desc",
+          },
+        });
+
+        let nextPembayaranNumber = 1;
+        if (lastPembayaran) {
+          const lastNumber = parseInt(
+            lastPembayaran.kodePembayaran.split("-")[2]
+          );
+          nextPembayaranNumber = lastNumber + 1;
+        }
+
+        const kodePembayaran = `BYR-${pembayaranDateStr}-${String(
+          nextPembayaranNumber
+        ).padStart(4, "0")}`;
+
+        await tx.pembayaranPenjualan.create({
+          data: {
+            kodePembayaran,
+            penjualanId: penjualan.id,
+            tanggalBayar: pembayaranDate,
+            nominal: BigInt(jumlahDibayar),
+            metode: metodePembayaran,
+            ...(userId ? { userId } : {}),
+          },
+        });
+      }
 
       return updated;
     });

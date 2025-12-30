@@ -369,6 +369,11 @@ export async function POST(
         const barang = barangById.get(barangId)!;
         const jumlahPerKemasan = toNumber(barang.jumlahPerKemasan);
         const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
+        const beratPerItem = toNumber(barang.berat);
+        const beratItem =
+          item.berat !== undefined && item.berat !== null
+            ? Number(item.berat)
+            : beratPerItem * totalPcs;
         const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
           totalPcs,
           jumlahPerKemasan
@@ -397,6 +402,7 @@ export async function POST(
             where: { id: itemId },
             data: {
               totalItem: BigInt(totalPcs),
+              berat: BigInt(beratItem),
               hargaJual: BigInt(hargaJual),
               diskonPerItem: BigInt(diskonPerItem),
               laba: BigInt(totalLaba),
@@ -420,6 +426,7 @@ export async function POST(
               penjualanId,
               barangId,
               totalItem: BigInt(totalPcs),
+              berat: BigInt(beratItem),
               hargaJual: BigInt(hargaJual),
               hargaBeli: BigInt(hargaBeli),
               diskonPerItem: BigInt(diskonPerItem),
@@ -465,6 +472,10 @@ export async function POST(
 
       const calculation = calculatePenjualan(updatedItems, diskonNota);
       const totalHarga = calculation.ringkasan.totalHarga;
+      const totalBerat = updatedItems.reduce(
+        (sum, item) => sum + toNumber(item.berat),
+        0
+      );
 
       const kembalian =
         jumlahDibayar >= totalHarga ? jumlahDibayar - totalHarga : 0;
@@ -523,6 +534,7 @@ export async function POST(
         diskonNota: BigInt(diskonNota),
         totalHarga: BigInt(totalHarga),
         jumlahDibayar: BigInt(jumlahDibayar),
+        beratTotal: BigInt(totalBerat),
         kembalian: BigInt(kembalian),
         metodePembayaran,
         statusPembayaran,

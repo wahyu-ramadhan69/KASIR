@@ -237,6 +237,7 @@ export async function POST(
     // Hitung subtotal dan total
     let subtotal = 0;
     const itemsData = [];
+    let totalBerat = 0;
 
     for (const item of body.items) {
       const barang = barangList.find((b) => b.id === item.barangId);
@@ -283,10 +284,14 @@ export async function POST(
         Number(barang.hargaBeli) / Number(barang.jumlahPerKemasan);
       const totalHargaBeli = totalPcs * hargaBeliPerPcs;
       const laba = itemTotal - totalHargaBeli;
+      const beratPerPcs = Number(barang.berat || 0);
+      const beratItem = beratPerPcs * totalPcs;
+      totalBerat += beratItem;
 
       itemsData.push({
         barangId: item.barangId,
         totalItem: BigInt(totalPcs),
+        berat: BigInt(beratItem),
         hargaJual: BigInt(hargaPerPcs),
         hargaBeli: BigInt(Math.floor(hargaBeliPerPcs)),
         diskonPerItem: BigInt(diskon),
@@ -318,6 +323,7 @@ export async function POST(
         diskonNota: BigInt(diskonNota),
         totalHarga: BigInt(totalHarga),
         jumlahDibayar: BigInt(jumlahDibayar),
+        beratTotal: BigInt(totalBerat),
         kembalian: BigInt(kembalian),
         keterangan: body.keterangan,
         metodePembayaran,
@@ -369,6 +375,15 @@ export async function POST(
           piutang: {
             increment: BigInt(totalHarga - jumlahDibayar),
           },
+        },
+      });
+    }
+
+    if (totalBerat > 0) {
+      await prisma.perjalananSales.update({
+        where: { id: perjalananId },
+        data: {
+          totalBerat: { increment: BigInt(totalBerat) },
         },
       });
     }

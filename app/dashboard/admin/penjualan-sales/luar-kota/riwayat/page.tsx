@@ -73,6 +73,7 @@ interface PerjalananSales {
   tanggalKembali: string | null;
   statusPerjalanan: string;
   keterangan: string | null;
+  isDeleted: boolean;
   karyawan: {
     id: number;
     nama: string;
@@ -104,8 +105,9 @@ const RiwayatPerjalananLuarKotaPage = () => {
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState<string>(todayStr);
+  const [endDate, setEndDate] = useState<string>(todayStr);
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -241,10 +243,11 @@ const RiwayatPerjalananLuarKotaPage = () => {
   };
 
   const calculateStats = (perjalananData: PerjalananSales[]) => {
-    const selesai = perjalananData.filter(
+    const filteredData = perjalananData.filter((p) => !p.isDeleted);
+    const selesai = filteredData.filter(
       (p) => p.statusPerjalanan === "SELESAI"
     );
-    const aktif = perjalananData.filter(
+    const aktif = filteredData.filter(
       (p) => p.statusPerjalanan === "AKTIF"
     );
 
@@ -253,7 +256,7 @@ const RiwayatPerjalananLuarKotaPage = () => {
     let totalPenjualan = 0;
     let totalPengembalian = 0;
 
-    perjalananData.forEach((p) => {
+    filteredData.forEach((p) => {
       if (p.penjualanHeaders) {
         totalPenjualan += p._count.penjualanHeaders;
         p.penjualanHeaders.forEach((pj) => {
@@ -268,7 +271,7 @@ const RiwayatPerjalananLuarKotaPage = () => {
     });
 
     setStats({
-      totalPerjalanan: perjalananData.length,
+      totalPerjalanan: filteredData.length,
       totalPendapatan,
       totalPenjualan,
       perjalananSelesai: selesai.length,
@@ -687,13 +690,20 @@ const RiwayatPerjalananLuarKotaPage = () => {
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full font-medium border ${getStatusColor(
-                              perjalanan.statusPerjalanan
-                            )}`}
-                          >
-                            {perjalanan.statusPerjalanan}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full font-medium border ${getStatusColor(
+                                perjalanan.statusPerjalanan
+                              )}`}
+                            >
+                              {perjalanan.statusPerjalanan}
+                            </span>
+                            {perjalanan.isDeleted && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 font-semibold">
+                                DELETED
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap">

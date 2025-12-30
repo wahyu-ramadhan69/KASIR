@@ -118,6 +118,8 @@ export async function GET(request: NextRequest) {
   }
   try {
     const { searchParams } = new URL(request.url);
+    const authData = await getAuthData();
+    const isAdmin = authData?.role === "ADMIN";
 
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
@@ -130,33 +132,34 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
+    const summary = searchParams.get("summary") === "1";
 
-    const where: any = {
+    const baseWhere: any = {
       karyawanId: null, // hanya penjualan header tanpa karyawan
     };
 
     if (status && status !== "all") {
-      where.statusTransaksi = status;
+      baseWhere.statusTransaksi = status;
     }
 
     if (pembayaran && pembayaran !== "all") {
-      where.statusPembayaran = pembayaran;
+      baseWhere.statusPembayaran = pembayaran;
     }
 
     if (customerId) {
-      where.customerId = parseInt(customerId);
+      baseWhere.customerId = parseInt(customerId);
     }
 
     // Filter berdasarkan tipe penjualan
     if (tipePenjualan === "toko") {
-      where.perjalananSalesId = null; // Penjualan toko tidak terkait perjalanan sales
+      baseWhere.perjalananSalesId = null; // Penjualan toko tidak terkait perjalanan sales
     } else if (tipePenjualan === "sales") {
-      where.perjalananSalesId = { not: null }; // Penjualan sales luar kota punya perjalanan
-      where.customerId = null;
+      baseWhere.perjalananSalesId = { not: null }; // Penjualan sales luar kota punya perjalanan
+      baseWhere.customerId = null;
     }
 
     if (search) {
-      where.OR = [
+      baseWhere.OR = [
         { kodePenjualan: { contains: search, mode: "insensitive" } },
         { namaCustomer: { contains: search, mode: "insensitive" } },
         { namaSales: { contains: search, mode: "insensitive" } },
@@ -166,18 +169,103 @@ export async function GET(request: NextRequest) {
     }
 
     if (startDate || endDate) {
-      where.tanggalTransaksi = {};
+      baseWhere.tanggalTransaksi = {};
       if (startDate) {
-        where.tanggalTransaksi.gte = new Date(startDate);
+        baseWhere.tanggalTransaksi.gte = new Date(startDate);
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        where.tanggalTransaksi.lte = end;
+        baseWhere.tanggalTransaksi.lte = end;
       }
     }
 
-    const totalCount = await prisma.penjualanHeader.count({ where });
+    const listWhere: any = { ...baseWhere };
+    if (!isAdmin) {
+      listWhere.isDeleted = false;
+      if (authData?.userId) {
+        listWhere.userId = parseInt(authData.userId, 10);
+      }
+    }
+
+    const summaryWhere: any = { ...baseWhere, isDeleted: false };
+    if (!isAdmin && authData?.userId) {
+      summaryWhere.userId = parseInt(authData.userId, 10);
+    }
+
+    if (summary) {
+      const totalTransaksi = await prisma.penjualanHeader.count({
+        where: summaryWhere,
+      });
+      const totalHutangTransaksi = await prisma.penjualanHeader.count({
+        where: { ...summaryWhere, statusPembayaran: "HUTANG" },
+      });
+      const totalLunas = await prisma.penjualanHeader.count({
+        where: { ...summaryWhere, statusPembayaran: "LUNAS" },
+      });
+      const hutangAgg = await prisma.penjualanHeader.aggregate({
+        where: { ...summaryWhere, statusPembayaran: "HUTANG" },
+        _sum: { totalHarga: true, jumlahDibayar: true },
+      });
+      const totalHutang =
+        Number(hutangAgg._sum.totalHarga || 0) -
+        Number(hutangAgg._sum.jumlahDibayar || 0);
+      const jatuhTempoLimit = new Date();
+      jatuhTempoLimit.setDate(jatuhTempoLimit.getDate() + 7);
+      const hutangJatuhTempo = await prisma.penjualanHeader.count({
+        where: {
+          ...summaryWhere,
+          statusPembayaran: "HUTANG",
+          tanggalJatuhTempo: { lte: jatuhTempoLimit },
+        },
+      });
+
+      let totalPembayaran = 0;
+      const pembayaranPenjualanWhere: any = {
+        ...summaryWhere,
+      };
+      delete pembayaranPenjualanWhere.tanggalTransaksi;
+      const pembayaranIds = await prisma.penjualanHeader.findMany({
+        where: pembayaranPenjualanWhere,
+        select: { id: true },
+      });
+      const idList = pembayaranIds.map((row) => row.id);
+      if (idList.length > 0) {
+        const pembayaranWhere: any = { penjualanId: { in: idList } };
+        if (startDate || endDate) {
+          pembayaranWhere.tanggalBayar = {};
+          if (startDate) {
+            pembayaranWhere.tanggalBayar.gte = new Date(startDate);
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            pembayaranWhere.tanggalBayar.lte = end;
+          }
+        }
+        const pembayaranAgg = await prisma.pembayaranPenjualan.aggregate({
+          where: pembayaranWhere,
+          _sum: { nominal: true },
+        });
+        totalPembayaran = Number(pembayaranAgg._sum.nominal || 0);
+      }
+      return NextResponse.json(
+        deepSerialize({
+          success: true,
+          data: [],
+          summary: {
+            totalTransaksi,
+            totalPembayaran,
+            totalHutang,
+            totalHutangTransaksi,
+            totalLunas,
+            hutangJatuhTempo,
+          },
+        })
+      );
+    }
+
+    const totalCount = await prisma.penjualanHeader.count({ where: listWhere });
 
     let orderBy: any;
     if (pembayaran === "HUTANG") {
@@ -187,25 +275,43 @@ export async function GET(request: NextRequest) {
     }
 
     const penjualan = await prisma.penjualanHeader.findMany({
-      where,
-      include: {
-        customer: true,
-        items: {
-          include: {
-            barang: true,
-          },
-          orderBy: { id: "asc" },
-        },
-      },
+      where: listWhere,
+      ...(summary
+        ? {
+            select: {
+              id: true,
+              kodePenjualan: true,
+              totalHarga: true,
+              jumlahDibayar: true,
+              statusPembayaran: true,
+              statusTransaksi: true,
+              tanggalJatuhTempo: true,
+              tanggalTransaksi: true,
+              isDeleted: true,
+            },
+          }
+        : {
+            include: {
+              customer: true,
+              items: {
+                include: {
+                  barang: true,
+                },
+                orderBy: { id: "asc" },
+              },
+            },
+          }),
       orderBy,
       skip,
       take: limit,
     });
 
-    const penjualanWithCalculation = penjualan.map((p) => ({
-      ...p,
-      calculation: calculatePenjualan(p.items, Number(p.diskonNota)),
-    }));
+    const penjualanWithCalculation = summary
+      ? penjualan
+      : penjualan.map((p) => ({
+          ...p,
+          calculation: calculatePenjualan(p.items, Number(p.diskonNota)),
+        }));
 
     const totalPages = Math.ceil(totalCount / limit);
     const hasMore = page < totalPages;
@@ -229,8 +335,6 @@ export async function GET(request: NextRequest) {
       { success: false, error: "Gagal mengambil data penjualan" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 

@@ -58,6 +58,7 @@ export async function GET(_request: NextRequest, { params }: RouteCtx) {
         customerId: idNum,
         statusPembayaran: "HUTANG",
         statusTransaksi: "SELESAI",
+        isDeleted: false,
       },
     });
 

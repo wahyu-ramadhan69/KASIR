@@ -167,8 +167,9 @@ const RiwayatPenjualanPage = () => {
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState<string>(todayStr);
+  const [endDate, setEndDate] = useState<string>(todayStr);
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -209,15 +210,11 @@ const RiwayatPenjualanPage = () => {
     };
   }, [searchTerm]);
 
-  // Fetch data when filters change
+  // Fetch data & stats when filters change
   useEffect(() => {
     fetchPenjualan(1, true);
-  }, [startDate, endDate, debouncedSearch]);
-
-  // Fetch stats on mount
-  useEffect(() => {
     fetchStats();
-  }, []);
+  }, [startDate, endDate, debouncedSearch]);
 
   // Setup intersection observer for infinite scroll
   useEffect(() => {
@@ -300,50 +297,34 @@ const RiwayatPenjualanPage = () => {
 
   const fetchStats = async () => {
     try {
-      const selesaiRes = await fetch(
-        "/api/penjualan?status=SELESAI&limit=1000"
-      );
+      const params = new URLSearchParams();
+      params.append("status", "SELESAI");
+      params.append("limit", "1000");
+      params.append("summary", "1");
+      if (debouncedSearch) {
+        params.append("search", debouncedSearch);
+      }
+      if (startDate) {
+        params.append("startDate", startDate);
+      }
+      if (endDate) {
+        params.append("endDate", endDate);
+      }
+      const selesaiRes = await fetch(`/api/penjualan-sales?${params.toString()}`);
       const selesaiData = await selesaiRes.json();
 
       if (selesaiData.success) {
-        const selesaiList = selesaiData.data as PenjualanHeader[];
-
-        const hutangList = selesaiList.filter(
-          (p) => p.statusPembayaran === "HUTANG"
-        );
-
-        const totalHutang = hutangList.reduce(
-          (sum, p) => sum + (p.totalHarga - p.jumlahDibayar),
-          0
-        );
-
-        const totalPendapatan = selesaiList.reduce(
-          (sum, p) => sum + p.jumlahDibayar,
-          0
-        );
-
-        // Hitung hutang yang akan jatuh tempo dalam 7 hari
-        const now = new Date();
-        const hutangJatuhTempo = hutangList.filter((p) => {
-          if (!p.tanggalJatuhTempo) return false;
-          const jatuhTempo = new Date(p.tanggalJatuhTempo);
-          const diffTime = jatuhTempo.getTime() - now.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          return diffDays <= 7;
-        }).length;
-
-        const totalLunas = selesaiList.filter(
-          (p) => p.statusPembayaran === "LUNAS"
-        ).length;
-
-        setStats({
-          totalTransaksi: selesaiList.length,
-          totalPendapatan,
-          totalHutang,
-          totalHutangTransaksi: hutangList.length,
-          totalLunas,
-          hutangJatuhTempo,
-        });
+        const summary = selesaiData.summary;
+        if (summary) {
+          setStats({
+            totalTransaksi: summary.totalTransaksi || 0,
+            totalPendapatan: summary.totalPembayaran || 0,
+            totalHutang: summary.totalHutang || 0,
+            totalHutangTransaksi: summary.totalHutangTransaksi || 0,
+            totalLunas: summary.totalLunas || 0,
+            hutangJatuhTempo: summary.hutangJatuhTempo || 0,
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching stats:", error);

@@ -26,6 +26,8 @@ function serializeBarang(barang: any) {
     stok: bigIntToNumber(barang.stok),
     jumlahPerKemasan: bigIntToNumber(barang.jumlahPerKemasan),
     ukuran: bigIntToNumber(barang.ukuran),
+    berat: bigIntToNumber(barang.berat),
+    limitStok: bigIntToNumber(barang.limitStok),
     limitPenjualan: bigIntToNumber(barang.limitPenjualan),
     supplier: barang.supplier
       ? {
@@ -115,6 +117,7 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       ukuran,
       satuan,
       supplierId,
+      berat,
       limitPenjualan,
     } = body;
 
@@ -154,6 +157,10 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
     // Update limitPenjualan jika dikirim
     if (limitPenjualan != null) {
       updateData.limitPenjualan = BigInt(limitPenjualan);
+    }
+
+    if (berat != null) {
+      updateData.berat = BigInt(berat);
     }
 
     const barang = await prisma.barang.update({

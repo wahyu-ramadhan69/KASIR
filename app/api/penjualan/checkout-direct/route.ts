@@ -165,10 +165,17 @@ export async function POST(request: NextRequest) {
         subtotal += totalHargaSebelumDiskon;
         totalDiskonItem += diskon;
 
+        const beratPerItem = Number(barang.berat || 0);
+        const beratItem =
+          item.berat !== undefined && item.berat !== null
+            ? Number(item.berat)
+            : beratPerItem * totalStokDiperlukan;
+
         return {
           ...item,
           barang,
           totalStokDiperlukan,
+          berat: beratItem,
         };
       })
     );
@@ -229,6 +236,10 @@ export async function POST(request: NextRequest) {
     // Mulai transaction
     const result = await prisma.$transaction(async (tx) => {
       // 1. Buat penjualan header
+      const totalBerat = itemsWithCalculation.reduce(
+        (sum, item) => sum + Number(item.berat || 0),
+        0
+      );
       const createData: any = {
         kodePenjualan,
         subtotal,
@@ -236,6 +247,7 @@ export async function POST(request: NextRequest) {
         totalHarga,
         jumlahDibayar,
         kembalian,
+        beratTotal: totalBerat,
         metodePembayaran,
         statusPembayaran,
         statusTransaksi: "SELESAI",
@@ -264,6 +276,7 @@ export async function POST(request: NextRequest) {
             penjualanId: penjualanHeader.id,
             barangId: item.barangId,
             totalItem: totalPcs,
+            berat: item.berat || 0,
             hargaJual: item.hargaJual,
             diskonPerItem: item.diskonPerItem || 0,
           },
@@ -289,6 +302,47 @@ export async function POST(request: NextRequest) {
             piutang: {
               increment: sisaHutang,
             },
+          },
+        });
+      }
+
+      if (jumlahDibayar > 0) {
+        const pembayaranDate = today;
+        const pembayaranDateStr = pembayaranDate
+          .toISOString()
+          .slice(0, 10)
+          .replace(/-/g, "");
+        const lastPembayaran = await tx.pembayaranPenjualan.findFirst({
+          where: {
+            kodePembayaran: {
+              startsWith: `BYR-${pembayaranDateStr}`,
+            },
+          },
+          orderBy: {
+            kodePembayaran: "desc",
+          },
+        });
+
+        let nextPembayaranNumber = 1;
+        if (lastPembayaran) {
+          const lastNumber = parseInt(
+            lastPembayaran.kodePembayaran.split("-")[2]
+          );
+          nextPembayaranNumber = lastNumber + 1;
+        }
+
+        const kodePembayaran = `BYR-${pembayaranDateStr}-${String(
+          nextPembayaranNumber
+        ).padStart(4, "0")}`;
+
+        await tx.pembayaranPenjualan.create({
+          data: {
+            kodePembayaran,
+            penjualanId: penjualanHeader.id,
+            tanggalBayar: pembayaranDate,
+            nominal: BigInt(jumlahDibayar),
+            metode: metodePembayaran,
+            ...(userId ? { userId } : {}),
           },
         });
       }

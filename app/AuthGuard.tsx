@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
-// Tipe data untuk payload JWT (hanya yang dibutuhkan)
 interface JWTPayload {
   userId: string;
   username: string;
@@ -16,9 +15,7 @@ interface JWTPayload {
 export async function isAuthenticated(): Promise<boolean> {
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
-
   if (!token) return false;
-
   try {
     jwt.verify(token, JWT_SECRET);
     return true;

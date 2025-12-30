@@ -175,6 +175,7 @@ export async function POST(
       totalItem,
       hargaJual,
       diskonPerItem = 0,
+      berat,
     } = body;
 
     // Validasi penjualan
@@ -219,6 +220,11 @@ export async function POST(
       totalPcsNeeded,
       jumlahPerKemasan
     );
+    const beratPerItem = toNumber(barang.berat);
+    const beratItem =
+      berat !== undefined && berat !== null
+        ? Number(berat)
+        : beratPerItem * totalPcsNeeded;
 
     if (stokTersedia < totalPcsNeeded) {
       return NextResponse.json(
@@ -284,6 +290,7 @@ export async function POST(
         penjualanId,
         barangId,
         totalItem: BigInt(totalPcsNeeded),
+        berat: BigInt(beratItem),
         hargaJual: BigInt(hargaJualFinal),
         hargaBeli: barang.hargaBeli, // Simpan harga beli dari master barang
         diskonPerItem: BigInt(diskonPerItem),
@@ -300,12 +307,17 @@ export async function POST(
 
     const diskonNotaPenjualan = toNumber(penjualan.diskonNota);
     const calculation = calculatePenjualan(allItems, diskonNotaPenjualan);
+    const beratTotal = allItems.reduce(
+      (sum, item) => sum + toNumber(item.berat),
+      0
+    );
 
     await prisma.penjualanHeader.update({
       where: { id: penjualanId },
       data: {
         subtotal: BigInt(calculation.ringkasan.subtotal),
         totalHarga: BigInt(calculation.ringkasan.totalHarga),
+        beratTotal: BigInt(beratTotal),
       },
     });
 

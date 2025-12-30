@@ -2,7 +2,7 @@
 import "../globals.css";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
-import { isAuthenticated } from "../AuthGuard";
+import { isAuthenticated, getAuthData } from "../AuthGuard";
 import { redirect } from "next/navigation";
 import { Toaster } from "react-hot-toast";
 
@@ -17,13 +17,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const auth = await isAuthenticated();
-  if (!auth) {
+  const authData = await getAuthData();
+  if (!auth || !authData) {
     redirect("/");
   }
+
+  const { role, username } = authData;
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       <Toaster position="top-right" />
-      <Sidebar />
+      <Sidebar role={role} username={username} />
       <div className="p-4 transition-all duration-300 xl:ml-80 sidebar-content">
         <Navbar />
         <div className="mt-2">

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         alamat: body.alamat,
         jenis: body.jenis,
         gajiPokok: body.gajiPokok,
-        tunjanganMakanPerHari: body.tunjanganMakanPerHari,
+        tunjanganMakan: body.tunjanganMakanPerHari,
         totalPinjaman: body.totalPinjaman || 0,
         sisaPinjaman: body.sisaPinjaman || 0,
         cicilanPerBulan: body.cicilanPerBulan || 0,

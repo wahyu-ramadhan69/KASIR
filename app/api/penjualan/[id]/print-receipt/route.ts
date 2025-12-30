@@ -61,6 +61,12 @@ export async function GET(
       }).format(date);
     };
 
+    const formatBeratKg = (grams: number | bigint): string => {
+      const kg = Number(grams) / 1000;
+      const trimmed = kg.toFixed(3).replace(/\.?0+$/, "");
+      return trimmed.replace(".", ",");
+    };
+
     // Generate HTML untuk nota
     const html = `
 <!DOCTYPE html>
@@ -71,7 +77,7 @@ export async function GET(
   <title>Nota ${penjualan.kodePenjualan}</title>
   <style>
     @page {
-      size: A6;
+      size: 80mm auto;
       margin: 0;
     }
 
@@ -83,10 +89,10 @@ export async function GET(
 
     body {
       font-family: 'Courier New', monospace;
-      font-size: 10px;
+      font-size: 9px;
       line-height: 1.4;
-      padding: 15px;
-      width: 105mm;
+      padding: 2mm;
+      width: 78mm;
       background: white;
     }
 
@@ -98,7 +104,7 @@ export async function GET(
     }
 
     .header h1 {
-      font-size: 16px;
+      font-size: 13px;
       font-weight: bold;
       margin-bottom: 4px;
     }
@@ -109,8 +115,8 @@ export async function GET(
     }
 
     .info-section {
-      margin: 10px 0;
-      font-size: 9px;
+      margin: 8px 0;
+      font-size: 8px;
     }
 
     .info-row {
@@ -121,7 +127,7 @@ export async function GET(
 
     .info-label {
       font-weight: bold;
-      width: 80px;
+      width: 68px;
     }
 
     .divider {
@@ -131,8 +137,8 @@ export async function GET(
 
     .items-table {
       width: 100%;
-      margin: 10px 0;
-      font-size: 9px;
+      margin: 8px 0;
+      font-size: 8px;
     }
 
     .items-header {
@@ -141,7 +147,7 @@ export async function GET(
       padding-bottom: 4px;
       margin-bottom: 4px;
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr;
+      grid-template-columns: 1.6fr 0.6fr 0.8fr;
       gap: 4px;
     }
 
@@ -157,9 +163,9 @@ export async function GET(
 
     .item-details {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr;
+      grid-template-columns: 1.6fr 0.6fr 0.8fr;
       gap: 4px;
-      font-size: 9px;
+      font-size: 8px;
     }
 
     .item-discount {
@@ -179,12 +185,12 @@ export async function GET(
       display: flex;
       justify-content: space-between;
       margin: 4px 0;
-      font-size: 10px;
+      font-size: 9px;
     }
 
     .summary-row.total {
       font-weight: bold;
-      font-size: 12px;
+      font-size: 11px;
       border-top: 1px solid #000;
       border-bottom: 1px solid #000;
       padding: 6px 0;
@@ -205,7 +211,7 @@ export async function GET(
       text-align: center;
       border-top: 1px dashed #000;
       padding-top: 8px;
-      font-size: 9px;
+      font-size: 8px;
     }
 
     .footer p {
@@ -227,12 +233,13 @@ export async function GET(
       border-top: 1px solid #000;
       margin-top: 50px;
       padding-top: 4px;
-      font-size: 9px;
+      font-size: 8px;
     }
 
     @media print {
       body {
-        padding: 10px;
+        padding: 2mm;
+        width: 78mm;
       }
 
       .no-print {
@@ -326,6 +333,10 @@ export async function GET(
     <div class="summary-row">
       <span>Subtotal:</span>
       <span>${formatRupiah(penjualan.subtotal)}</span>
+    </div>
+    <div class="summary-row">
+      <span>Total Berat:</span>
+      <span>${formatBeratKg(penjualan.beratTotal)} kg</span>
     </div>
     ${
       Number(penjualan.diskonNota) > 0

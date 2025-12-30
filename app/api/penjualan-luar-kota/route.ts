@@ -231,6 +231,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Siapkan manifest dan cek stok cukup
+    let totalBerat = 0;
     const manifestData = body.manifestBarang.map((item: any) => {
       const barang = barangList.find((b) => b.id === item.barangId);
       if (!barang) throw new Error("Barang tidak ditemukan");
@@ -243,6 +244,9 @@ export async function POST(request: NextRequest) {
           `Stok ${barang.namaBarang} tidak cukup (tersedia ${availablePcs} pcs)`
         );
       }
+
+      const beratPerPcs = Number(barang.berat || 0);
+      totalBerat += beratPerPcs * totalItem;
 
       return {
         barangId: item.barangId,
@@ -263,6 +267,7 @@ export async function POST(request: NextRequest) {
           kotaTujuan: body.kotaTujuan,
           tanggalBerangkat: new Date(body.tanggalBerangkat),
           keterangan: body.keterangan,
+          totalBerat: BigInt(totalBerat),
           createdBy: userId,
           manifestBarang: {
             create: manifestData,

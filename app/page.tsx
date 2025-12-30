@@ -15,6 +15,17 @@ export default function LoginPage() {
   const [verifying, setVerifying] = useState(false);
   const router = useRouter();
 
+  function getRedirectPath(role?: string) {
+    switch (role?.toLowerCase()) {
+      case "admin":
+        return "/dashboard/admin";
+      case "kasir":
+        return "/dashboard/kasir";
+      default:
+        return "/dashboard";
+    }
+  }
+
   async function handleLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
@@ -34,7 +45,7 @@ export default function LoginPage() {
           setIsTwoFA(true);
           setCode("");
         } else {
-          router.push("/dashboard/admin");
+          router.push(getRedirectPath(data?.user?.role));
           setUsername("");
           setPassword("");
         }
@@ -62,7 +73,7 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        router.push("/dashboard/admin");
+        router.push(getRedirectPath(data?.user?.role));
       } else {
         toast.error(data?.error || "Kode OTP salah");
       }

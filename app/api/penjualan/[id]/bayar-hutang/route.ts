@@ -42,7 +42,7 @@ export async function POST(
     const { id } = await params;
     const penjualanId = parseInt(id);
     const body = await request.json();
-    const { jumlahBayar } = body;
+    const { jumlahBayar, metodePembayaran = "CASH", catatan } = body;
 
     if (!jumlahBayar || jumlahBayar <= 0) {
       return NextResponse.json(
@@ -123,6 +123,47 @@ export async function POST(
           karyawan: true,
         },
       });
+
+      if (jumlahBayar > 0) {
+        const pembayaranDate = new Date();
+        const pembayaranDateStr = pembayaranDate
+          .toISOString()
+          .slice(0, 10)
+          .replace(/-/g, "");
+        const lastPembayaran = await tx.pembayaranPenjualan.findFirst({
+          where: {
+            kodePembayaran: {
+              startsWith: `BYR-${pembayaranDateStr}`,
+            },
+          },
+          orderBy: {
+            kodePembayaran: "desc",
+          },
+        });
+
+        let nextPembayaranNumber = 1;
+        if (lastPembayaran) {
+          const lastNumber = parseInt(
+            lastPembayaran.kodePembayaran.split("-")[2]
+          );
+          nextPembayaranNumber = lastNumber + 1;
+        }
+
+        const kodePembayaran = `BYR-${pembayaranDateStr}-${String(
+          nextPembayaranNumber
+        ).padStart(4, "0")}`;
+
+        await tx.pembayaranPenjualan.create({
+          data: {
+            kodePembayaran,
+            penjualanId,
+            tanggalBayar: pembayaranDate,
+            nominal: BigInt(jumlahBayar),
+            metode: metodePembayaran,
+            catatan: catatan || null,
+          },
+        });
+      }
 
       return updated;
     });

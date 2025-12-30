@@ -93,6 +93,10 @@ export async function POST(
     const dibayar = BigInt(jumlahDibayar);
     const kembalian = dibayar > totalHarga ? dibayar - totalHarga : BigInt(0);
     const sisaHutang = totalHarga > dibayar ? totalHarga - dibayar : BigInt(0);
+    const totalBerat = penjualan.items.reduce(
+      (sum, item) => sum + Number(item.berat || 0),
+      0
+    );
 
     // Tentukan status pembayaran
     let statusPembayaran: "LUNAS" | "HUTANG" = "LUNAS";
@@ -118,8 +122,12 @@ export async function POST(
     const result = await prisma.$transaction(async (tx) => {
       // Update stok barang
       for (const item of penjualan.items) {
+        const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan || 1);
         const totalPcs =
-          item.jumlahDus * item.barang.jumlahPerKemasan + item.jumlahPcs;
+          item.totalItem !== null && item.totalItem !== undefined
+            ? Number(item.totalItem)
+            : Number(item.jumlahDus || 0) * jumlahPerKemasan +
+              Number(item.jumlahPcs || 0);
 
         await tx.barang.update({
           where: { id: item.barangId },
@@ -150,6 +158,7 @@ export async function POST(
           diskonNota: BigInt(diskonNota),
           totalHarga,
           jumlahDibayar: dibayar,
+          beratTotal: BigInt(totalBerat),
           kembalian,
           keterangan: keterangan || null,
           rutePengiriman: rutePengiriman || null,
@@ -170,6 +179,48 @@ export async function POST(
           karyawan: true,
         },
       });
+
+      if (dibayar > 0) {
+        const pembayaranDate = tanggalPenjualan
+          ? new Date(tanggalPenjualan)
+          : new Date();
+        const pembayaranDateStr = pembayaranDate
+          .toISOString()
+          .slice(0, 10)
+          .replace(/-/g, "");
+        const lastPembayaran = await tx.pembayaranPenjualan.findFirst({
+          where: {
+            kodePembayaran: {
+              startsWith: `BYR-${pembayaranDateStr}`,
+            },
+          },
+          orderBy: {
+            kodePembayaran: "desc",
+          },
+        });
+
+        let nextPembayaranNumber = 1;
+        if (lastPembayaran) {
+          const lastNumber = parseInt(
+            lastPembayaran.kodePembayaran.split("-")[2]
+          );
+          nextPembayaranNumber = lastNumber + 1;
+        }
+
+        const kodePembayaran = `BYR-${pembayaranDateStr}-${String(
+          nextPembayaranNumber
+        ).padStart(4, "0")}`;
+
+        await tx.pembayaranPenjualan.create({
+          data: {
+            kodePembayaran,
+            penjualanId,
+            tanggalBayar: pembayaranDate,
+            nominal: dibayar,
+            metode: metodePembayaran || "CASH",
+          },
+        });
+      }
 
       return updatedPenjualan;
     });

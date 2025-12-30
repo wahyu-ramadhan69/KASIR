@@ -33,7 +33,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const navLinks = [
+// Menu untuk Admin
+const adminNavLinks = [
   {
     label: "Dashboard",
     href: "/dashboard/admin",
@@ -41,7 +42,7 @@ const navLinks = [
   },
 ];
 
-const masterDataLinks = [
+const adminMasterDataLinks = [
   {
     label: "Master Data",
     href: "/dashboard/admin/barang",
@@ -76,7 +77,7 @@ const masterDataLinks = [
   },
 ];
 
-const transactionLinks = [
+const adminTransactionLinks = [
   {
     label: "Pembelian",
     href: "/dashboard/admin/pembelian",
@@ -95,7 +96,7 @@ const transactionLinks = [
     ],
   },
   {
-    label: "Transaksi Toko",
+    label: "Transaksi Kasir",
     href: "/dashboard/admin/penjualan",
     icon: <ShoppingBag className="w-5 h-5" />,
     subMenu: [
@@ -231,29 +232,175 @@ const transactionLinks = [
   },
 ];
 
-const Sidebar: React.FC = () => {
+// Menu untuk Kasir
+const kasirNavLinks = [
+  {
+    label: "Dashboard",
+    href: "/dashboard/kasir",
+    icon: <LayoutDashboard className="w-5 h-5" />,
+  },
+];
+
+const kasirMasterDataLinks = [
+  {
+    label: "Master Data",
+    href: "/dashboard/kasir/barang",
+    icon: <Database className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Supplier",
+        href: "/dashboard/kasir/supplier",
+        icon: <Users className="w-4 h-4" />,
+      },
+      {
+        label: "Customer",
+        href: "/dashboard/kasir/customer",
+        icon: <UserCheck className="w-4 h-4" />,
+      },
+    ],
+  },
+];
+
+const kasirTransactionLinks = [
+  {
+    label: "Transaksi Kasir",
+    href: "/dashboard/kasir/penjualan",
+    icon: <ShoppingBag className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Penjualan Toko",
+        href: "/dashboard/kasir/penjualan",
+        icon: <ShoppingBag className="w-4 h-4" />,
+      },
+      {
+        label: "Pengembalian Barang",
+        href: "/dashboard/kasir/penjualan/pengembalian",
+        icon: <Undo2 className="w-4 h-4" />,
+      },
+      {
+        label: "Riwayat Penjualan",
+        href: "/dashboard/kasir/penjualan/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+      {
+        label: "Riwayat Pengembalian",
+        href: "/dashboard/kasir/penjualan/pengembalian/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Sales dan Kanvas",
+    href: "/dashboard/kasir/penjualan-sales",
+    icon: <Truck className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Dalam Kota",
+        href: "/dashboard/kasir/penjualan-sales",
+        icon: <PackageOpen className="w-4 h-4" />,
+      },
+      {
+        label: "Luar Kota",
+        href: "/dashboard/kasir/penjualan-sales/luar-kota",
+        icon: <Truck className="w-4 h-4" />,
+      },
+      {
+        label: "Kanvas Sales",
+        href: "/dashboard/kasir/penjualan-sales/kanvas",
+        icon: <Truck className="w-4 h-4" />,
+      },
+      {
+        label: "Riwayat Penjualan",
+        href: "/dashboard/kasir/penjualan-sales/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+      {
+        label: "Riwayat Kanvas",
+        href: "/dashboard/kasir/penjualan-sales/luar-kota/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+      {
+        label: "Pengembalian Kanvas",
+        href: "/dashboard/kasir/penjualan-sales/riwayat/pengembalian",
+        icon: <History className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Hutang-Piutang",
+    href: "/dashboard/kasir/hutang-piutang/hutang-pembelian",
+    icon: <Wallet2 className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Piutang Customer",
+        href: "/dashboard/kasir/hutang-piutang/piutang-customer",
+        icon: <ReceiptText className="w-4 h-4" />,
+      },
+      {
+        label: "Piutang Kanvas",
+        href: "/dashboard/kasir/hutang-piutang/piutang-kanvas",
+        icon: <ReceiptText className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Pengeluaran",
+    href: "/dashboard/kasir/pengeluaran/harian",
+    icon: <DollarSign className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Pengeluaran Harian",
+        href: "/dashboard/kasir/pengeluaran/harian",
+        icon: <CalendarDays className="w-4 h-4" />,
+      },
+    ],
+  },
+];
+
+interface SidebarProps {
+  role: string;
+  username?: string;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
   const router = useRouter();
   const pathname = usePathname();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // Dapatkan menu berdasarkan role
+  const userRole = role.toLowerCase() as "admin" | "kasir";
+  const navLinks = userRole === "admin" ? adminNavLinks : kasirNavLinks;
+  const masterDataLinks =
+    userRole === "admin" ? adminMasterDataLinks : kasirMasterDataLinks;
+  const transactionLinks =
+    userRole === "admin" ? adminTransactionLinks : kasirTransactionLinks;
+
   // Auto-expand menu jika ada submenu yang aktif
   useEffect(() => {
     if (!isCollapsed) {
       masterDataLinks.forEach((link) => {
-        if (isSubMenuActive(link.subMenu) && !openMenus.includes(link.label)) {
+        if (
+          link.subMenu &&
+          isSubMenuActive(link.subMenu) &&
+          !openMenus.includes(link.label)
+        ) {
           setOpenMenus((prev) => [...prev, link.label]);
         }
       });
 
       transactionLinks.forEach((link) => {
-        if (isSubMenuActive(link.subMenu) && !openMenus.includes(link.label)) {
+        if (
+          link.subMenu &&
+          isSubMenuActive(link.subMenu) &&
+          !openMenus.includes(link.label)
+        ) {
           setOpenMenus((prev) => [...prev, link.label]);
         }
       });
     }
-  }, [pathname, isCollapsed]);
+  }, [pathname, isCollapsed, masterDataLinks, transactionLinks, openMenus]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -311,6 +458,122 @@ const Sidebar: React.FC = () => {
   const isSubMenuActive = (subMenu: { href: string }[]) =>
     subMenu.some((item) => pathname === item.href);
 
+  const renderMenuItem = (link: any, isSubMenu: boolean = false) => {
+    const hasSubMenu = link.subMenu && link.subMenu.length > 0;
+    const isActive = hasSubMenu
+      ? isSubMenuActive(link.subMenu)
+      : pathname === link.href;
+
+    if (hasSubMenu) {
+      return (
+        <li key={link.label} className="relative group">
+          <button
+            onClick={() => toggleMenu(link.label)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+              isActive
+                ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
+                : "text-gray-300 hover:bg-white/5 hover:text-white"
+            } ${isCollapsed ? "justify-center" : ""}`}
+            type="button"
+          >
+            <span
+              className={`flex-shrink-0 ${
+                isActive ? "text-white" : "text-gray-400 group-hover:text-white"
+              }`}
+            >
+              {link.icon}
+            </span>
+            {!isCollapsed && (
+              <>
+                <span className="flex-1 text-left">{link.label}</span>
+                <span
+                  className={`transform transition-transform duration-200 ${
+                    isMenuOpen(link.label) ? "rotate-180" : ""
+                  }`}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </span>
+              </>
+            )}
+          </button>
+
+          {/* Tooltip for collapsed state */}
+          {isCollapsed && (
+            <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
+              {link.label}
+            </div>
+          )}
+
+          {/* Sub Menu */}
+          {!isCollapsed && (
+            <ul
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                isMenuOpen(link.label)
+                  ? "max-h-96 opacity-100 mt-1"
+                  : "max-h-0 opacity-0"
+              }`}
+            >
+              {link.subMenu.map((subItem: any) => (
+                <li key={subItem.href}>
+                  <Link href={subItem.href} scroll={false}>
+                    <button
+                      className={`group w-full flex items-center gap-3 pl-12 pr-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
+                        pathname === subItem.href
+                          ? "text-blue-400 bg-blue-500/10"
+                          : "text-gray-400 hover:text-white hover:bg-white/5"
+                      }`}
+                      type="button"
+                    >
+                      <span
+                        className={`${
+                          pathname === subItem.href
+                            ? "text-blue-400"
+                            : "text-gray-500 group-hover:text-gray-300"
+                        }`}
+                      >
+                        {subItem.icon}
+                      </span>
+                      <span className="text-xs">{subItem.label}</span>
+                    </button>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      );
+    }
+
+    return (
+      <li key={link.href} className="relative group">
+        <Link href={link.href} scroll={false}>
+          <button
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+              isActive
+                ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
+                : "text-gray-300 hover:bg-white/5 hover:text-white"
+            } ${isCollapsed ? "justify-center" : ""}`}
+            type="button"
+          >
+            <span
+              className={`flex-shrink-0 ${
+                isActive ? "text-white" : "text-gray-400 group-hover:text-white"
+              }`}
+            >
+              {link.icon}
+            </span>
+            {!isCollapsed && <span>{link.label}</span>}
+          </button>
+        </Link>
+        {isCollapsed && (
+          <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
+            {link.label}
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
     <>
       {/* Mobile Menu Button */}
@@ -351,18 +614,20 @@ const Sidebar: React.FC = () => {
               className={`flex items-center gap-3 group ${
                 isCollapsed ? "justify-center w-full" : "flex-1"
               }`}
-              href="/dashboard/admin"
+              href={
+                userRole === "admin" ? "/dashboard/admin" : "/dashboard/kasir"
+              }
             >
               <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow flex-shrink-0">
                 <LayoutDashboard className="w-5 h-5 text-white" />
               </div>
               {!isCollapsed && (
                 <div className="overflow-hidden">
-                  <h6 className="block font-sans text-sm font-bold text-white tracking-wide whitespace-nowrap">
-                    ADMIN
+                  <h6 className="block font-sans text-sm font-bold text-white tracking-wide whitespace-nowrap uppercase">
+                    {userRole}
                   </h6>
                   <p className="text-xs text-gray-400 whitespace-nowrap">
-                    Dashboard
+                    {username || "Dashboard"}
                   </p>
                 </div>
               )}
@@ -400,128 +665,23 @@ const Sidebar: React.FC = () => {
               </h3>
             )}
             <ul className="flex flex-col gap-1">
-              {navLinks.map((link) => (
-                <li key={link.href} className="relative group">
-                  <Link href={link.href} scroll={false}>
-                    <button
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
-                        pathname === link.href
-                          ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
-                          : "text-gray-300 hover:bg-white/5 hover:text-white"
-                      } ${isCollapsed ? "justify-center" : ""}`}
-                      type="button"
-                    >
-                      <span
-                        className={`flex-shrink-0 ${
-                          pathname === link.href
-                            ? "text-white"
-                            : "text-gray-400 group-hover:text-white"
-                        }`}
-                      >
-                        {link.icon}
-                      </span>
-                      {!isCollapsed && <span>{link.label}</span>}
-                    </button>
-                  </Link>
-                  {isCollapsed && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
-                      {link.label}
-                    </div>
-                  )}
-                </li>
-              ))}
+              {navLinks.map((link) => renderMenuItem(link))}
             </ul>
           </div>
 
           {/* Master Data */}
-          <div className="mb-6">
-            {!isCollapsed && (
-              <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Data
-              </h3>
-            )}
-            <ul className="flex flex-col gap-1">
-              {masterDataLinks.map((link) => (
-                <li key={link.label} className="relative group">
-                  <button
-                    onClick={() => toggleMenu(link.label)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
-                      isSubMenuActive(link.subMenu)
-                        ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
-                        : "text-gray-300 hover:bg-white/5 hover:text-white"
-                    } ${isCollapsed ? "justify-center" : ""}`}
-                    type="button"
-                  >
-                    <span
-                      className={`flex-shrink-0 ${
-                        isSubMenuActive(link.subMenu)
-                          ? "text-white"
-                          : "text-gray-400 group-hover:text-white"
-                      }`}
-                    >
-                      {link.icon}
-                    </span>
-                    {!isCollapsed && (
-                      <>
-                        <span className="flex-1 text-left">{link.label}</span>
-                        <span
-                          className={`transform transition-transform duration-200 ${
-                            isMenuOpen(link.label) ? "rotate-180" : ""
-                          }`}
-                        >
-                          <ChevronDown className="w-4 h-4" />
-                        </span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Tooltip for collapsed state */}
-                  {isCollapsed && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
-                      {link.label}
-                    </div>
-                  )}
-
-                  {/* Sub Menu */}
-                  {!isCollapsed && (
-                    <ul
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        isMenuOpen(link.label)
-                          ? "max-h-96 opacity-100 mt-1"
-                          : "max-h-0 opacity-0"
-                      }`}
-                    >
-                      {link.subMenu.map((subItem) => (
-                        <li key={subItem.href}>
-                          <Link href={subItem.href} scroll={false}>
-                            <button
-                              className={`group w-full flex items-center gap-3 pl-12 pr-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
-                                pathname === subItem.href
-                                  ? "text-blue-400 bg-blue-500/10"
-                                  : "text-gray-400 hover:text-white hover:bg-white/5"
-                              }`}
-                              type="button"
-                            >
-                              <span
-                                className={`${
-                                  pathname === subItem.href
-                                    ? "text-blue-400"
-                                    : "text-gray-500 group-hover:text-gray-300"
-                                }`}
-                              >
-                                {subItem.icon}
-                              </span>
-                              <span className="text-xs">{subItem.label}</span>
-                            </button>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {masterDataLinks.length > 0 && (
+            <div className="mb-6">
+              {!isCollapsed && (
+                <h3 className="px-4 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Data
+                </h3>
+              )}
+              <ul className="flex flex-col gap-1">
+                {masterDataLinks.map((link) => renderMenuItem(link))}
+              </ul>
+            </div>
+          )}
 
           {/* Transaksi */}
           <div className="mb-6">
@@ -531,85 +691,7 @@ const Sidebar: React.FC = () => {
               </h3>
             )}
             <ul className="flex flex-col gap-1">
-              {transactionLinks.map((link) => (
-                <li key={link.label} className="relative group">
-                  <button
-                    onClick={() => toggleMenu(link.label)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
-                      isSubMenuActive(link.subMenu)
-                        ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30"
-                        : "text-gray-300 hover:bg-white/5 hover:text-white"
-                    } ${isCollapsed ? "justify-center" : ""}`}
-                    type="button"
-                  >
-                    <span
-                      className={`flex-shrink-0 ${
-                        isSubMenuActive(link.subMenu)
-                          ? "text-white"
-                          : "text-gray-400 group-hover:text-white"
-                      }`}
-                    >
-                      {link.icon}
-                    </span>
-                    {!isCollapsed && (
-                      <>
-                        <span className="flex-1 text-left">{link.label}</span>
-                        <span
-                          className={`transform transition-transform duration-200 ${
-                            isMenuOpen(link.label) ? "rotate-180" : ""
-                          }`}
-                        >
-                          <ChevronDown className="w-4 h-4" />
-                        </span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Tooltip for collapsed state */}
-                  {isCollapsed && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
-                      {link.label}
-                    </div>
-                  )}
-
-                  {/* Sub Menu */}
-                  {!isCollapsed && (
-                    <ul
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        isMenuOpen(link.label)
-                          ? "max-h-96 opacity-100 mt-1"
-                          : "max-h-0 opacity-0"
-                      }`}
-                    >
-                      {link.subMenu.map((subItem) => (
-                        <li key={subItem.href}>
-                          <Link href={subItem.href} scroll={false}>
-                            <button
-                              className={`group w-full flex items-center gap-3 pl-12 pr-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
-                                pathname === subItem.href
-                                  ? "text-blue-400 bg-blue-500/10"
-                                  : "text-gray-400 hover:text-white hover:bg-white/5"
-                              }`}
-                              type="button"
-                            >
-                              <span
-                                className={`${
-                                  pathname === subItem.href
-                                    ? "text-blue-400"
-                                    : "text-gray-500 group-hover:text-gray-300"
-                                }`}
-                              >
-                                {subItem.icon}
-                              </span>
-                              <span className="text-xs">{subItem.label}</span>
-                            </button>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
+              {transactionLinks.map((link) => renderMenuItem(link))}
             </ul>
           </div>
 
