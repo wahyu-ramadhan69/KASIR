@@ -327,7 +327,7 @@ const kasirTransactionLinks = [
   //   ],
   // },
   {
-    label: "Hutang-Piutang",
+    label: "Piutang",
     href: "/dashboard/kasir/hutang-piutang/hutang-pembelian",
     icon: <Wallet2 className="w-5 h-5" />,
     subMenu: [
@@ -336,11 +336,11 @@ const kasirTransactionLinks = [
         href: "/dashboard/kasir/hutang-piutang/piutang-customer",
         icon: <ReceiptText className="w-4 h-4" />,
       },
-      {
-        label: "Piutang Kanvas",
-        href: "/dashboard/kasir/hutang-piutang/piutang-kanvas",
-        icon: <ReceiptText className="w-4 h-4" />,
-      },
+      // {
+      //   label: "Piutang Kanvas",
+      //   href: "/dashboard/kasir/hutang-piutang/piutang-kanvas",
+      //   icon: <ReceiptText className="w-4 h-4" />,
+      // },
     ],
   },
   {
