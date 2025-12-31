@@ -41,6 +41,7 @@ interface DailySales {
 }
 
 type Period = "daily" | "monthly" | "yearly";
+// lupa
 
 const formatRupiah = (number: number): string => {
   return new Intl.NumberFormat("id-ID", {
