@@ -159,8 +159,7 @@ export async function GET(request: NextRequest) {
 
     let logoBase64: string | null = null;
     const host =
-      request.headers.get("x-forwarded-host") ||
-      request.headers.get("host");
+      request.headers.get("x-forwarded-host") || request.headers.get("host");
     const protoHeader = request.headers.get("x-forwarded-proto");
     const protocol =
       protoHeader ||
@@ -310,7 +309,7 @@ export async function GET(request: NextRequest) {
       { label: "Sisa Piutang Belum Dibayar", value: totalSisaPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
       { label: "Kerugian Barang Rusak/Kadaluarsa", value: totalKerugian },
-      { label: "Setoran Harus Dibayar", value: totalSetoran },
+      { label: "Setoran Akhir", value: totalSetoran },
     ];
 
     rows.forEach((row, index) => {
