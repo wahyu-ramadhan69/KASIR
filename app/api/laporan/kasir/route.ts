@@ -139,11 +139,41 @@ export async function GET(request: NextRequest) {
 
     doc.rect(0, 0, pageWidth, 110).fill("#0f172a");
 
-    const logoUrl = new URL("/sembako.png", request.url);
-    const logoRes = await fetch(logoUrl);
-    if (logoRes.ok) {
-      const logoArrayBuffer = await logoRes.arrayBuffer();
-      const logoBase64 = Buffer.from(logoArrayBuffer).toString("base64");
+    let logoBase64: string | null = null;
+    const host =
+      request.headers.get("x-forwarded-host") ||
+      request.headers.get("host");
+    const protoHeader = request.headers.get("x-forwarded-proto");
+    const protocol =
+      protoHeader ||
+      (request.nextUrl?.protocol
+        ? request.nextUrl.protocol.replace(":", "")
+        : "http");
+
+    if (host) {
+      try {
+        const logoRes = await fetch(`${protocol}://${host}/sembako.png`);
+        if (logoRes.ok) {
+          const logoArrayBuffer = await logoRes.arrayBuffer();
+          logoBase64 = Buffer.from(logoArrayBuffer).toString("base64");
+        }
+      } catch {
+        logoBase64 = null;
+      }
+    }
+
+    if (!logoBase64) {
+      try {
+        const { readFile } = await import("node:fs/promises");
+        const logoPath = path.join(process.cwd(), "public", "sembako.png");
+        const logoBuffer = await readFile(logoPath);
+        logoBase64 = logoBuffer.toString("base64");
+      } catch {
+        logoBase64 = null;
+      }
+    }
+
+    if (logoBase64) {
       doc.image(`data:image/png;base64,${logoBase64}`, 40, 22, {
         width: 66,
         height: 66,
