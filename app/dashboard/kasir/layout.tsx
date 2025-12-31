@@ -8,13 +8,13 @@ export default async function KasirLayout({
 }>) {
   const authData = await getAuthData();
 
-  if (!authData) {
-    redirect("/");
-  }
+  // if (!authData) {
+  //   redirect("/");
+  // }
 
-  if (authData.role !== "KASIR") {
-    redirect("/dashboard/admin");
-  }
+  // if (authData.role !== "KASIR") {
+  //   redirect("/dashboard/admin");
+  // }
 
   return <>{children}</>;
 }
