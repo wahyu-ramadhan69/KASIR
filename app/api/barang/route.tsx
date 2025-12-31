@@ -50,8 +50,6 @@ export async function POST(request: NextRequest) {
       stok,
       jenisKemasan,
       jumlahPerKemasan,
-      ukuran,
-      satuan,
       supplierId,
       berat,
       limitPenjualan,
@@ -63,8 +61,6 @@ export async function POST(request: NextRequest) {
       hargaJual == null ||
       !jenisKemasan ||
       jumlahPerKemasan == null ||
-      ukuran == null ||
-      !satuan ||
       supplierId == null
     ) {
       return NextResponse.json(
@@ -82,11 +78,10 @@ export async function POST(request: NextRequest) {
         stok: stok != null ? BigInt(stok) : BigInt(0),
         jenisKemasan: String(jenisKemasan).trim(),
         jumlahPerKemasan: BigInt(jumlahPerKemasan),
-        ukuran: BigInt(ukuran),
-        satuan: String(satuan).trim(),
         supplierId: Number(supplierId),
         berat: berat != null ? BigInt(berat) : BigInt(0),
-        limitPenjualan: limitPenjualan != null ? BigInt(limitPenjualan) : BigInt(0),
+        limitPenjualan:
+          limitPenjualan != null ? BigInt(limitPenjualan) : BigInt(0),
       },
       include: {
         supplier: true,

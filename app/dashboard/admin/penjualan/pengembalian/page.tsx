@@ -18,12 +18,11 @@ import Link from "next/link";
 interface Barang {
   id: number;
   namaBarang: string;
-  satuan: string;
   jumlahPerKemasan: number;
   hargaJual: number;
   jenisKemasan: string;
-  ukuran: number;
   stok: number;
+  berat: number;
 }
 
 interface PengembalianItem {
@@ -200,6 +199,13 @@ const InputPengembalianPage = () => {
     }).format(number);
   };
 
+  const formatGramsToKg = (grams: number): string => {
+    if (!Number.isFinite(grams)) return "";
+    const kg = grams / 1000;
+    const formatted = kg.toFixed(3).replace(/\.?0+$/, "");
+    return formatted.replace(".", ",");
+  };
+
   return (
     <div className="w-full min-h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] overflow-hidden flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100">
       <Toaster
@@ -325,7 +331,7 @@ const InputPengembalianPage = () => {
                             <div className="space-y-1.5 mb-3">
                               <div className="flex items-center gap-1 flex-wrap">
                                 <span className="bg-gray-200 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-gray-700">
-                                  {barang.ukuran} {barang.satuan}
+                                  {formatGramsToKg(barang.berat)} KG
                                 </span>
                                 <span className="text-gray-400 text-[10px]">
                                   •

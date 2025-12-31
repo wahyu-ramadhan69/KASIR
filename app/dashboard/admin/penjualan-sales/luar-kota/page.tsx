@@ -30,12 +30,10 @@ interface Karyawan {
 interface Barang {
   id: number;
   namaBarang: string;
-  satuan: string;
   jumlahPerKemasan: number;
   stok: number;
   hargaJual: number;
   jenisKemasan: string;
-  ukuran: number;
   limitPenjualan: number;
   berat?: number | string;
 }
@@ -393,7 +391,7 @@ const CreatePerjalananPage = () => {
     return `${kg.toLocaleString("id-ID", {
       minimumFractionDigits: kg % 1 === 0 ? 0 : 3,
       maximumFractionDigits: 3,
-    })} Kg`;
+    })} KG`;
   };
 
   const filteredBarang = barangList.filter((b) =>
@@ -567,7 +565,7 @@ const CreatePerjalananPage = () => {
                           <div className="ml-6 space-y-1">
                             <p className="text-[10px] text-gray-600 font-semibold flex items-center gap-1">
                               <span className="bg-gray-200 px-1.5 py-0.5 rounded-md">
-                                {barang.ukuran} {barang.satuan}
+                                {formatBeratKg(Number(barang.berat || 0))}
                               </span>
                               <span className="text-gray-400">•</span>
                               <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md">
@@ -607,7 +605,7 @@ const CreatePerjalananPage = () => {
                                   }`}
                                 ></div>
                                 Stok: {stokDus}/{barang.jenisKemasan}
-                                {stokPcs > 0 && ` ${stokPcs}/${barang.satuan}`}
+                                {stokPcs > 0 && ` ${stokPcs}/pcs`}
                               </span>
                             </div>
 
@@ -851,7 +849,7 @@ const CreatePerjalananPage = () => {
                                 {/* Per Item */}
                                 <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100 p-2 rounded-xl">
                                   <span className="text-xs font-bold text-gray-700 uppercase">
-                                    {barang.satuan}:
+                                    Pcs:
                                   </span>
                                   <div className="flex items-center gap-1.5">
                                     <button
@@ -1249,7 +1247,7 @@ const CreatePerjalananPage = () => {
                             {sisaItem > 0 && (
                               <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100 p-2 rounded-lg">
                                 <span className="text-xs font-bold text-gray-700 uppercase">
-                                  Sisa {barang.satuan}:
+                                  Sisa pcs:
                                 </span>
                                 <span className="text-sm font-bold text-orange-700">
                                   {sisaItem}
@@ -1261,7 +1259,7 @@ const CreatePerjalananPage = () => {
                                 Total Item:
                               </span>
                               <span className="text-sm font-bold text-blue-600">
-                                {item.totalItem} {barang.satuan}
+                                {item.totalItem} pcs
                               </span>
                             </div>
                             <div className="flex items-center justify-between bg-gradient-to-r from-green-50 to-emerald-50 p-2 rounded-lg border border-green-200">

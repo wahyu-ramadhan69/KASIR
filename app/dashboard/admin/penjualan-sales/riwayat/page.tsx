@@ -310,7 +310,9 @@ const RiwayatPenjualanPage = () => {
       if (endDate) {
         params.append("endDate", endDate);
       }
-      const selesaiRes = await fetch(`/api/penjualan-sales?${params.toString()}`);
+      const selesaiRes = await fetch(
+        `/api/penjualan-sales?${params.toString()}`
+      );
       const selesaiData = await selesaiRes.json();
 
       if (selesaiData.success) {
@@ -649,9 +651,7 @@ const RiwayatPenjualanPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Sales
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Dalam/Luar Kota
-                    </th>
+
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Tanggal
                     </th>
@@ -735,31 +735,6 @@ const RiwayatPenjualanPage = () => {
                               <p className="text-xs text-blue-600 mt-0.5">
                                 {pj.karyawan.noHp}
                               </p>
-                            )}
-                          </td>
-
-                          {/* Dalam/Luar Kota */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {pj.perjalananSales ? (
-                              <div>
-                                <p className="text-xs text-gray-600 font-medium mb-1">
-                                  Luar Kota
-                                </p>
-                                <span className="inline-flex px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold">
-                                  {pj.perjalananSales.kotaTujuan}
-                                </span>
-                              </div>
-                            ) : (
-                              <div>
-                                <p className="text-xs text-gray-600 font-medium mb-1">
-                                  Dalam Kota
-                                </p>
-                                {pj.rutePengiriman && (
-                                  <span className="inline-flex px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-semibold">
-                                    {pj.rutePengiriman}
-                                  </span>
-                                )}
-                              </div>
                             )}
                           </td>
 
@@ -992,8 +967,7 @@ const RiwayatPenjualanPage = () => {
                       {selectedPenjualan.items?.map((item) => {
                         const jumlahPerKemasan =
                           item.barang?.jumlahPerKemasan || 1;
-                        const labelKemasan =
-                          item.barang?.jenisKemasan || "dus";
+                        const labelKemasan = item.barang?.jenisKemasan || "dus";
                         const totalItem =
                           item.totalItem ??
                           item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;

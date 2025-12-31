@@ -56,8 +56,6 @@ interface Barang {
   stok: number;
   jumlahPerKemasan: number;
   jenisKemasan: string;
-  ukuran: number;
-  satuan: string;
   limitPenjualan: number;
   supplierId: number;
   berat: number;
@@ -87,6 +85,11 @@ interface PenjualanItem {
   barang: Barang;
 }
 
+interface PembayaranPenjualan {
+  metodePembayaran?: "CASH" | "TRANSFER" | "CASH_TRANSFER";
+  metode?: "CASH" | "TRANSFER" | "CASH_TRANSFER";
+}
+
 interface PenjualanHeader {
   id: number;
   kodePenjualan: string;
@@ -97,13 +100,14 @@ interface PenjualanHeader {
   totalHarga: number;
   jumlahDibayar: number;
   kembalian: number;
-  metodePembayaran: "CASH" | "TRANSFER";
+  metodePembayaran: "CASH" | "TRANSFER" | "CASH_TRANSFER";
   statusPembayaran: "LUNAS" | "HUTANG";
   statusTransaksi: "KERANJANG" | "SELESAI" | "DIBATALKAN";
   tanggalTransaksi: string;
   tanggalJatuhTempo: string;
   customer: Customer | null;
   items: PenjualanItem[];
+  pembayaran?: PembayaranPenjualan[];
   createdAt: string;
   updatedAt: string;
   calculation?: {
@@ -130,6 +134,13 @@ const formatRupiahInput = (value: string): string => {
 
 const parseRupiahToNumber = (value: string): number => {
   return parseInt(value.replace(/[^\d]/g, "")) || 0;
+};
+
+const formatGramsToKg = (grams: number): string => {
+  if (!Number.isFinite(grams)) return "";
+  const kg = grams / 1000;
+  const formatted = kg.toFixed(3).replace(/\.?0+$/, "");
+  return formatted.replace(".", ",");
 };
 
 const getTotalItemPcs = (item: CartItem): number => {
@@ -185,9 +196,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     "rupiah"
   );
   const [jumlahDibayar, setJumlahDibayar] = useState<string>("");
-  const [metodePembayaran, setMetodePembayaran] = useState<"CASH" | "TRANSFER">(
-    "CASH"
-  );
+  const [metodePembayaran, setMetodePembayaran] = useState<
+    "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  >("CASH");
   const [tanggalTransaksi, setTanggalTransaksi] = useState<string>("");
   const [tanggalJatuhTempo, setTanggalJatuhTempo] = useState<string>("");
 
@@ -208,6 +219,26 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const [originalQtyByBarangId, setOriginalQtyByBarangId] = useState<{
     [key: number]: number;
   }>({});
+
+  const resolveMetodePembayaran = (
+    data: any
+  ): "CASH" | "TRANSFER" | "CASH_TRANSFER" => {
+    const metode =
+      data?.metodePembayaran ??
+      data?.pembayaran?.metodePembayaran ??
+      data?.pembayaran?.[0]?.metodePembayaran ??
+      data?.pembayaran?.metode ??
+      data?.pembayaran?.[0]?.metode;
+    if (metode === "TRANSFER") return "TRANSFER";
+    if (metode === "CASH_TRANSFER") return "CASH_TRANSFER";
+    return "CASH";
+  };
+
+  const formatMetodePembayaranLabel = (
+    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  ) => {
+    return metode === "CASH_TRANSFER" ? "CASH + TRANSFER" : metode;
+  };
 
   useEffect(() => {
     fetchBarang();
@@ -344,7 +375,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       setDiskonNotaType("rupiah");
       setDiskonNota(Number(penjualan.diskonNota).toLocaleString("id-ID"));
       setJumlahDibayar(Number(penjualan.jumlahDibayar).toLocaleString("id-ID"));
-      setMetodePembayaran(penjualan.metodePembayaran);
+      setMetodePembayaran(resolveMetodePembayaran(penjualan));
 
       const transaksiDate = penjualan.tanggalTransaksi
         ? new Date(penjualan.tanggalTransaksi).toISOString().split("T")[0]
@@ -1456,7 +1487,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                             <div className="ml-6 space-y-1">
                               <p className="text-[10px] text-gray-600 font-semibold flex items-center gap-1">
                                 <span className="bg-gray-200 px-1.5 py-0.5 rounded-md">
-                                  {barang.ukuran} {barang.satuan}
+                                  {formatGramsToKg(barang.berat)} KG
                                 </span>
                                 <span className="text-gray-400">•</span>
                                 <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md">
@@ -1495,7 +1526,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   ></div>
                                   Stok: {stokDus}/{barang.jenisKemasan}
                                   {stokPcs > 0 &&
-                                    ` ${stokPcs}/${barang.satuan}`}
+                                    ` ${stokPcs}/pcs`}
                                 </span>
                               </div>
 
@@ -1757,7 +1788,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                             {/* Pcs */}
                             <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100 p-2 rounded-xl">
                               <span className="text-xs font-bold text-gray-700 uppercase">
-                                {item.barang.satuan}:
+                                Pcs:
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <button
@@ -2145,7 +2176,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                     Metode Pembayaran
                   </label>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setMetodePembayaran("CASH")}
                     className={`py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 border-2 ${
@@ -2167,6 +2198,17 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   >
                     <CreditCard className="w-5 h-5" />
                     Transfer
+                  </button>
+                  <button
+                    onClick={() => setMetodePembayaran("CASH_TRANSFER")}
+                    className={`py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 border-2 ${
+                      metodePembayaran === "CASH_TRANSFER"
+                        ? "bg-slate-800 border-slate-800 text-white"
+                        : "bg-white border-slate-300 text-slate-700 hover:border-slate-400"
+                    }`}
+                  >
+                    <CreditCard className="w-5 h-5" />
+                    Cash + Transfer
                   </button>
                 </div>
               </div>
@@ -2385,12 +2427,16 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   <span className="text-gray-500">Metode</span>
                   <span
                     className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      receiptData.metodePembayaran === "CASH"
+                      resolveMetodePembayaran(receiptData) === "CASH"
                         ? "bg-green-100 text-green-700"
-                        : "bg-purple-100 text-purple-700"
+                        : resolveMetodePembayaran(receiptData) === "TRANSFER"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-blue-100 text-blue-700"
                     }`}
                   >
-                    {receiptData.metodePembayaran}
+                    {formatMetodePembayaranLabel(
+                      resolveMetodePembayaran(receiptData)
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between">

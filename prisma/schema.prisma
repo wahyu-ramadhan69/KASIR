@@ -29,8 +29,6 @@ model Barang {
   stok                  BigInt          @default(0)
   jenisKemasan          String
   jumlahPerKemasan      BigInt
-  ukuran                BigInt
-  satuan                String
   supplier              Supplier        @relation(fields: [supplierId], references: [id])
   supplierId            Int
   berat                 BigInt          @default(0)
@@ -262,6 +260,7 @@ model PengembalianBarang {
 enum MetodePembayaran {
   CASH
   TRANSFER
+  CASH_TRANSFER
 }
 
 enum StatusPembayaran {

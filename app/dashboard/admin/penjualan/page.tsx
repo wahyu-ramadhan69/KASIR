@@ -56,8 +56,6 @@ interface Barang {
   stok: number;
   jumlahPerKemasan: number;
   jenisKemasan: string;
-  ukuran: number;
-  satuan: string;
   limitPenjualan: number;
   supplierId: number;
   berat: number;
@@ -130,6 +128,13 @@ const formatRupiahInput = (value: string): string => {
 
 const parseRupiahToNumber = (value: string): number => {
   return parseInt(value.replace(/[^\d]/g, "")) || 0;
+};
+
+const formatGramsToKg = (grams: number): string => {
+  if (!Number.isFinite(grams)) return "";
+  const kg = grams / 1000;
+  const formatted = kg.toFixed(3).replace(/\.?0+$/, "");
+  return formatted.replace(".", ",");
 };
 
 const getTotalItemPcs = (item: CartItem): number => {
@@ -1456,7 +1461,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                             <div className="ml-6 space-y-1">
                               <p className="text-[10px] text-gray-600 font-semibold flex items-center gap-1">
                                 <span className="bg-gray-200 px-1.5 py-0.5 rounded-md">
-                                  {barang.ukuran} {barang.satuan}
+                                  {formatGramsToKg(barang.berat)} KG
                                 </span>
                                 <span className="text-gray-400">•</span>
                                 <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md">
@@ -1495,7 +1500,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   ></div>
                                   Stok: {stokDus}/{barang.jenisKemasan}
                                   {stokPcs > 0 &&
-                                    ` ${stokPcs}/${barang.satuan}`}
+                                    ` ${stokPcs}/pcs`}
                                 </span>
                               </div>
 
@@ -1757,7 +1762,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                             {/* Pcs */}
                             <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100 p-2 rounded-xl">
                               <span className="text-xs font-bold text-gray-700 uppercase">
-                                {item.barang.satuan}:
+                                Pcs:
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <button

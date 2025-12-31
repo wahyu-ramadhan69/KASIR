@@ -68,8 +68,6 @@ interface Barang {
   stok: number;
   jenisKemasan: string;
   jumlahPerKemasan: number;
-  ukuran: number;
-  satuan: string;
   limitPenjualan: number;
   berat: number;
 }
@@ -110,7 +108,7 @@ interface PenjualanHeader {
   kembalian: number;
   keterangan?: string | null;
   rutePengiriman?: string | null;
-  metodePembayaran: "CASH" | "TRANSFER";
+  metodePembayaran: "CASH" | "TRANSFER" | "CASH_TRANSFER";
   statusPembayaran: "LUNAS" | "HUTANG";
   statusTransaksi: "KERANJANG" | "SELESAI";
   tanggalTransaksi?: string;
@@ -225,6 +223,13 @@ const PenjualanPage = () => {
     const beratPerItem = Number(barang.berat || 0);
     if (beratPerItem <= 0 || totalPcs <= 0) return 0;
     return beratPerItem * totalPcs;
+  };
+
+  const formatGramsToKg = (grams: number): string => {
+    if (!Number.isFinite(grams)) return "";
+    const kg = grams / 1000;
+    const formatted = kg.toFixed(3).replace(/\.?0+$/, "");
+    return formatted.replace(".", ",");
   };
 
   const getItemBeratGrams = (item: PenjualanItem): number => {
@@ -542,6 +547,12 @@ const PenjualanPage = () => {
       currency: "IDR",
       minimumFractionDigits: 0,
     }).format(number);
+  };
+
+  const formatMetodePembayaranLabel = (
+    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  ) => {
+    return metode === "CASH_TRANSFER" ? "CASH + TRANSFER" : metode;
   };
 
   const handleAddItem = async (barang: Barang) => {
@@ -1806,7 +1817,7 @@ const PenjualanPage = () => {
                             <div className="ml-6 space-y-1">
                               <p className="text-[10px] text-gray-600 font-semibold flex items-center gap-1">
                                 <span className="bg-gray-200 px-1.5 py-0.5 rounded-md">
-                                  {barang.ukuran} {barang.satuan}
+                                  {formatGramsToKg(barang.berat)} KG
                                 </span>
                                 <span className="text-gray-400">•</span>
                                 <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md">
@@ -1847,7 +1858,7 @@ const PenjualanPage = () => {
                                   ></div>
                                   Stok: {stokDus}/{barang.jenisKemasan}
                                   {stokPcs > 0 &&
-                                    ` ${stokPcs}/${barang.satuan}`}
+                                    ` ${stokPcs}/pcs`}
                                 </span>
                               </div>
 
@@ -2095,7 +2106,7 @@ const PenjualanPage = () => {
                               {/* Pcs */}
                               <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100 p-2 rounded-xl">
                                 <span className="text-xs font-bold text-gray-700 uppercase">
-                                  {item.barang.satuan}:
+                                  Pcs:
                                 </span>
                                 <div className="flex items-center gap-1.5">
                                   <button
@@ -2452,7 +2463,7 @@ const PenjualanPage = () => {
                   <CreditCard className="w-4 h-4 text-slate-600" />
                   Metode Pembayaran
                 </label>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-3 gap-2.5">
                   <button
                     onClick={() =>
                       setCurrentPenjualan({
@@ -2484,6 +2495,22 @@ const PenjualanPage = () => {
                   >
                     <CreditCard className="w-4 h-4" />
                     Transfer
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPenjualan({
+                        ...currentPenjualan,
+                        metodePembayaran: "CASH_TRANSFER",
+                      })
+                    }
+                    className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
+                      currentPenjualan.metodePembayaran === "CASH_TRANSFER"
+                        ? "bg-slate-700 text-white border-slate-700"
+                        : "bg-white text-gray-600 border-gray-300 hover:border-slate-400"
+                    }`}
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    Cash + Transfer
                   </button>
                 </div>
               </div>
@@ -2747,7 +2774,7 @@ const PenjualanPage = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 font-semibold">Metode</span>
                   <span className="font-bold text-gray-900">
-                    {receiptData.metodePembayaran}
+                    {formatMetodePembayaranLabel(receiptData.metodePembayaran)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">

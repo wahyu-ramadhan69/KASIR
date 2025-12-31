@@ -25,7 +25,6 @@ function serializeBarang(barang: any) {
     hargaJual: bigIntToNumber(barang.hargaJual),
     stok: bigIntToNumber(barang.stok),
     jumlahPerKemasan: bigIntToNumber(barang.jumlahPerKemasan),
-    ukuran: bigIntToNumber(barang.ukuran),
     berat: bigIntToNumber(barang.berat),
     limitStok: bigIntToNumber(barang.limitStok),
     limitPenjualan: bigIntToNumber(barang.limitPenjualan),
@@ -114,8 +113,6 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       stok,
       jenisKemasan,
       jumlahPerKemasan,
-      ukuran,
-      satuan,
       supplierId,
       berat,
       limitPenjualan,
@@ -127,8 +124,6 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       hargaJual == null ||
       !jenisKemasan ||
       jumlahPerKemasan == null ||
-      ukuran == null ||
-      !satuan ||
       supplierId == null
     ) {
       return NextResponse.json(
@@ -144,8 +139,6 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       hargaJual: BigInt(hargaJual),
       jenisKemasan: String(jenisKemasan).trim(),
       jumlahPerKemasan: BigInt(jumlahPerKemasan),
-      ukuran: BigInt(ukuran),
-      satuan: String(satuan).trim(),
       supplierId: Number(supplierId),
     };
 

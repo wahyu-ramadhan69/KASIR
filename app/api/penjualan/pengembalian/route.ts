@@ -53,8 +53,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
-    const withoutPerjalanan =
-      searchParams.get("withoutPerjalanan") === "true";
+    const withoutPerjalanan = searchParams.get("withoutPerjalanan") === "true";
     const withKaryawan = searchParams.get("withKaryawan") === "true";
     const karyawanId = searchParams.get("karyawanId");
 
@@ -115,7 +114,6 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             namaBarang: true,
-            satuan: true,
             jumlahPerKemasan: true,
           },
         },
@@ -232,7 +230,6 @@ export async function POST(request: NextRequest) {
           })
         );
       }
-
     }
 
     await prisma.$transaction([
@@ -258,7 +255,6 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             namaBarang: true,
-            satuan: true,
             jumlahPerKemasan: true,
           },
         },

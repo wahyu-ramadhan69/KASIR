@@ -14,16 +14,16 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Barang {
   id: number;
   namaBarang: string;
-  satuan: string;
   jumlahPerKemasan: number;
   hargaJual: number;
   jenisKemasan: string;
-  ukuran: number;
   stok: number;
+  berat: number;
 }
 
 interface PengembalianItem {
@@ -43,6 +43,12 @@ const InputPengembalianPage = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [loadingEdit, setLoadingEdit] = useState(false);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const editId = searchParams.get("edit");
+  const isEditMode = Boolean(editId);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -55,6 +61,52 @@ const InputPengembalianPage = () => {
   useEffect(() => {
     fetchBarang(debouncedSearch);
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (!editId) return;
+    const fetchEditData = async () => {
+      setLoadingEdit(true);
+      try {
+        const res = await fetch(`/api/penjualan/pengembalian/${editId}`);
+        const data = await res.json();
+        if (!data.success) {
+          toast.error(data.error || "Gagal mengambil data pengembalian");
+          return;
+        }
+
+        const pengembalian = data.data as {
+          barangId: number;
+          jumlahDus: number;
+          jumlahPcs: number;
+          kondisiBarang: PengembalianItem["kondisiBarang"];
+          keterangan: string | null;
+          barang: Barang;
+        };
+
+        setItems([
+          {
+            barangId: pengembalian.barangId,
+            jumlahDus: Number(pengembalian.jumlahDus || 0),
+            jumlahPcs: Number(pengembalian.jumlahPcs || 0),
+            kondisiBarang: pengembalian.kondisiBarang,
+            keterangan: pengembalian.keterangan || "",
+          },
+        ]);
+
+        setBarangById((prev) => ({
+          ...prev,
+          [pengembalian.barangId]: pengembalian.barang,
+        }));
+      } catch (error) {
+        console.error("Error fetching pengembalian:", error);
+        toast.error("Gagal mengambil data pengembalian");
+      } finally {
+        setLoadingEdit(false);
+      }
+    };
+
+    fetchEditData();
+  }, [editId]);
 
   const fetchBarang = async (keyword: string = "") => {
     setLoadingBarang(true);
@@ -85,6 +137,10 @@ const InputPengembalianPage = () => {
   };
 
   const handleAddItem = (barang: Barang) => {
+    if (isEditMode) {
+      toast.error("Mode edit hanya untuk satu barang");
+      return;
+    }
     const existing = items.some((item) => item.barangId === barang.id);
     if (existing) {
       toast.error("Barang sudah ada dalam daftar pengembalian");
@@ -149,27 +205,64 @@ const InputPengembalianPage = () => {
       }
     }
 
+    if (isEditMode && items.length !== 1) {
+      toast.error("Edit hanya bisa untuk 1 barang");
+      return;
+    }
     setShowConfirmModal(true);
   };
 
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/penjualan/pengembalian`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pengembalianBarang: items,
-        }),
-      });
+      if (isEditMode) {
+        if (items.length !== 1) {
+          toast.error("Edit hanya bisa untuk 1 barang");
+          return;
+        }
+        const updatePayload = {
+          barangId: items[0].barangId,
+          jumlahDus: items[0].jumlahDus,
+          jumlahPcs: items[0].jumlahPcs,
+          kondisiBarang: items[0].kondisiBarang,
+          keterangan: items[0].keterangan,
+        };
 
-      const data = await res.json();
-      if (data.success) {
-        toast.success("Pengembalian berhasil disimpan");
+        const updateRes = await fetch(
+          `/api/penjualan/pengembalian/${editId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatePayload),
+          }
+        );
+        const updateData = await updateRes.json();
+        if (!updateData.success) {
+          toast.error(updateData.error || "Gagal memperbarui pengembalian");
+          return;
+        }
+
+        toast.success("Pengembalian berhasil diperbarui");
         setShowConfirmModal(false);
         setItems([]);
+        router.push("/dashboard/kasir/penjualan/pengembalian/riwayat");
       } else {
-        toast.error(data.message || "Gagal menyimpan pengembalian");
+        const res = await fetch(`/api/penjualan/pengembalian`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pengembalianBarang: items,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          toast.success("Pengembalian berhasil disimpan");
+          setShowConfirmModal(false);
+          setItems([]);
+        } else {
+          toast.error(data.message || "Gagal menyimpan pengembalian");
+        }
       }
     } catch (error) {
       console.error("Error:", error);
@@ -198,6 +291,13 @@ const InputPengembalianPage = () => {
       currency: "IDR",
       minimumFractionDigits: 0,
     }).format(number);
+  };
+
+  const formatGramsToKg = (grams: number): string => {
+    if (!Number.isFinite(grams)) return "";
+    const kg = grams / 1000;
+    const formatted = kg.toFixed(3).replace(/\.?0+$/, "");
+    return formatted.replace(".", ",");
   };
 
   return (
@@ -229,10 +329,14 @@ const InputPengembalianPage = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white tracking-tight">
-                  Input Pengembalian Barang
+                  {isEditMode
+                    ? "Edit Pengembalian Barang"
+                    : "Input Pengembalian Barang"}
                 </h1>
                 <p className="text-blue-100 text-sm">
-                  Catat barang yang dikembalikan
+                  {isEditMode
+                    ? "Perbarui data pengembalian barang"
+                    : "Catat barang yang dikembalikan"}
                 </p>
               </div>
             </div>
@@ -248,6 +352,11 @@ const InputPengembalianPage = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 min-h-0">
+        {isEditMode && (
+          <div className="mb-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl px-4 py-3 text-sm font-semibold">
+            Mode edit aktif. Anda hanya dapat mengubah 1 barang pengembalian.
+          </div>
+        )}
         <div className="flex gap-4 h-full min-h-0">
           <div className="w-[60%] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col min-h-0">
             <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
@@ -325,7 +434,7 @@ const InputPengembalianPage = () => {
                             <div className="space-y-1.5 mb-3">
                               <div className="flex items-center gap-1 flex-wrap">
                                 <span className="bg-gray-200 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-gray-700">
-                                  {barang.ukuran} {barang.satuan}
+                                  {formatGramsToKg(barang.berat)} KG
                                 </span>
                                 <span className="text-gray-400 text-[10px]">
                                   •
@@ -354,9 +463,9 @@ const InputPengembalianPage = () => {
 
                             <button
                               onClick={() => handleAddItem(barang)}
-                              disabled={isAdded}
+                              disabled={isAdded || isEditMode}
                               className={`relative overflow-hidden w-full py-2 rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 font-bold text-xs ${
-                                isAdded
+                                isAdded || isEditMode
                                   ? "bg-blue-200 text-blue-700 cursor-not-allowed"
                                   : "bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl active:scale-95"
                               }`}
@@ -372,7 +481,11 @@ const InputPengembalianPage = () => {
                                 strokeWidth={3}
                               />
                               <span className="relative z-10">
-                                {isAdded ? "Ditambahkan" : "Tambah"}
+                                {isEditMode
+                                  ? "Mode Edit"
+                                  : isAdded
+                                  ? "Ditambahkan"
+                                  : "Tambah"}
                               </span>
                             </button>
                           </div>
@@ -633,11 +746,11 @@ const InputPengembalianPage = () => {
             <div className="p-4 border-t bg-white">
               <button
                 onClick={handleOpenConfirmModal}
-                disabled={loading || items.length === 0}
+                disabled={loading || loadingEdit || items.length === 0}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-300 text-white px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:cursor-not-allowed active:scale-95"
               >
                 <Check className="w-5 h-5" strokeWidth={2.5} />
-                Simpan Pengembalian
+                {isEditMode ? "Update Pengembalian" : "Simpan Pengembalian"}
               </button>
             </div>
           </div>
@@ -653,7 +766,9 @@ const InputPengembalianPage = () => {
                   <div className="bg-white/20 backdrop-blur-sm p-2 rounded-lg">
                     <Package className="w-5 h-5" />
                   </div>
-                  <h3 className="text-xl font-bold">Konfirmasi Pengembalian</h3>
+                  <h3 className="text-xl font-bold">
+                    {isEditMode ? "Konfirmasi Update" : "Konfirmasi Pengembalian"}
+                  </h3>
                 </div>
                 <button
                   onClick={() => setShowConfirmModal(false)}
@@ -795,7 +910,7 @@ const InputPengembalianPage = () => {
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    Ya, Simpan Pengembalian
+                    {isEditMode ? "Ya, Update Pengembalian" : "Ya, Simpan Pengembalian"}
                   </>
                 )}
               </button>

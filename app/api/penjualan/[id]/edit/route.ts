@@ -348,7 +348,11 @@ export async function POST(
     const diskonNota = toNumber(body.diskonNota);
     const jumlahDibayar = toNumber(body.jumlahDibayar);
     const metodePembayaran =
-      body.metodePembayaran === "TRANSFER" ? "TRANSFER" : "CASH";
+      body.metodePembayaran === "TRANSFER"
+        ? "TRANSFER"
+        : body.metodePembayaran === "CASH_TRANSFER"
+        ? "CASH_TRANSFER"
+        : "CASH";
 
     const oldTotalHarga = toNumber(penjualan.totalHarga);
     const oldJumlahDibayar = toNumber(penjualan.jumlahDibayar);

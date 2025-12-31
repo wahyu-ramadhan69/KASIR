@@ -1,7 +1,7 @@
 // app/api/penjualan/[id]/checkout/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { getAuthData, isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -167,6 +167,8 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
+    const authData = await getAuthData();
+    const userId = authData?.userId ? parseInt(authData.userId, 10) : undefined;
     const { id } = await params;
     const penjualanId = parseInt(id);
     const body = await request.json();
@@ -535,6 +537,7 @@ export async function POST(
             tanggalBayar: pembayaranDate,
             nominal: BigInt(jumlahDibayar),
             metode: metodePembayaran,
+            ...(userId ? { userId } : {}),
           },
         });
       }

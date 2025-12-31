@@ -46,9 +46,7 @@ function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
 }
 
 // Helper untuk total penjualan harian termasuk manifest terjual
-async function getTotalPenjualanHariIni(
-  barangId: number
-): Promise<number> {
+async function getTotalPenjualanHariIni(barangId: number): Promise<number> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -124,7 +122,9 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
     );
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
+      jumlahPcs > 0
+        ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
+        : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
     const diskon = diskonPerItem * jumlahDus;
 
@@ -277,7 +277,10 @@ export async function POST(request: NextRequest) {
 
       if (!karyawan || karyawan.jenis !== "SALES") {
         return NextResponse.json(
-          { success: false, error: "Sales tidak ditemukan atau bukan jenis SALES" },
+          {
+            success: false,
+            error: "Sales tidak ditemukan atau bukan jenis SALES",
+          },
           { status: 404 }
         );
       }
@@ -394,7 +397,10 @@ export async function POST(request: NextRequest) {
       const transaksiDate = tanggalTransaksi
         ? new Date(tanggalTransaksi)
         : new Date();
-      const dateStr = transaksiDate.toISOString().slice(0, 10).replace(/-/g, "");
+      const dateStr = transaksiDate
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, "");
 
       const lastPenjualan = await tx.penjualanHeader.findFirst({
         where: {
@@ -457,7 +463,8 @@ export async function POST(request: NextRequest) {
         const hargaBeliPerPcs = Math.round(hargaBeliBarang / jumlahPerKemasan);
         const hargaJualPerPcs = Math.round(hargaJualFinal / jumlahPerKemasan);
 
-        const labaPerDus = hargaJualFinal - item.diskonPerItem - hargaBeliBarang;
+        const labaPerDus =
+          hargaJualFinal - item.diskonPerItem - hargaBeliBarang;
         const labaFromDus = labaPerDus * jumlahDus;
 
         const labaPerPcs = hargaJualPerPcs - hargaBeliPerPcs;
@@ -646,8 +653,6 @@ export async function POST(request: NextRequest) {
             id: result.karyawan.id,
             nama: result.karyawan.nama,
           }
-        : result.namaSales
-        ? { nama: result.namaSales }
         : null,
       items: result.items.map((item) => ({
         namaBarang: item.barang.namaBarang,

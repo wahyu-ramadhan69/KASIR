@@ -248,6 +248,11 @@ const kasirMasterDataLinks = [
     icon: <Database className="w-5 h-5" />,
     subMenu: [
       {
+        label: "Barang",
+        href: "/dashboard/kasir/barang",
+        icon: <Package className="w-4 h-4" />,
+      },
+      {
         label: "Supplier",
         href: "/dashboard/kasir/supplier",
         icon: <Users className="w-4 h-4" />,
@@ -289,43 +294,43 @@ const kasirTransactionLinks = [
       },
     ],
   },
-  // {
-  //   label: "Sales dan Kanvas",
-  //   href: "/dashboard/kasir/penjualan-sales",
-  //   icon: <Truck className="w-5 h-5" />,
-  //   subMenu: [
-  //     {
-  //       label: "Dalam Kota",
-  //       href: "/dashboard/kasir/penjualan-sales",
-  //       icon: <PackageOpen className="w-4 h-4" />,
-  //     },
-  //     {
-  //       label: "Luar Kota",
-  //       href: "/dashboard/kasir/penjualan-sales/luar-kota",
-  //       icon: <Truck className="w-4 h-4" />,
-  //     },
-  //     {
-  //       label: "Kanvas Sales",
-  //       href: "/dashboard/kasir/penjualan-sales/kanvas",
-  //       icon: <Truck className="w-4 h-4" />,
-  //     },
-  //     {
-  //       label: "Riwayat Penjualan",
-  //       href: "/dashboard/kasir/penjualan-sales/riwayat",
-  //       icon: <History className="w-4 h-4" />,
-  //     },
-  //     {
-  //       label: "Riwayat Kanvas",
-  //       href: "/dashboard/kasir/penjualan-sales/luar-kota/riwayat",
-  //       icon: <History className="w-4 h-4" />,
-  //     },
-  //     {
-  //       label: "Pengembalian Kanvas",
-  //       href: "/dashboard/kasir/penjualan-sales/riwayat/pengembalian",
-  //       icon: <History className="w-4 h-4" />,
-  //     },
-  //   ],
-  // },
+  {
+    label: "Sales",
+    href: "/dashboard/kasir/penjualan-sales",
+    icon: <Truck className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Transaksi Sales",
+        href: "/dashboard/kasir/penjualan-sales",
+        icon: <PackageOpen className="w-4 h-4" />,
+      },
+      // {
+      //   label: "Luar Kota",
+      //   href: "/dashboard/kasir/penjualan-sales/luar-kota",
+      //   icon: <Truck className="w-4 h-4" />,
+      // },
+      // {
+      //   label: "Kanvas Sales",
+      //   href: "/dashboard/kasir/penjualan-sales/kanvas",
+      //   icon: <Truck className="w-4 h-4" />,
+      // },
+      {
+        label: "Riwayat Transaksi Sales",
+        href: "/dashboard/kasir/penjualan-sales/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+      // {
+      //   label: "Riwayat Kanvas",
+      //   href: "/dashboard/kasir/penjualan-sales/luar-kota/riwayat",
+      //   icon: <History className="w-4 h-4" />,
+      // },
+      // {
+      //   label: "Pengembalian Kanvas",
+      //   href: "/dashboard/kasir/penjualan-sales/riwayat/pengembalian",
+      //   icon: <History className="w-4 h-4" />,
+      // },
+    ],
+  },
   {
     label: "Piutang",
     href: "/dashboard/kasir/hutang-piutang/hutang-pembelian",
@@ -336,11 +341,11 @@ const kasirTransactionLinks = [
         href: "/dashboard/kasir/hutang-piutang/piutang-customer",
         icon: <ReceiptText className="w-4 h-4" />,
       },
-      // {
-      //   label: "Piutang Kanvas",
-      //   href: "/dashboard/kasir/hutang-piutang/piutang-kanvas",
-      //   icon: <ReceiptText className="w-4 h-4" />,
-      // },
+      {
+        label: "Piutang Sales",
+        href: "/dashboard/kasir/hutang-piutang/piutang-kanvas",
+        icon: <ReceiptText className="w-4 h-4" />,
+      },
     ],
   },
   {

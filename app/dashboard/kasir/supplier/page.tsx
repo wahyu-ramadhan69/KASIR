@@ -6,8 +6,9 @@ import {
   Users,
   Package,
   RefreshCw,
-  Trash2,
   X,
+  Phone,
+  MapPin,
 } from "lucide-react";
 
 interface Barang {
@@ -64,65 +65,9 @@ const DataSupplierPage = () => {
     }
   };
 
-
-  const handleDelete = async (id: number, namaSupplier: string) => {
-    if (
-      !confirm(`Apakah Anda yakin ingin menghapus supplier "${namaSupplier}"?`)
-    ) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/supplier/${id}`, {
-        method: "DELETE",
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success("Supplier berhasil dihapus!", {
-          duration: 4000,
-          position: "top-right",
-          style: {
-            background: "#10b981",
-            color: "#fff",
-            fontWeight: "500",
-          },
-          iconTheme: {
-            primary: "#fff",
-            secondary: "#10b981",
-          },
-        });
-        fetchSupplier();
-      } else {
-        toast.error(data.error || "Gagal menghapus supplier", {
-          duration: 4000,
-          position: "top-right",
-          style: {
-            background: "#ef4444",
-            color: "#fff",
-            fontWeight: "500",
-          },
-        });
-      }
-    } catch (error) {
-      console.error("Error deleting supplier:", error);
-      toast.error("Terjadi kesalahan saat menghapus supplier", {
-        duration: 4000,
-        position: "top-right",
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-          fontWeight: "500",
-        },
-      });
-    }
-  };
-
   const formatPhoneNumber = (phone: string): string => {
     return phone.replace(/(\d{4})(\d{4})(\d+)/, "$1-$2-$3");
   };
-
 
   const filteredSupplier = supplierList.filter((item) => {
     return (
@@ -131,6 +76,11 @@ const DataSupplierPage = () => {
       item.noHp.includes(searchTerm)
     );
   });
+
+  const totalBarang = supplierList.reduce(
+    (sum, supplier) => sum + supplier.barang.length,
+    0
+  );
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -209,7 +159,44 @@ const DataSupplierPage = () => {
           )}
         </div>
 
-        {/* Supplier List */}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
+          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                  Total Supplier
+                </p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">
+                  {supplierList.length}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Mitra terdaftar</p>
+              </div>
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <Users className="w-8 h-8 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                  Total Barang
+                </p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">
+                  {totalBarang}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Produk aktif</p>
+              </div>
+              <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <Package className="w-8 h-8 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Supplier Cards Grid */}
         {loading ? (
           <div className="flex justify-center items-center py-24">
             <div className="text-center">
@@ -232,71 +219,70 @@ const DataSupplierPage = () => {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Nama Supplier
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Alamat
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Nomor HP
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Produk
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Aksi
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredSupplier.map((supplier) => (
-                    <tr key={supplier.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <p className="font-medium text-gray-900 text-sm">
-                          {supplier.namaSupplier}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredSupplier.map((supplier) => (
+              <div
+                key={supplier.id}
+                className="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
+              >
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-1">
+                        {supplier.namaSupplier}
+                      </h3>
+                      <div className="flex items-center gap-2 text-blue-50 text-sm">
+                        <Package className="w-4 h-4" />
+                        <span>{supplier.barang.length} Produk</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-gray-600">
                         {supplier.alamat}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <p className="text-sm text-gray-600 font-medium">
                         {formatPhoneNumber(supplier.noHp)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4 text-gray-400" />
-                          <span>{supplier.barang.length} produk</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => setSelectedSupplier(supplier)}
-                            className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                      </p>
+                    </div>
+                  </div>
+
+                  {supplier.barang.length > 0 && (
+                    <div className="border-t border-gray-200 pt-4 mt-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        Produk Tersedia
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {supplier.barang.map((item) => (
+                          <span
+                            key={item.id}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
                           >
-                            Detail
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDelete(supplier.id, supplier.namaSupplier)
-                            }
-                            className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
-                          >
-                            Hapus
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                            {item.namaBarang}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4" />
+                  <button
+                    onClick={() => setSelectedSupplier(supplier)}
+                    className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all font-medium text-sm"
+                  >
+                    Lihat Detail
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -364,7 +350,6 @@ const DataSupplierPage = () => {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

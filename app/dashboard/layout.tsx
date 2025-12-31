@@ -30,7 +30,9 @@ export default async function RootLayout({
       <div className="p-4 transition-all duration-300 xl:ml-80 sidebar-content">
         <Navbar />
         <div className="mt-2">
-          <div className="fmb-4 w-full">{children}</div>
+          <div className="flex justify-center mb-4 grid-cols-1 gap-6 xl:grid-cols-3">
+            {children}
+          </div>
         </div>
         <div className="text-blue-gray-600">
           {/* <footer className="py-2"></footer> */}

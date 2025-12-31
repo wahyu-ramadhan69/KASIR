@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Calendar,
   Check,
+  Edit,
   Eye,
   Loader2,
   Package,
@@ -592,13 +593,22 @@ const RiwayatPengembalianPage = () => {
                             {truncateText(item.keterangan, 25)}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-center">
-                            <button
-                              onClick={() => handleViewDetail(item)}
-                              className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
-                              title="Lihat Detail"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => handleViewDetail(item)}
+                                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
+                                title="Lihat Detail"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <Link
+                                href={`/dashboard/kasir/penjualan/pengembalian?edit=${item.id}`}
+                                className="p-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-all"
+                                title="Edit Pengembalian"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       );
