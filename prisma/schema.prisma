@@ -162,6 +162,7 @@ model PembayaranPenjualan {
   tanggalBayar          DateTime         @default(now())
   nominal               BigInt
   metode                MetodePembayaran @default(CASH)
+  jenisPembayaran       String           @default("PENJUALAN")
   catatan               String?
   userId                Int?
   createdAt             DateTime         @default(now())
@@ -247,6 +248,7 @@ model PengembalianBarang {
   barangId              Int
   jumlahDus             BigInt
   jumlahPcs             BigInt
+  userId                Int?
   kondisiBarang         KondisiBarang           @default(BAIK)
   keterangan            String?
   tanggalPengembalian   DateTime                @default(now())

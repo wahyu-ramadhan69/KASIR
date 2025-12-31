@@ -1,7 +1,7 @@
 // app/api/penjualan/[id]/bayar-hutang/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { getAuthData, isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -36,6 +36,10 @@ export async function POST(
 ) {
   const auth = await isAuthenticated();
   if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const authData = await getAuthData();
+  if (!authData?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -153,14 +157,18 @@ export async function POST(
           nextPembayaranNumber
         ).padStart(4, "0")}`;
 
+        const nominalTercatat = Math.min(jumlahBayar, sisaHutang);
+
         await tx.pembayaranPenjualan.create({
           data: {
             kodePembayaran,
             penjualanId,
             tanggalBayar: pembayaranDate,
-            nominal: BigInt(jumlahBayar),
+            nominal: BigInt(nominalTercatat),
             metode: metodePembayaran,
+            jenisPembayaran: "PIUTANG",
             catatan: catatan || null,
+            userId: Number(authData.userId),
           },
         });
       }

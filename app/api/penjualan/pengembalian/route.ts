@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { getAuthData } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -37,8 +37,8 @@ function deepSerialize(obj: any): any {
 
 // GET: Ambil pengembalian barang dengan filter dan pagination
 export async function GET(request: NextRequest) {
-  const auth = await isAuthenticated();
-  if (!auth) {
+  const authData = await getAuthData();
+  if (!authData) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -59,6 +59,9 @@ export async function GET(request: NextRequest) {
     const karyawanId = searchParams.get("karyawanId");
 
     const where: any = {};
+    const roleUpper = authData.role?.toUpperCase();
+    const userId = Number(authData.userId);
+    const shouldFilterByUser = roleUpper !== "ADMIN" && !Number.isNaN(userId);
 
     if (barangId) {
       where.barangId = parseInt(barangId);
@@ -97,6 +100,10 @@ export async function GET(request: NextRequest) {
         end.setHours(23, 59, 59, 999);
         where.tanggalPengembalian.lte = end;
       }
+    }
+
+    if (shouldFilterByUser) {
+      where.userId = userId;
     }
 
     const totalCount = await prisma.pengembalianBarang.count({ where });
@@ -154,15 +161,13 @@ export async function GET(request: NextRequest) {
       { success: false, error: "Gagal mengambil data pengembalian" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
 // POST: Catat pengembalian barang (perjalanan sales)
 export async function POST(request: NextRequest) {
-  const auth = await isAuthenticated();
-  if (!auth) {
+  const authData = await getAuthData();
+  if (!authData) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -212,6 +217,7 @@ export async function POST(request: NextRequest) {
         jumlahPcs: BigInt(item.jumlahPcs),
         kondisiBarang: item.kondisiBarang,
         keterangan: item.keterangan,
+        userId: Number(authData.userId),
       });
 
       if (item.kondisiBarang === "BAIK") {
@@ -276,7 +282,5 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

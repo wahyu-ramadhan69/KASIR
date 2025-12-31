@@ -175,7 +175,7 @@ const adminTransactionLinks = [
         icon: <ReceiptText className="w-4 h-4" />,
       },
       {
-        label: "Piutang Kanvas",
+        label: "Piutang Sales",
         href: "/dashboard/admin/hutang-piutang/piutang-kanvas",
         icon: <ReceiptText className="w-4 h-4" />,
       },
@@ -433,7 +433,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/logout", { method: "DELETE" });
+      await fetch("/api/auth/logout", { method: "DELETE" });
       localStorage.removeItem("token");
       router.push("/");
     } catch (error) {

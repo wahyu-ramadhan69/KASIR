@@ -25,7 +25,7 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/logout", { method: "DELETE" });
+      await fetch("/api/auth/logout", { method: "DELETE" });
       localStorage.removeItem("token");
       router.push("/");
     } catch (error) {

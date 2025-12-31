@@ -1,7 +1,7 @@
 // app/api/penjualan/summary/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { getAuthData } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -53,14 +53,19 @@ function deepSerialize(obj: any): any {
 }
 
 export async function GET(request: Request) {
-  const auth = await isAuthenticated();
-  if (!auth) {
+  const authData = await getAuthData();
+  if (!authData) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "daily";
     const range = parseInt(searchParams.get("range") || "30");
+    const roleUpper = authData.role?.toUpperCase();
+    const isAdmin = roleUpper === "ADMIN";
+    const isKasir = roleUpper === "KASIR";
+    const userId = Number(authData.userId);
+    const shouldFilterByUser = !isAdmin && !Number.isNaN(userId);
 
     const today = new Date();
     today.setHours(23, 59, 59, 999);
@@ -80,21 +85,99 @@ export async function GET(request: Request) {
       startDate.setHours(0, 0, 0, 0);
     }
 
-    // Fetch data penjualan
-    const penjualanHeaders = await prisma.penjualanHeader.findMany({
-      where: {
-        tanggalTransaksi: {
-          gte: startDate,
-          lte: today,
+    type PenjualanEntry = {
+      tanggal: Date;
+      nominal: number;
+    };
+
+    let penjualanEntries: PenjualanEntry[] = [];
+    let piutangEntries: PenjualanEntry[] = [];
+
+    if (isKasir) {
+      // Fetch data penjualan berdasarkan pembayaran (khusus kasir)
+      const pembayaranPenjualan = await prisma.pembayaranPenjualan.findMany({
+        where: {
+          tanggalBayar: {
+            gte: startDate,
+            lte: today,
+          },
+          penjualan: {
+            statusTransaksi: "SELESAI",
+          },
+          jenisPembayaran: "PENJUALAN",
+          ...(shouldFilterByUser ? { userId } : {}),
         },
-        statusTransaksi: "SELESAI",
-      },
-      select: {
-        id: true,
-        tanggalTransaksi: true,
-        totalHarga: true,
-      },
-    });
+        select: {
+          tanggalBayar: true,
+          nominal: true,
+        },
+      });
+      penjualanEntries = pembayaranPenjualan.map((item) => ({
+        tanggal: item.tanggalBayar,
+        nominal: Number(item.nominal),
+      }));
+
+      const pembayaranPiutang = await prisma.pembayaranPenjualan.findMany({
+        where: {
+          tanggalBayar: {
+            gte: startDate,
+            lte: today,
+          },
+          penjualan: {
+            statusTransaksi: "SELESAI",
+          },
+          jenisPembayaran: "PIUTANG",
+          ...(shouldFilterByUser ? { userId } : {}),
+        },
+        select: {
+          tanggalBayar: true,
+          nominal: true,
+        },
+      });
+      piutangEntries = pembayaranPiutang.map((item) => ({
+        tanggal: item.tanggalBayar,
+        nominal: Number(item.nominal),
+      }));
+    } else {
+      // Fetch data penjualan berdasarkan header (admin/role lain)
+      const penjualanHeaders = await prisma.penjualanHeader.findMany({
+        where: {
+          tanggalTransaksi: {
+            gte: startDate,
+            lte: today,
+          },
+          statusTransaksi: "SELESAI",
+          ...(shouldFilterByUser ? { userId } : {}),
+        },
+        select: {
+          tanggalTransaksi: true,
+          totalHarga: true,
+        },
+      });
+      penjualanEntries = penjualanHeaders.map((item) => ({
+        tanggal: item.tanggalTransaksi,
+        nominal: Number(item.totalHarga),
+      }));
+
+      const pembayaranPiutang = await prisma.pembayaranPenjualan.findMany({
+        where: {
+          tanggalBayar: {
+            gte: startDate,
+            lte: today,
+          },
+          jenisPembayaran: "PIUTANG",
+          ...(shouldFilterByUser ? { userId } : {}),
+        },
+        select: {
+          tanggalBayar: true,
+          nominal: true,
+        },
+      });
+      piutangEntries = pembayaranPiutang.map((item) => ({
+        tanggal: item.tanggalBayar,
+        nominal: Number(item.nominal),
+      }));
+    }
 
     // Fetch data pembelian
     const pembelianHeaders = await prisma.pembelianHeader.findMany({
@@ -119,6 +202,7 @@ export async function GET(request: Request) {
           gte: startDate,
           lte: today,
         },
+        ...(shouldFilterByUser ? { userId } : {}),
       },
       select: {
         tanggalInput: true,
@@ -135,6 +219,7 @@ export async function GET(request: Request) {
             lte: today,
           },
           statusTransaksi: "SELESAI",
+          ...(shouldFilterByUser ? { userId } : {}),
         },
       },
       select: {
@@ -162,6 +247,7 @@ export async function GET(request: Request) {
         kondisiBarang: {
           in: ["RUSAK", "KADALUARSA"],
         },
+        ...(shouldFilterByUser ? { userId } : {}),
       },
       select: {
         tanggalPengembalian: true,
@@ -178,6 +264,7 @@ export async function GET(request: Request) {
 
     type DailyValue = {
       penjualan: number;
+      piutang: number;
       pembelian: number;
       pengeluaran: number;
       labaKotor: number;
@@ -205,6 +292,7 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
@@ -223,11 +311,12 @@ export async function GET(request: Request) {
     }
 
     // Isi data penjualan
-    for (const h of penjualanHeaders) {
-      const key = getKey(h.tanggalTransaksi);
+    for (const h of penjualanEntries) {
+      const key = getKey(h.tanggal);
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
@@ -235,7 +324,24 @@ export async function GET(request: Request) {
           laba: 0,
         };
       }
-      dataMap[key].penjualan += Number(h.totalHarga);
+      dataMap[key].penjualan += h.nominal;
+    }
+
+    // Isi data pembayaran piutang
+    for (const h of piutangEntries) {
+      const key = getKey(h.tanggal);
+      if (!dataMap[key]) {
+        dataMap[key] = {
+          penjualan: 0,
+          piutang: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          kerugian: 0,
+          laba: 0,
+        };
+      }
+      dataMap[key].piutang += h.nominal;
     }
 
     // Isi data pembelian
@@ -244,6 +350,7 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
@@ -260,6 +367,7 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
@@ -276,6 +384,7 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
@@ -300,6 +409,7 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
           labaKotor: 0,
@@ -336,6 +446,7 @@ export async function GET(request: Request) {
       .map(([date, value]) => ({
         date,
         penjualan: value.penjualan,
+        piutang: value.piutang,
         pembelian: value.pembelian,
         pengeluaran: value.pengeluaran,
         kerugian: value.kerugian,
