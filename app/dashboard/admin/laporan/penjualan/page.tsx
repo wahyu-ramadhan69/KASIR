@@ -17,8 +17,6 @@ import Link from "next/link";
 interface Barang {
   id: number;
   namaBarang: string;
-  ukuran: number;
-  satuan: string;
   jumlahPerKemasan: number;
 }
 
@@ -82,6 +80,7 @@ const LaporanPenjualanPage = () => {
   const [penjualanList, setPenjualanList] = useState<PenjualanHeader[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [fetchBlocked, setFetchBlocked] = useState<boolean>(false);
   const [stats, setStats] = useState<Stats>({
     totalPenjualan: 0,
     totalModal: 0,
@@ -119,6 +118,7 @@ const LaporanPenjualanPage = () => {
     setPenjualanList([]);
     setPage(1);
     setHasMore(true);
+    setFetchBlocked(false);
     fetchData(1, true);
   }, [startDate, endDate, searchTerm, statusFilter]);
 
@@ -126,7 +126,13 @@ const LaporanPenjualanPage = () => {
     // Setup intersection observer untuk infinite scroll
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+        if (
+          entries[0].isIntersecting &&
+          hasMore &&
+          !loading &&
+          !loadingMore &&
+          !fetchBlocked
+        ) {
           loadMore();
         }
       },
@@ -144,11 +150,8 @@ const LaporanPenjualanPage = () => {
     };
   }, [hasMore, loading, loadingMore, page]);
 
-  const fetchData = async (
-    pageNum: number,
-    reset: boolean = false,
-    retryCount: number = 0
-  ) => {
+  const fetchData = async (pageNum: number, reset: boolean = false) => {
+    if (fetchBlocked) return;
     if (reset) {
       setLoading(true);
     } else {
@@ -164,15 +167,6 @@ const LaporanPenjualanPage = () => {
       if (statusFilter !== "all") url += `&statusPembayaran=${statusFilter}`;
 
       const res = await fetch(url);
-
-      // Handle 404 with retry logic (max 5 attempts)
-      if (res.status === 404 && retryCount < 5) {
-        console.warn(
-          `Attempt ${retryCount + 1}/5 failed (404). Retrying in 2s...`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        return fetchData(pageNum, reset, retryCount + 1);
-      }
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -192,11 +186,9 @@ const LaporanPenjualanPage = () => {
       }
     } catch (error) {
       console.error("Error fetching data:", error);
-      if (retryCount >= 5) {
-        toast.error("Gagal mengambil data transaksi setelah 5 percobaan");
-      } else {
-        toast.error("Gagal mengambil data transaksi");
-      }
+      toast.error("Gagal mengambil data transaksi");
+      setFetchBlocked(true);
+      setHasMore(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -204,6 +196,7 @@ const LaporanPenjualanPage = () => {
   };
 
   const loadMore = () => {
+    if (fetchBlocked) return;
     const nextPage = page + 1;
     setPage(nextPage);
     fetchData(nextPage, false);
@@ -856,9 +849,7 @@ const LaporanPenjualanPage = () => {
                           </td>
                           <td className="px-3 py-2 text-center">
                             {jumlahDus > 0 && (
-                              <span>
-                                {jumlahDus} {item.barang?.satuan || "kemasan"}
-                              </span>
+                              <span>{jumlahDus} kemasan</span>
                             )}
                             {jumlahPcs > 0 && (
                               <span className="text-gray-500">

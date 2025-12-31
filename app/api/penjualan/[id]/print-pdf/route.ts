@@ -51,9 +51,7 @@ export async function GET(
     ).length;
     const paperHeight = Math.max(
       420,
-      baseHeight +
-        penjualan.items.length * perItemHeight +
-        discountCount * 8
+      baseHeight + penjualan.items.length * perItemHeight + discountCount * 8
     );
 
     const doc = new PDFDocument({
@@ -109,7 +107,10 @@ export async function GET(
     doc.text("Telp: 021-12345678", { align: "center" });
 
     doc.moveDown(0.5);
-    doc.moveTo(margin, doc.y).lineTo(paperWidth - margin, doc.y).stroke();
+    doc
+      .moveTo(margin, doc.y)
+      .lineTo(paperWidth - margin, doc.y)
+      .stroke();
     doc.moveDown(0.5);
 
     // Info Transaksi
@@ -157,7 +158,10 @@ export async function GET(
       .text(penjualan.statusPembayaran || "-", leftCol + 55, currentY);
 
     doc.moveDown(0.5);
-    doc.moveTo(margin, doc.y).lineTo(paperWidth - margin, doc.y).stroke();
+    doc
+      .moveTo(margin, doc.y)
+      .lineTo(paperWidth - margin, doc.y)
+      .stroke();
     doc.moveDown(0.5);
 
     // Header Tabel
@@ -176,7 +180,10 @@ export async function GET(
     });
 
     currentY += 10;
-    doc.moveTo(margin, currentY).lineTo(paperWidth - margin, currentY).stroke();
+    doc
+      .moveTo(margin, currentY)
+      .lineTo(paperWidth - margin, currentY)
+      .stroke();
     currentY += 5;
 
     // Items
@@ -188,7 +195,7 @@ export async function GET(
       const jumlahTotal =
         item.totalItem !== undefined && item.totalItem !== null
           ? Number(item.totalItem)
-          : item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
+          : 0;
       const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
       const jumlahPcs = jumlahTotal % jumlahPerKemasan;
       const hargaSatuan = Number(item.hargaJual);
@@ -240,7 +247,10 @@ export async function GET(
     // Garis pembatas
     doc.moveDown(0.3);
     currentY = doc.y;
-    doc.moveTo(margin, currentY).lineTo(paperWidth - margin, currentY).stroke();
+    doc
+      .moveTo(margin, currentY)
+      .lineTo(paperWidth - margin, currentY)
+      .stroke();
     currentY += 8;
 
     // Summary
@@ -277,15 +287,10 @@ export async function GET(
     currentY += 15;
     doc.font("Helvetica-Bold").fontSize(11);
     doc.text("TOTAL:", colHarga, currentY);
-    doc.text(
-      formatRupiah(Number(penjualan.totalHarga)),
-      colTotal,
-      currentY,
-      {
-        width: contentWidth - (colTotal - leftCol),
-        align: "right",
-      }
-    );
+    doc.text(formatRupiah(Number(penjualan.totalHarga)), colTotal, currentY, {
+      width: contentWidth - (colTotal - leftCol),
+      align: "right",
+    });
 
     currentY += 12;
     doc.font("Helvetica").fontSize(9);
@@ -303,21 +308,19 @@ export async function GET(
     currentY += 12;
     doc.fillColor("#059669");
     doc.text("Kembalian:", colHarga, currentY);
-    doc.text(
-      formatRupiah(Number(penjualan.kembalian)),
-      colTotal,
-      currentY,
-      {
-        width: contentWidth - (colTotal - leftCol),
-        align: "right",
-      }
-    );
+    doc.text(formatRupiah(Number(penjualan.kembalian)), colTotal, currentY, {
+      width: contentWidth - (colTotal - leftCol),
+      align: "right",
+    });
     doc.fillColor("#000000");
 
     // Footer
     doc.moveDown(1);
     currentY = doc.y;
-    doc.moveTo(margin, currentY).lineTo(paperWidth - margin, currentY).stroke();
+    doc
+      .moveTo(margin, currentY)
+      .lineTo(paperWidth - margin, currentY)
+      .stroke();
     doc.moveDown(0.5);
 
     doc

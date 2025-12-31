@@ -271,7 +271,7 @@ export async function GET(
     </div>
     <div class="info-row">
       <span class="info-label">Sales:</span>
-      <span>${penjualan.karyawan?.nama || penjualan.namaSales || "-"}</span>
+      <span>${penjualan.karyawan?.nama || "-"}</span>
     </div>
     <div class="info-row">
       <span class="info-label">Metode:</span>
@@ -298,8 +298,7 @@ export async function GET(
         const jumlahTotal =
           item.totalItem !== undefined && item.totalItem !== null
             ? Number(item.totalItem)
-            : Number(item.jumlahDus) * jumlahPerKemasan +
-              Number(item.jumlahPcs || 0);
+            : 0;
         const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
         const jumlahPcs = jumlahTotal % jumlahPerKemasan;
         const hargaSatuan = Number(item.hargaJual || item.barang.hargaJual);

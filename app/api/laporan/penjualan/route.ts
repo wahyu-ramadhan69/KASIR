@@ -121,8 +121,6 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 namaBarang: true,
-                ukuran: true,
-                satuan: true,
                 jumlahPerKemasan: true,
               },
             },
