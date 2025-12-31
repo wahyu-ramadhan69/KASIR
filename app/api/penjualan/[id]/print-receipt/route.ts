@@ -89,8 +89,9 @@ export async function GET(
 
     body {
       font-family: 'Courier New', monospace;
-      font-size: 9px;
-      line-height: 1.4;
+      font-size: 11px;
+      line-height: 1.5;
+      font-weight: 600;
       padding: 2mm;
       width: 78mm;
       background: white;
@@ -104,19 +105,19 @@ export async function GET(
     }
 
     .header h1 {
-      font-size: 13px;
-      font-weight: bold;
+      font-size: 17px;
+      font-weight: 800;
       margin-bottom: 4px;
     }
 
     .header p {
-      font-size: 9px;
+      font-size: 11px;
       margin: 2px 0;
     }
 
     .info-section {
       margin: 8px 0;
-      font-size: 8px;
+      font-size: 10px;
     }
 
     .info-row {
@@ -126,7 +127,7 @@ export async function GET(
     }
 
     .info-label {
-      font-weight: bold;
+      font-weight: 800;
       width: 68px;
     }
 
@@ -138,11 +139,11 @@ export async function GET(
     .items-table {
       width: 100%;
       margin: 8px 0;
-      font-size: 8px;
+      font-size: 10px;
     }
 
     .items-header {
-      font-weight: bold;
+      font-weight: 800;
       border-bottom: 1px solid #000;
       padding-bottom: 4px;
       margin-bottom: 4px;
@@ -157,7 +158,7 @@ export async function GET(
     }
 
     .item-name {
-      font-weight: bold;
+      font-weight: 800;
       margin-bottom: 2px;
     }
 
@@ -165,12 +166,12 @@ export async function GET(
       display: grid;
       grid-template-columns: 1.6fr 0.6fr 0.8fr;
       gap: 4px;
-      font-size: 8px;
+      font-size: 10px;
     }
 
     .item-discount {
       color: #dc2626;
-      font-size: 8px;
+      font-size: 10px;
       margin-top: 2px;
       padding-left: 8px;
     }
@@ -185,12 +186,12 @@ export async function GET(
       display: flex;
       justify-content: space-between;
       margin: 4px 0;
-      font-size: 9px;
+      font-size: 11px;
     }
 
     .summary-row.total {
-      font-weight: bold;
-      font-size: 11px;
+      font-weight: 800;
+      font-size: 13px;
       border-top: 1px solid #000;
       border-bottom: 1px solid #000;
       padding: 6px 0;
@@ -199,7 +200,7 @@ export async function GET(
 
     .summary-row.change {
       color: #059669;
-      font-weight: bold;
+      font-weight: 800;
     }
 
     .summary-row.discount {
@@ -211,7 +212,7 @@ export async function GET(
       text-align: center;
       border-top: 1px dashed #000;
       padding-top: 8px;
-      font-size: 8px;
+      font-size: 10px;
     }
 
     .footer p {
@@ -233,7 +234,7 @@ export async function GET(
       border-top: 1px solid #000;
       margin-top: 50px;
       padding-top: 4px;
-      font-size: 8px;
+      font-size: 10px;
     }
 
     @media print {

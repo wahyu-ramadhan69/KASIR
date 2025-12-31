@@ -95,13 +95,17 @@ export async function GET(
     };
 
     // Header
-    doc.fontSize(11).font("Helvetica-Bold").text("NOTA PENJUALAN", {
+    doc.fontSize(14).font("Helvetica-Bold").text("NOTA PENJUALAN", {
       align: "center",
     });
 
     doc.moveDown(0.3);
-    doc.fontSize(7).font("Helvetica").text("Toko ABC", { align: "center" });
-    doc.text("Jl. Contoh No. 123, Jakarta", { align: "center" });
+    doc.fontSize(9).font("Helvetica-Bold").text("Toko ABC", {
+      align: "center",
+    });
+    doc.font("Helvetica").text("Jl. Contoh No. 123, Jakarta", {
+      align: "center",
+    });
     doc.text("Telp: 021-12345678", { align: "center" });
 
     doc.moveDown(0.5);
@@ -112,7 +116,7 @@ export async function GET(
     const leftCol = margin;
     let currentY = doc.y;
 
-    doc.fontSize(7).font("Helvetica-Bold");
+    doc.fontSize(9).font("Helvetica-Bold");
     doc.text("No Nota:", leftCol, currentY);
     doc
       .font("Helvetica")
@@ -158,7 +162,7 @@ export async function GET(
 
     // Header Tabel
     currentY = doc.y;
-    doc.fontSize(6.5).font("Helvetica-Bold");
+    doc.fontSize(8.5).font("Helvetica-Bold");
     const colItem = leftCol;
     const colQty = leftCol + 96;
     const colHarga = leftCol + 140;
@@ -176,7 +180,7 @@ export async function GET(
     currentY += 5;
 
     // Items
-    doc.font("Helvetica").fontSize(6.5);
+    doc.font("Helvetica").fontSize(8.5);
     let subtotal = 0;
 
     for (const item of penjualan.items) {
@@ -224,12 +228,12 @@ export async function GET(
 
       // Tampilkan diskon jika ada
       if (diskonTotal > 0) {
-        doc.fontSize(6).fillColor("#DC2626");
+        doc.fontSize(8).fillColor("#DC2626");
         doc.text(`  Diskon: -${formatRupiah(diskonTotal)}`, leftCol, currentY, {
           width: contentWidth,
         });
         currentY += 8;
-        doc.fillColor("#000000").fontSize(7);
+        doc.fillColor("#000000").fontSize(9);
       }
     }
 
@@ -240,7 +244,7 @@ export async function GET(
     currentY += 8;
 
     // Summary
-    doc.font("Helvetica").fontSize(7);
+    doc.font("Helvetica").fontSize(9);
     doc.text("Subtotal:", colHarga, currentY);
     doc.text(formatRupiah(subtotal), colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
@@ -271,7 +275,7 @@ export async function GET(
     }
 
     currentY += 15;
-    doc.font("Helvetica-Bold").fontSize(9);
+    doc.font("Helvetica-Bold").fontSize(11);
     doc.text("TOTAL:", colHarga, currentY);
     doc.text(
       formatRupiah(Number(penjualan.totalHarga)),
@@ -284,7 +288,7 @@ export async function GET(
     );
 
     currentY += 12;
-    doc.font("Helvetica").fontSize(7);
+    doc.font("Helvetica").fontSize(9);
     doc.text("Dibayar:", colHarga, currentY);
     doc.text(
       formatRupiah(Number(penjualan.jumlahDibayar)),
@@ -317,12 +321,12 @@ export async function GET(
     doc.moveDown(0.5);
 
     doc
-      .fontSize(6.5)
-      .font("Helvetica")
+      .fontSize(8.5)
+      .font("Helvetica-Bold")
       .text("Terima kasih atas pembelian Anda!", {
         align: "center",
       });
-    doc.fontSize(6).text("Barang yang sudah dibeli tidak dapat dikembalikan", {
+    doc.fontSize(8).text("Barang yang sudah dibeli tidak dapat dikembalikan", {
       align: "center",
     });
 

@@ -306,7 +306,7 @@ export async function GET(request: NextRequest) {
     const rows = [
       { label: "Total Transaksi", value: totalPenjualan },
       { label: "Pembayaran Piutang Customer", value: totalPiutang },
-      { label: "Sisa Piutang Belum Dibayar", value: totalSisaPiutang },
+      { label: "Total Piutang Customer", value: totalSisaPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
       { label: "Kerugian", value: totalKerugian },
       { label: "Setoran Akhir", value: totalSetoran },
