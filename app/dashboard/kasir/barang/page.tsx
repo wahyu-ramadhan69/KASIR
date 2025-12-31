@@ -435,7 +435,7 @@ const DataBarangPage = () => {
             <div className="flex items-center gap-4">
               <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
                 <Package className="w-10 h-10 text-white" />
-      </div>
+              </div>
               <div>
                 <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
                   Data Barang
@@ -697,15 +697,11 @@ const DataBarangPage = () => {
                         <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                           Supplier
                         </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
-                          Harga Beli
-                        </th>
+
                         <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
                           Harga Jual
                         </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
-                          Profit
-                        </th>
+
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Stok
                         </th>
@@ -774,14 +770,7 @@ const DataBarangPage = () => {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <div className="text-sm font-semibold text-gray-900">
-                                {formatRupiahSimple(item.hargaBeli)}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {formatRupiah(item.hargaBeli)}
-                              </div>
-                            </td>
+
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <div className="text-sm font-semibold text-blue-600">
                                 {formatRupiahSimple(item.hargaJual)}
@@ -790,23 +779,7 @@ const DataBarangPage = () => {
                                 {formatRupiah(item.hargaJual)}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <div
-                                className={`text-sm font-bold ${getProfitColor(
-                                  profit
-                                )}`}
-                              >
-                                {formatRupiahSimple(profit)}
-                              </div>
-                              <div
-                                className={`text-xs ${getProfitColor(
-                                  profit
-                                )} opacity-75`}
-                              >
-                                {getPercentagePrefix(profit)}
-                                {percentage}%
-                              </div>
-                            </td>
+
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span
                                 className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${stokStatus.color}`}
@@ -1273,30 +1246,30 @@ const DataBarangPage = () => {
                   </div>
                 </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                  <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                    Stok
-                  </p>
-                  <p className="text-gray-900 text-xl font-bold">
-                    {selectedBarang.stok} pcs
-                  </p>
-                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
+                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
+                      Stok
+                    </p>
+                    <p className="text-gray-900 text-xl font-bold">
+                      {selectedBarang.stok} pcs
+                    </p>
+                  </div>
 
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                  <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                    Berat
-                  </p>
-                  <p className="text-gray-900 text-xl font-bold">
-                    {formatGramsToKg(selectedBarang.berat)} KG
-                  </p>
-                </div>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
+                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
+                      Berat
+                    </p>
+                    <p className="text-gray-900 text-xl font-bold">
+                      {formatGramsToKg(selectedBarang.berat)} KG
+                    </p>
+                  </div>
 
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
-                  <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-2">
-                    Kemasan
-                  </p>
-                  <p className="text-purple-900 text-xl font-bold">
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
+                    <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-2">
+                      Kemasan
+                    </p>
+                    <p className="text-purple-900 text-xl font-bold">
                       {selectedBarang.jumlahPerKemasan} pcs
                     </p>
                     <p className="text-xs text-purple-600 mt-1">
@@ -1341,8 +1314,7 @@ const DataBarangPage = () => {
             </div>
           </div>
         )}
-
-              </div>
+      </div>
     </div>
   );
 };

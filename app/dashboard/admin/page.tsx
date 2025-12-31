@@ -40,9 +40,15 @@ interface DailySales {
   penjualan: number;
   pembelian: number;
   pengeluaran: number;
+  labaKotor: number;
   kerugian: number;
   laba: number;
   label?: string;
+}
+
+interface PaymentTotals {
+  penjualan: number;
+  piutang: number;
 }
 
 type Period = "daily" | "monthly" | "yearly";
@@ -282,6 +288,10 @@ const Penjualan30HariPage = () => {
   const [chartType, setChartType] = useState<"bar" | "area">("area");
   const [period, setPeriod] = useState<Period>("daily");
   const [range, setRange] = useState<number>(30);
+  const [paymentTotals, setPaymentTotals] = useState<PaymentTotals>({
+    penjualan: 0,
+    piutang: 0,
+  });
   const [visibleLines, setVisibleLines] = useState({
     penjualan: true,
     pembelian: true,
@@ -312,6 +322,10 @@ const Penjualan30HariPage = () => {
 
       if (json.success) {
         setData(json.data);
+        setPaymentTotals({
+          penjualan: json.paymentTotals?.penjualan ?? 0,
+          piutang: json.paymentTotals?.piutang ?? 0,
+        });
       } else {
         console.error(json.error);
       }
@@ -334,6 +348,7 @@ const Penjualan30HariPage = () => {
     (sum, item) => sum + item.pengeluaran,
     0
   );
+  const totalLabaKotor = data.reduce((sum, item) => sum + item.labaKotor, 0);
   const totalKerugian = data.reduce((sum, item) => sum + item.kerugian, 0);
   const totalLaba = data.reduce((sum, item) => sum + item.laba, 0);
 
@@ -615,7 +630,7 @@ const Penjualan30HariPage = () => {
         </div>
 
         {/* ✅ UPDATED: STATS CARDS - Now 5 cards (removed Rata-rata) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Penjualan"
             value={formatNumber(totalPenjualan)}
@@ -636,6 +651,26 @@ const Penjualan30HariPage = () => {
           />
 
           <StatCard
+            title="Laba Kotor"
+            value={formatNumber(totalLabaKotor)}
+            subtitle={formatRupiah(totalLabaKotor)}
+            icon={BarChart3}
+            gradient="bg-gradient-to-br from-cyan-500 to-blue-600"
+            delay={75}
+          />
+
+          <StatCard
+            title="Laba Bersih"
+            value={formatNumber(totalLaba)}
+            subtitle={formatRupiah(totalLaba)}
+            icon={Sparkles}
+            gradient="bg-gradient-to-br from-green-500 to-emerald-600"
+            delay={200}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatCard
             title="Pengeluaran"
             value={formatNumber(totalPengeluaran)}
             subtitle={formatRupiah(totalPengeluaran)}
@@ -654,12 +689,21 @@ const Penjualan30HariPage = () => {
           />
 
           <StatCard
-            title="Laba Bersih"
-            value={formatNumber(totalLaba)}
-            subtitle={formatRupiah(totalLaba)}
-            icon={Sparkles}
-            gradient="bg-gradient-to-br from-green-500 to-emerald-600"
-            delay={200}
+            title="Pembayaran Penjualan"
+            value={formatNumber(paymentTotals.penjualan)}
+            subtitle={formatRupiah(paymentTotals.penjualan)}
+            icon={DollarSign}
+            gradient="bg-gradient-to-br from-blue-500 to-sky-600"
+            delay={250}
+          />
+
+          <StatCard
+            title="Pembayaran Piutang"
+            value={formatNumber(paymentTotals.piutang)}
+            subtitle={formatRupiah(paymentTotals.piutang)}
+            icon={TrendingUp}
+            gradient="bg-gradient-to-br from-teal-500 to-emerald-600"
+            delay={300}
           />
         </div>
 

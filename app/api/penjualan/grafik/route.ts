@@ -92,6 +92,7 @@ export async function GET(request: Request) {
 
     let penjualanEntries: PenjualanEntry[] = [];
     let piutangEntries: PenjualanEntry[] = [];
+    let pembayaranPenjualanEntries: PenjualanEntry[] = [];
 
     if (isKasir) {
       // Fetch data penjualan berdasarkan pembayaran (khusus kasir)
@@ -116,6 +117,7 @@ export async function GET(request: Request) {
         tanggal: item.tanggalBayar,
         nominal: Number(item.nominal),
       }));
+      pembayaranPenjualanEntries = penjualanEntries;
 
       const pembayaranPiutang = await prisma.pembayaranPenjualan.findMany({
         where: {
@@ -157,6 +159,28 @@ export async function GET(request: Request) {
       penjualanEntries = penjualanHeaders.map((item) => ({
         tanggal: item.tanggalTransaksi,
         nominal: Number(item.totalHarga),
+      }));
+
+      const pembayaranPenjualan = await prisma.pembayaranPenjualan.findMany({
+        where: {
+          tanggalBayar: {
+            gte: startDate,
+            lte: today,
+          },
+          penjualan: {
+            statusTransaksi: "SELESAI",
+          },
+          jenisPembayaran: "PENJUALAN",
+          ...(shouldFilterByUser ? { userId } : {}),
+        },
+        select: {
+          tanggalBayar: true,
+          nominal: true,
+        },
+      });
+      pembayaranPenjualanEntries = pembayaranPenjualan.map((item) => ({
+        tanggal: item.tanggalBayar,
+        nominal: Number(item.nominal),
       }));
 
       const pembayaranPiutang = await prisma.pembayaranPenjualan.findMany({
@@ -449,9 +473,19 @@ export async function GET(request: Request) {
         piutang: value.piutang,
         pembelian: value.pembelian,
         pengeluaran: value.pengeluaran,
+        labaKotor: value.labaKotor,
         kerugian: value.kerugian,
         laba: value.laba, // ✅ Sudah dikurangi pengeluaran
       }));
+
+    const totalPembayaranPenjualan = pembayaranPenjualanEntries.reduce(
+      (sum, item) => sum + item.nominal,
+      0
+    );
+    const totalPembayaranPiutang = piutangEntries.reduce(
+      (sum, item) => sum + item.nominal,
+      0
+    );
 
     return NextResponse.json(
       deepSerialize({
@@ -459,6 +493,10 @@ export async function GET(request: Request) {
         data,
         period,
         range,
+        paymentTotals: {
+          penjualan: totalPembayaranPenjualan,
+          piutang: totalPembayaranPiutang,
+        },
       })
     );
   } catch (error) {
