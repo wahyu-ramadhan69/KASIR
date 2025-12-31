@@ -355,6 +355,18 @@ const kasirTransactionLinks = [
       },
     ],
   },
+  {
+    label: "Laporan",
+    href: "/dashboard/kasir/laporan",
+    icon: <FileText className="w-5 h-5" />,
+    subMenu: [
+      {
+        label: "Laporan All",
+        href: "/dashboard/kasir/laporan",
+        icon: <FileText className="w-4 h-4" />,
+      },
+    ],
+  },
 ];
 
 interface SidebarProps {
