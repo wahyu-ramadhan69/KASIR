@@ -8,13 +8,13 @@ export default async function AdminLayout({
 }>) {
   const authData = await getAuthData();
 
-  if (!authData) {
-    redirect("/");
-  }
+  // if (!authData) {
+  //   redirect("/");
+  // }
 
-  if (authData.role !== "ADMIN") {
-    redirect("/dashboard/kasir");
-  }
+  // if (authData.role !== "ADMIN") {
+  //   redirect("/dashboard/kasir");
+  // }
 
   return <>{children}</>;
 }

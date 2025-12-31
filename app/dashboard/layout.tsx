@@ -18,15 +18,15 @@ export default async function RootLayout({
 }>) {
   const auth = await isAuthenticated();
   const authData = await getAuthData();
-  if (!auth || !authData) {
-    redirect("/");
-  }
-  const { role, username } = authData;
+  // if (!auth || !authData) {
+  //   redirect("/");
+  // }
+  // const { role, username } = authData;
 
   return (
     <div className="min-h-screen bg-gray-50/50">
       <Toaster position="top-right" />
-      <Sidebar role={role} username={username} />
+      {/* <Sidebar role={role} username={username} /> */}
       <div className="p-4 transition-all duration-300 xl:ml-80 sidebar-content">
         <Navbar />
         <div className="mt-2">
