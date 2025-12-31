@@ -47,10 +47,18 @@ export async function POST(
     const penjualanId = parseInt(id);
     const body = await request.json();
     const { jumlahBayar, metodePembayaran = "CASH", catatan } = body;
+    const metodeValid = ["CASH", "TRANSFER", "CASH_TRANSFER"] as const;
 
     if (!jumlahBayar || jumlahBayar <= 0) {
       return NextResponse.json(
         { success: false, error: "Jumlah pembayaran tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    if (!metodeValid.includes(metodePembayaran)) {
+      return NextResponse.json(
+        { success: false, error: "Metode pembayaran tidak valid" },
         { status: 400 }
       );
     }
@@ -121,6 +129,7 @@ export async function POST(
           ),
           kembalian: BigInt(kembalianLama + kembalianBaru),
           statusPembayaran: isLunas ? "LUNAS" : "HUTANG",
+          metodePembayaran,
         },
         include: {
           customer: true,

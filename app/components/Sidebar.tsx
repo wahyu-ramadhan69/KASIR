@@ -137,26 +137,26 @@ const adminTransactionLinks = [
         href: "/dashboard/admin/penjualan-sales/luar-kota",
         icon: <Truck className="w-4 h-4" />,
       },
-      {
-        label: "Kanvas Sales",
-        href: "/dashboard/admin/penjualan-sales/kanvas",
-        icon: <Truck className="w-4 h-4" />,
-      },
+      // {
+      //   label: "Kanvas Sales",
+      //   href: "/dashboard/admin/penjualan-sales/kanvas",
+      //   icon: <Truck className="w-4 h-4" />,
+      // },
       {
         label: "Riwayat Transaksi Sales",
         href: "/dashboard/admin/penjualan-sales/riwayat",
         icon: <History className="w-4 h-4" />,
       },
-      {
-        label: "Riwayat Kanvas",
-        href: "/dashboard/admin/penjualan-sales/luar-kota/riwayat",
-        icon: <History className="w-4 h-4" />,
-      },
-      {
-        label: "Pengembalian Kanvas",
-        href: "/dashboard/admin/penjualan-sales/riwayat/pengembalian",
-        icon: <History className="w-4 h-4" />,
-      },
+      // {
+      //   label: "Riwayat Kanvas",
+      //   href: "/dashboard/admin/penjualan-sales/luar-kota/riwayat",
+      //   icon: <History className="w-4 h-4" />,
+      // },
+      // {
+      //   label: "Pengembalian Kanvas",
+      //   href: "/dashboard/admin/penjualan-sales/riwayat/pengembalian",
+      //   icon: <History className="w-4 h-4" />,
+      // },
     ],
   },
   {

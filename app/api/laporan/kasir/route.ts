@@ -304,11 +304,11 @@ export async function GET(request: NextRequest) {
     });
 
     const rows = [
-      { label: "Total Penjualan", value: totalPenjualan },
-      { label: "Pembayaran Piutang", value: totalPiutang },
+      { label: "Total Transaksi", value: totalPenjualan },
+      { label: "Pembayaran Piutang Customer", value: totalPiutang },
       { label: "Sisa Piutang Belum Dibayar", value: totalSisaPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
-      { label: "Kerugian Barang Rusak/Kadaluarsa", value: totalKerugian },
+      { label: "Kerugian", value: totalKerugian },
       { label: "Setoran Akhir", value: totalSetoran },
     ];
 

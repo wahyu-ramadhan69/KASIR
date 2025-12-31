@@ -66,7 +66,7 @@ interface PenjualanHeader {
   totalHarga: number;
   jumlahDibayar: number;
   kembalian: number;
-  metodePembayaran: "CASH" | "TRANSFER";
+  metodePembayaran: "CASH" | "TRANSFER" | "CASH_TRANSFER";
   statusPembayaran: "LUNAS" | "HUTANG";
   statusTransaksi: "KERANJANG" | "SELESAI" | "DIBATALKAN";
   tanggalTransaksi: string;
@@ -168,6 +168,9 @@ const RiwayatPenjualanPage = () => {
   const [pelunasanPenjualan, setPelunasanPenjualan] =
     useState<PenjualanHeader | null>(null);
   const [jumlahBayar, setJumlahBayar] = useState<string>("");
+  const [metodePembayaranPelunasan, setMetodePembayaranPelunasan] = useState<
+    "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  >("CASH");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Ubah Jatuh Tempo modal
@@ -415,6 +418,7 @@ const RiwayatPenjualanPage = () => {
     setPelunasanPenjualan(penjualan);
     const sisaHutang = penjualan.totalHarga - penjualan.jumlahDibayar;
     setJumlahBayar(sisaHutang.toString());
+    setMetodePembayaranPelunasan(penjualan.metodePembayaran || "CASH");
     setShowPelunasanModal(true);
   };
 
@@ -430,7 +434,7 @@ const RiwayatPenjualanPage = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jumlahBayar: parseInt(jumlahBayar),
-            metodePembayaran: pelunasanPenjualan.metodePembayaran || "CASH",
+            metodePembayaran: metodePembayaranPelunasan,
           }),
         }
       );
@@ -1325,6 +1329,49 @@ const RiwayatPenjualanPage = () => {
                 </div>
 
                 {/* Input */}
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Metode Pembayaran <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <button
+                      onClick={() => setMetodePembayaranPelunasan("CASH")}
+                      className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
+                        metodePembayaranPelunasan === "CASH"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:border-emerald-400"
+                      }`}
+                    >
+                      <Banknote className="w-4 h-4" />
+                      Cash
+                    </button>
+                    <button
+                      onClick={() => setMetodePembayaranPelunasan("TRANSFER")}
+                      className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
+                        metodePembayaranPelunasan === "TRANSFER"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:border-emerald-400"
+                      }`}
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Transfer
+                    </button>
+                    <button
+                      onClick={() =>
+                        setMetodePembayaranPelunasan("CASH_TRANSFER")
+                      }
+                      className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
+                        metodePembayaranPelunasan === "CASH_TRANSFER"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:border-emerald-400"
+                      }`}
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Cash + Transfer
+                    </button>
+                  </div>
+                </div>
+
                 <div className="mb-4">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Jumlah Pembayaran <span className="text-red-500">*</span>

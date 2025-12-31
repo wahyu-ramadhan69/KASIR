@@ -2732,7 +2732,7 @@ const PenjualanPage = () => {
       {/* Receipt Modal - Enhanced */}
       {showReceiptModal && receiptData && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
             {/* Success Header */}
             <div className="bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 p-8 rounded-t-3xl text-center relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50"></div>
@@ -2751,86 +2751,85 @@ const PenjualanPage = () => {
 
             {/* Receipt Body */}
             <div className="p-6 space-y-4">
-              {/* Transaction Info */}
-              <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 p-4 rounded-2xl border-2 border-gray-200 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 font-semibold">No Nota</span>
-                  <span className="font-bold text-gray-900">
-                    {receiptData.kodePenjualan}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 font-semibold">Customer</span>
-                  <span className="font-bold text-gray-900">
-                    {receiptData.customer?.nama}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 font-semibold">Sales</span>
-                  <span className="font-bold text-gray-900">
-                    {receiptData.karyawan?.nama}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 font-semibold">Metode</span>
-                  <span className="font-bold text-gray-900">
-                    {formatMetodePembayaranLabel(receiptData.metodePembayaran)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 font-semibold">Status</span>
-                  <span
-                    className={`px-3 py-1 rounded-lg font-extrabold text-xs ${
-                      receiptData.statusPembayaran === "LUNAS"
-                        ? "bg-green-500 text-white"
-                        : "bg-yellow-500 text-white"
-                    }`}
-                  >
-                    {receiptData.statusPembayaran}
-                  </span>
-                </div>
-              </div>
-
-              {/* Items */}
-              <div className="space-y-2">
-                <h4 className="font-extrabold text-gray-900 text-sm uppercase tracking-wide">
-                  Detail Pembelian
-                </h4>
-                <div className="bg-white border-2 border-gray-200 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
-                  {receiptData.items?.map((item: any, index: number) => (
-                    <div
-                      key={index}
-                      className="text-sm pb-2 border-b last:border-b-0"
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Transaction Info */}
+                <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 p-4 rounded-2xl border-2 border-gray-200 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 font-semibold">No Nota</span>
+                    <span className="font-bold text-gray-900">
+                      {receiptData.kodePenjualan}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 font-semibold">Customer</span>
+                    <span className="font-bold text-gray-900">
+                      {receiptData.customer?.nama}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 font-semibold">Sales</span>
+                    <span className="font-bold text-gray-900">
+                      {receiptData.karyawan?.nama}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 font-semibold">Metode</span>
+                    <span className="font-bold text-gray-900">
+                      {formatMetodePembayaranLabel(receiptData.metodePembayaran)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 font-semibold">Status</span>
+                    <span
+                      className={`px-3 py-1 rounded-lg font-extrabold text-xs ${
+                        receiptData.statusPembayaran === "LUNAS"
+                          ? "bg-green-500 text-white"
+                          : "bg-yellow-500 text-white"
+                      }`}
                     >
-                      {(() => {
-                        const jumlahPerKemasan =
-                          item.barang?.jumlahPerKemasan || 1;
-                        const totalItem =
-                          item.totalItem ??
-                          item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
-                        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
-                          totalItem,
-                          jumlahPerKemasan
-                        );
-                        return (
-                          <>
-                      <div className="flex justify-between font-bold text-gray-900">
-                        <span>{item.barang?.namaBarang}</span>
-                        <span>{formatRupiah(item.hargaJual)}</span>
+                      {receiptData.statusPembayaran}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Items */}
+                <div className="space-y-2">
+                  <div className="bg-white border-2 border-gray-200 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+                    {receiptData.items?.map((item: any, index: number) => (
+                      <div
+                        key={index}
+                        className="text-sm pb-2 border-b last:border-b-0"
+                      >
+                        {(() => {
+                          const jumlahPerKemasan =
+                            item.barang?.jumlahPerKemasan || 1;
+                          const totalItem =
+                            item.totalItem ??
+                            item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
+                          const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
+                            totalItem,
+                            jumlahPerKemasan
+                          );
+                          return (
+                            <>
+                              <div className="flex justify-between font-bold text-gray-900">
+                                <span>{item.barang?.namaBarang}</span>
+                                <span>{formatRupiah(item.hargaJual)}</span>
+                              </div>
+                              <div className="text-xs text-gray-600 mt-1">
+                                {jumlahDus} dus + {jumlahPcs} pcs
+                                {item.diskonPerItem > 0 && (
+                                  <span className="text-red-600 ml-2">
+                                    (Diskon: {formatRupiah(item.diskonPerItem)})
+                                  </span>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        {jumlahDus} dus + {jumlahPcs} pcs
-                        {item.diskonPerItem > 0 && (
-                          <span className="text-red-600 ml-2">
-                            (Diskon: {formatRupiah(item.diskonPerItem)})
-                          </span>
-                        )}
-                      </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -2872,7 +2871,8 @@ const PenjualanPage = () => {
             </div>
 
             {/* Footer Actions */}
-            <div className="p-6 bg-gray-50 border-t-2 border-gray-200 rounded-b-3xl space-y-3">
+            <div className="p-6 bg-gray-50 border-t-2 border-gray-200 rounded-b-3xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <button
                 onClick={() => {
                   window.open(`/api/penjualan/${receiptData.id}/print-receipt`, '_blank');
@@ -2892,6 +2892,7 @@ const PenjualanPage = () => {
                 <ShoppingCart className="w-5 h-5" />
                 TRANSAKSI BARU
               </button>
+              </div>
             </div>
           </div>
         </div>
