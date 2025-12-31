@@ -123,12 +123,12 @@ const adminTransactionLinks = [
     ],
   },
   {
-    label: "Sales dan Kanvas",
+    label: "Sales",
     href: "/dashboard/admin/penjualan-sales",
     icon: <Truck className="w-5 h-5" />,
     subMenu: [
       {
-        label: "Dalam Kota",
+        label: "Transaksi Sales",
         href: "/dashboard/admin/penjualan-sales",
         icon: <PackageOpen className="w-4 h-4" />,
       },
@@ -143,7 +143,7 @@ const adminTransactionLinks = [
         icon: <Truck className="w-4 h-4" />,
       },
       {
-        label: "Riwayat Penjualan",
+        label: "Riwayat Transaksi Sales",
         href: "/dashboard/admin/penjualan-sales/riwayat",
         icon: <History className="w-4 h-4" />,
       },

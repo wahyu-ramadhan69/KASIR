@@ -114,10 +114,28 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const piutangBelumDibayar = await prisma.penjualanHeader.findMany({
+      where: {
+        tanggalTransaksi: { gte: startDate, lte: endDate },
+        statusTransaksi: "SELESAI",
+        statusPembayaran: "HUTANG",
+        ...(shouldFilterByUser ? { userId } : {}),
+      },
+      select: {
+        totalHarga: true,
+        jumlahDibayar: true,
+      },
+    });
+
     const totalPenjualan = Number(penjualanAgg._sum.nominal || 0);
     const totalPiutang = Number(piutangAgg._sum.nominal || 0);
     const totalPengeluaran = Number(pengeluaranAgg._sum.jumlah || 0);
     const totalKerugian = calcKerugian(pengembalianRusak);
+    const totalSisaPiutang = piutangBelumDibayar.reduce((sum, item) => {
+      const total = Number(item.totalHarga || 0);
+      const dibayar = Number(item.jumlahDibayar || 0);
+      return sum + Math.max(0, total - dibayar);
+    }, 0);
     const totalSetoran =
       totalPenjualan + totalPiutang - totalPengeluaran - totalKerugian;
 
@@ -289,6 +307,7 @@ export async function GET(request: NextRequest) {
     const rows = [
       { label: "Total Penjualan", value: totalPenjualan },
       { label: "Pembayaran Piutang", value: totalPiutang },
+      { label: "Sisa Piutang Belum Dibayar", value: totalSisaPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
       { label: "Kerugian Barang Rusak/Kadaluarsa", value: totalKerugian },
       { label: "Setoran Harus Dibayar", value: totalSetoran },
