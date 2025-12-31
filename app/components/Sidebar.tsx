@@ -132,11 +132,11 @@ const adminTransactionLinks = [
         href: "/dashboard/admin/penjualan-sales",
         icon: <PackageOpen className="w-4 h-4" />,
       },
-      {
-        label: "Luar Kota",
-        href: "/dashboard/admin/penjualan-sales/luar-kota",
-        icon: <Truck className="w-4 h-4" />,
-      },
+      // {
+      //   label: "Luar Kota",
+      //   href: "/dashboard/admin/penjualan-sales/luar-kota",
+      //   icon: <Truck className="w-4 h-4" />,
+      // },
       // {
       //   label: "Kanvas Sales",
       //   href: "/dashboard/admin/penjualan-sales/kanvas",
