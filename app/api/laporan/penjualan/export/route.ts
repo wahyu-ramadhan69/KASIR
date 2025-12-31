@@ -52,6 +52,13 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+function formatKgDisplay(grams: any): string {
+  const kg = toNumber(grams) / 1000;
+  if (!Number.isFinite(kg)) return "0";
+  const trimmed = kg.toFixed(3).replace(/\.?0+$/, "");
+  return trimmed.replace(".", ",");
+}
+
 function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
   const perKemasan = Math.max(1, jumlahPerKemasan);
   const jumlahDus = Math.floor(totalItem / perKemasan);
@@ -193,7 +200,7 @@ async function generateSummaryReport(
     search?: string | null;
   }
 ) {
-  const where: any = { statusTransaksi: "SELESAI" };
+  const where: any = { statusTransaksi: "SELESAI", isDeleted: false };
 
   if (filters.startDate || filters.endDate) {
     where.tanggalTransaksi = {};
@@ -519,8 +526,7 @@ async function generateDetailReport(
             select: {
               id: true,
               namaBarang: true,
-              ukuran: true,
-              satuan: true,
+              berat: true,
               jenisKemasan: true,
               jumlahPerKemasan: true,
             },
@@ -571,7 +577,7 @@ async function generateDetailReport(
   worksheet.getColumn(7).width = 16; // Status Pembayaran
   worksheet.getColumn(8).width = 14; // Kode Barang
   worksheet.getColumn(9).width = 22; // Nama Barang
-  worksheet.getColumn(10).width = 12; // Ukuran
+  worksheet.getColumn(10).width = 12; // Berat
   worksheet.getColumn(11).width = 14; // Qty kemasan
   worksheet.getColumn(12).width = 14; // Qty total item
   worksheet.getColumn(13).width = 12; // Harga Jual
@@ -599,7 +605,7 @@ async function generateDetailReport(
       "Status Pembayaran",
       "Kode",
       "Nama Barang",
-      "Ukuran",
+      "Berat (kg)",
       "QTY Kemasan",
       "QTY Total Item",
       "Harga Jual",
@@ -681,7 +687,7 @@ async function generateDetailReport(
       row.getCell(7).value = penjualan.statusPembayaran;
       row.getCell(8).value = `BRG-${item.barang.id}`;
       row.getCell(9).value = item.barang.namaBarang;
-      row.getCell(10).value = `${item.barang.ukuran} ${item.barang.satuan}`;
+      row.getCell(10).value = formatKgDisplay(item.barang.berat);
       row.getCell(11).value = `${jumlahDus} ${item.barang.jenisKemasan}`;
       row.getCell(12).value = `${totalPcs} item`;
       row.getCell(13).value = hargaJual;
@@ -896,6 +902,7 @@ async function generateYearlyReport(
     const penjualanList = await prisma.penjualanHeader.findMany({
       where: {
         statusTransaksi: "SELESAI",
+        isDeleted: false,
         tanggalTransaksi: {
           gte: startDate,
           lte: endDate,
