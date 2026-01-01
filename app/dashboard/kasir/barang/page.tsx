@@ -1188,64 +1188,6 @@ const DataBarangPage = () => {
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 rounded-2xl p-6 border-2 border-blue-200">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-blue-600 p-3 rounded-xl">
-                      <BarChart3 className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800">
-                      Informasi Profit
-                    </h3>
-                  </div>
-
-                  <div className="bg-white rounded-xl p-4 shadow-md">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-semibold text-gray-700">
-                        Profit per Unit
-                      </span>
-                      <div className="text-right">
-                        <span
-                          className={`text-xl font-bold ${getProfitColor(
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).profit
-                          )}`}
-                        >
-                          {formatRupiah(
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).profit
-                          )}
-                        </span>
-                        <div
-                          className={`text-sm ${getProfitColor(
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).profit
-                          )}`}
-                        >
-                          {getPercentagePrefix(
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).profit
-                          )}
-                          {
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).percentage
-                          }
-                          %
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
                     <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">

@@ -1387,7 +1387,7 @@ async function generateRingkasan(
   worksheet.getColumn(1).width = 25;
   worksheet.getColumn(2).width = 18;
   worksheet.getColumn(3).width = 20;
-  worksheet.getColumn(4).width = 30;
+  worksheet.getColumn(4).width = 45;
 
   // Data
   const summaryData = [

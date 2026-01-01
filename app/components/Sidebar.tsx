@@ -252,11 +252,11 @@ const kasirMasterDataLinks = [
         href: "/dashboard/kasir/barang",
         icon: <Package className="w-4 h-4" />,
       },
-      {
-        label: "Supplier",
-        href: "/dashboard/kasir/supplier",
-        icon: <Users className="w-4 h-4" />,
-      },
+      // {
+      //   label: "Supplier",
+      //   href: "/dashboard/kasir/supplier",
+      //   icon: <Users className="w-4 h-4" />,
+      // },
       {
         label: "Customer",
         href: "/dashboard/kasir/customer",
