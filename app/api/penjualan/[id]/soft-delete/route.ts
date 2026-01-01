@@ -50,11 +50,7 @@ export async function PATCH(_req: NextRequest, { params }: RouteCtx) {
     await prisma.$transaction(async (tx) => {
       for (const item of existing.items) {
         const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan || 1);
-        const totalPcs =
-          item.totalItem !== null && item.totalItem !== undefined
-            ? Number(item.totalItem)
-            : Number(item.jumlahDus || 0) * jumlahPerKemasan +
-              Number(item.jumlahPcs || 0);
+        const totalPcs = Number(item.totalItem || 0);
         if (totalPcs > 0) {
           await tx.barang.update({
             where: { id: item.barangId },

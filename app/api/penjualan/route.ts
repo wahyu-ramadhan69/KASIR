@@ -274,37 +274,42 @@ export async function GET(request: NextRequest) {
       orderBy = { tanggalTransaksi: "desc" };
     }
 
-    const penjualan = await prisma.penjualanHeader.findMany({
-      where: listWhere,
-      ...(summary
-        ? {
-            select: {
-              id: true,
-              kodePenjualan: true,
-              totalHarga: true,
-              jumlahDibayar: true,
-              statusPembayaran: true,
-              statusTransaksi: true,
-              tanggalJatuhTempo: true,
-              tanggalTransaksi: true,
-              isDeleted: true,
-            },
-          }
-        : {
+    let penjualan: any[] = [];
+    if (summary) {
+      penjualan = await prisma.penjualanHeader.findMany({
+        where: listWhere,
+        select: {
+          id: true,
+          kodePenjualan: true,
+          totalHarga: true,
+          jumlahDibayar: true,
+          statusPembayaran: true,
+          statusTransaksi: true,
+          tanggalJatuhTempo: true,
+          tanggalTransaksi: true,
+          isDeleted: true,
+        },
+        orderBy,
+        skip,
+        take: limit,
+      });
+    } else {
+      penjualan = await prisma.penjualanHeader.findMany({
+        where: listWhere,
+        include: {
+          customer: true,
+          items: {
             include: {
-              customer: true,
-              items: {
-                include: {
-                  barang: true,
-                },
-                orderBy: { id: "asc" },
-              },
+              barang: true,
             },
-          }),
-      orderBy,
-      skip,
-      take: limit,
-    });
+            orderBy: { id: "asc" },
+          },
+        },
+        orderBy,
+        skip,
+        take: limit,
+      });
+    }
 
     const penjualanWithCalculation = summary
       ? penjualan

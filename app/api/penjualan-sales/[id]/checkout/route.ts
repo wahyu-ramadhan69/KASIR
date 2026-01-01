@@ -132,11 +132,7 @@ export async function POST(
       // Update stok barang
       for (const item of penjualan.items) {
         const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan || 1);
-        const totalPcs =
-          item.totalItem !== null && item.totalItem !== undefined
-            ? Number(item.totalItem)
-            : Number(item.jumlahDus || 0) * jumlahPerKemasan +
-              Number(item.jumlahPcs || 0);
+        const totalPcs = Number(item.totalItem || 0);
 
         await tx.barang.update({
           where: { id: item.barangId },
@@ -170,13 +166,14 @@ export async function POST(
           beratTotal: BigInt(totalBerat),
           kembalian,
           keterangan: keterangan || null,
-          rutePengiriman: rutePengiriman || null,
           metodePembayaran,
           statusPembayaran,
           statusTransaksi: "SELESAI",
           tanggalJatuhTempo:
             statusPembayaran === "HUTANG" ? tanggalJatuhTempo : null,
-          tanggalTransaksi: tanggalPenjualan ? new Date(tanggalPenjualan) : new Date(),
+          tanggalTransaksi: tanggalPenjualan
+            ? new Date(tanggalPenjualan)
+            : new Date(),
         },
         include: {
           items: {
@@ -265,7 +262,9 @@ export async function POST(
         message:
           statusPembayaran === "LUNAS"
             ? "Transaksi berhasil diproses"
-            : `Transaksi berhasil diproses dengan sisa hutang: ${Number(sisaHutang)}`,
+            : `Transaksi berhasil diproses dengan sisa hutang: ${Number(
+                sisaHutang
+              )}`,
       })
     );
   } catch (error: any) {

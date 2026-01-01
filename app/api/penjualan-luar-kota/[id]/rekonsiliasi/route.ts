@@ -37,7 +37,6 @@ export async function GET(
               select: {
                 id: true,
                 namaBarang: true,
-                satuan: true,
                 jumlahPerKemasan: true,
               },
             },
@@ -87,10 +86,7 @@ export async function GET(
       for (const penjualan of perjalanan.penjualanHeaders) {
         for (const item of penjualan.items) {
           if (item.barangId === manifest.barangId) {
-            const pcs =
-              Number(item.jumlahDus) * Number(item.barang.jumlahPerKemasan) +
-              Number(item.jumlahPcs);
-            totalTerjualPcs += pcs;
+            totalTerjualPcs += Number(item.totalItem || 0);
           }
         }
       }

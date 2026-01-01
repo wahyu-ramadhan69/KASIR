@@ -345,7 +345,6 @@ export async function POST(
               select: {
                 id: true,
                 namaBarang: true,
-                satuan: true,
                 jumlahPerKemasan: true,
               },
             },
@@ -519,7 +518,6 @@ export async function GET(
               select: {
                 id: true,
                 namaBarang: true,
-                satuan: true,
                 jumlahPerKemasan: true,
               },
             },

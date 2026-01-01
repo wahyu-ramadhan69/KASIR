@@ -90,12 +90,7 @@ export async function GET(request: NextRequest) {
     penjualan.forEach((p) => {
       p.items.forEach((item) => {
         const barangId = item.barangId;
-        const jumlahDus = Number(item.jumlahDus);
-        const jumlahPcs = Number(item.jumlahPcs);
-        const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan);
-
-        // Total dalam pcs
-        const totalPcs = jumlahDus * jumlahPerKemasan + jumlahPcs;
+        const totalPcs = Number(item.totalItem || 0);
 
         if (salesSummary[barangId]) {
           salesSummary[barangId] += totalPcs;

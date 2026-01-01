@@ -105,7 +105,7 @@ export async function POST(
     // Prepare data pengembalian
     const pengembalianData = [];
     const barangUpdates: any[] = [];
-      const manifestUpdates: any[] = [];
+    const manifestUpdates: any[] = [];
 
     for (const item of body.pengembalianBarang) {
       const barang = barangList.find((b) => b.id === item.barangId);
@@ -221,7 +221,6 @@ export async function POST(
           select: {
             id: true,
             namaBarang: true,
-            satuan: true,
             jumlahPerKemasan: true,
           },
         },
@@ -286,7 +285,6 @@ export async function GET(
           select: {
             id: true,
             namaBarang: true,
-            satuan: true,
             jumlahPerKemasan: true,
           },
         },
@@ -369,6 +367,16 @@ export async function DELETE(
         {
           success: false,
           message: "Data pengembalian tidak ditemukan",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (!pengembalian.perjalanan) {
+      return Response.json(
+        {
+          success: false,
+          message: "Data perjalanan tidak ditemukan",
         },
         { status: 404 }
       );

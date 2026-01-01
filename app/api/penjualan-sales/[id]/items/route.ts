@@ -68,7 +68,7 @@ export async function POST(
     const { id } = await params;
     const penjualanId = parseInt(id);
     const body = await request.json();
-    const { barangId, jumlahDus, jumlahPcs, diskonPerItem } = body;
+    const { barangId, totalItem, diskonPerItem } = body;
 
     // Validasi penjualan harus masih dalam status KERANJANG
     const penjualan = await prisma.penjualanHeader.findUnique({
@@ -105,8 +105,7 @@ export async function POST(
     }
 
     // Hitung total quantity
-    const totalPcs =
-      BigInt(jumlahDus) * barang.jumlahPerKemasan + BigInt(jumlahPcs);
+    const totalPcs = BigInt(totalItem || 0);
 
     // Cek stok
     if (totalPcs > barang.stok) {
@@ -135,8 +134,7 @@ export async function POST(
       item = await prisma.penjualanItem.update({
         where: { id: existingItem.id },
         data: {
-          jumlahDus: BigInt(jumlahDus),
-          jumlahPcs: BigInt(jumlahPcs),
+          totalItem: totalPcs,
           hargaJual,
           hargaBeli,
           diskonPerItem: BigInt(diskonPerItem || 0),
@@ -152,8 +150,7 @@ export async function POST(
         data: {
           penjualanId,
           barangId,
-          jumlahDus: BigInt(jumlahDus),
-          jumlahPcs: BigInt(jumlahPcs),
+          totalItem: totalPcs,
           hargaJual,
           hargaBeli,
           diskonPerItem: BigInt(diskonPerItem || 0),

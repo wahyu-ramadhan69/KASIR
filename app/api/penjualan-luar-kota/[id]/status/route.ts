@@ -144,22 +144,13 @@ export async function PATCH(
             perjalananSalesId: id,
           },
         },
-        include: {
-          barang: {
-            select: {
-              jumlahPerKemasan: true,
-            },
-          },
-        },
       });
 
       // Group by barangId dan hitung total terjual
       const terjualMap = new Map<number, number>();
 
       for (const item of penjualanItems) {
-        const totalPcs =
-          Number(item.jumlahDus) * Number(item.barang.jumlahPerKemasan) +
-          Number(item.jumlahPcs);
+        const totalPcs = Number(item.totalItem || 0);
         const current = terjualMap.get(item.barangId) || 0;
         terjualMap.set(item.barangId, current + totalPcs);
       }
@@ -257,7 +248,6 @@ export async function PATCH(
               select: {
                 id: true,
                 namaBarang: true,
-                satuan: true,
                 jumlahPerKemasan: true,
               },
             },

@@ -80,9 +80,7 @@ export async function POST(
         const barang = originalItem.barang;
         const totalReturPcs =
           BigInt(jumlahDus) * barang.jumlahPerKemasan + BigInt(jumlahPcs);
-        const totalBeliPcs =
-          originalItem.jumlahDus * barang.jumlahPerKemasan +
-          originalItem.jumlahPcs;
+        const totalBeliPcs = originalItem.totalItem;
 
         // Validasi jumlah retur tidak boleh lebih dari yang dibeli
         if (totalReturPcs > totalBeliPcs) {
@@ -138,10 +136,7 @@ export async function POST(
             BigInt(jumlahDus) * barang.jumlahPerKemasan + BigInt(jumlahPcs);
 
           // Hitung harga retur (proporsional)
-          const hargaPerPcs =
-            originalItem!.hargaJual /
-            (originalItem!.jumlahDus * barang.jumlahPerKemasan +
-              originalItem!.jumlahPcs);
+          const hargaPerPcs = originalItem!.hargaJual / originalItem!.totalItem;
           const totalHargaRetur = hargaPerPcs * totalReturPcs;
 
           // Update stok (kembalikan)
@@ -155,10 +150,9 @@ export async function POST(
           });
 
           // Update atau hapus item penjualan
-          const newJumlahDus = originalItem!.jumlahDus - BigInt(jumlahDus);
-          const newJumlahPcs = originalItem!.jumlahPcs - BigInt(jumlahPcs);
+          const newTotalPcs = originalItem!.totalItem - totalReturPcs;
 
-          if (newJumlahDus <= 0 && newJumlahPcs <= 0) {
+          if (newTotalPcs <= 0) {
             // Hapus item jika quantity jadi 0
             await tx.penjualanItem.delete({
               where: { id: originalItem!.id },
@@ -172,21 +166,15 @@ export async function POST(
             });
           } else {
             // Update quantity
-            const newTotalPcs =
-              newJumlahDus * barang.jumlahPerKemasan + newJumlahPcs;
             const newHargaJual = hargaPerPcs * newTotalPcs;
             const newHargaBeli =
-              (originalItem!.hargaBeli /
-                (originalItem!.jumlahDus * barang.jumlahPerKemasan +
-                  originalItem!.jumlahPcs)) *
-              newTotalPcs;
+              (originalItem!.hargaBeli / originalItem!.totalItem) * newTotalPcs;
             const newLaba = newHargaJual - newHargaBeli;
 
             await tx.penjualanItem.update({
               where: { id: originalItem!.id },
               data: {
-                jumlahDus: newJumlahDus,
-                jumlahPcs: newJumlahPcs,
+                totalItem: newTotalPcs,
                 hargaJual: newHargaJual,
                 hargaBeli: newHargaBeli,
                 laba: newLaba,
@@ -223,21 +211,13 @@ export async function POST(
           if (originalItem) {
             // Update item yang sudah ada
             const hargaPerPcs =
-              originalItem.hargaJual /
-              (originalItem.jumlahDus * barang!.jumlahPerKemasan +
-                originalItem.jumlahPcs);
+              originalItem.hargaJual / originalItem.totalItem;
 
-            const newJumlahDus = originalItem.jumlahDus + BigInt(jumlahDus);
-            const newJumlahPcs = originalItem.jumlahPcs + BigInt(jumlahPcs);
-            const newTotalPcs =
-              newJumlahDus * barang!.jumlahPerKemasan + newJumlahPcs;
+            const newTotalPcs = originalItem.totalItem + totalTambahPcs;
 
             const newHargaJual = hargaPerPcs * newTotalPcs;
             const newHargaBeli =
-              (originalItem.hargaBeli /
-                (originalItem.jumlahDus * barang!.jumlahPerKemasan +
-                  originalItem.jumlahPcs)) *
-              newTotalPcs;
+              (originalItem.hargaBeli / originalItem.totalItem) * newTotalPcs;
             const newLaba = newHargaJual - newHargaBeli;
 
             const totalHargaTambah = hargaPerPcs * totalTambahPcs;
@@ -245,8 +225,7 @@ export async function POST(
             await tx.penjualanItem.update({
               where: { id: originalItem.id },
               data: {
-                jumlahDus: newJumlahDus,
-                jumlahPcs: newJumlahPcs,
+                totalItem: newTotalPcs,
                 hargaJual: newHargaJual,
                 hargaBeli: newHargaBeli,
                 laba: newLaba,
@@ -271,8 +250,7 @@ export async function POST(
               data: {
                 penjualanId,
                 barangId,
-                jumlahDus: BigInt(jumlahDus),
-                jumlahPcs: BigInt(jumlahPcs),
+                totalItem: totalTambahPcs,
                 hargaJual,
                 hargaBeli,
                 diskonPerItem: BigInt(0),

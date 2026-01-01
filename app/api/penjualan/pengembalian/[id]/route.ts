@@ -137,7 +137,7 @@ export async function PUT(
       );
     }
 
-    const kondisi = kondisiBarang as string;
+    const kondisi = kondisiBarang as "BAIK" | "RUSAK" | "KADALUARSA";
     if (!["BAIK", "RUSAK", "KADALUARSA"].includes(kondisi)) {
       return NextResponse.json(
         { success: false, error: "Kondisi barang tidak valid" },

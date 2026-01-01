@@ -12,12 +12,19 @@ function bigIntToNumber(value: bigint | number): number {
   return value;
 }
 
-// Helper to serialize sales data with BigInt conversion
-function serializeSales(sales: any) {
+// Helper to serialize sales data with conversion
+function serializeSales(karyawan: any) {
   return {
-    ...sales,
-    limitHutang: bigIntToNumber(sales.limitHutang),
-    hutang: bigIntToNumber(sales.hutang),
+    id: karyawan.id,
+    namaSales: karyawan.nama,
+    nik: karyawan.nik,
+    alamat: karyawan.alamat,
+    noHp: karyawan.noHp,
+    limitHutang: bigIntToNumber(karyawan.totalPinjaman || 0),
+    hutang: bigIntToNumber(karyawan.sisaPinjaman || 0),
+    isActive: karyawan.isActive,
+    createdAt: karyawan.createdAt,
+    updatedAt: karyawan.updatedAt,
   };
 }
 
@@ -38,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // CEK JIKA NIK SUDAH TERDAFTAR
-    const exist = await prisma.sales.findUnique({
+    const exist = await prisma.karyawan.findUnique({
       where: { nik },
     });
 
@@ -50,17 +57,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert to BigInt for database
-    const limitHutangValue = limitHutang ? BigInt(limitHutang) : BigInt(0);
-    const hutangValue = hutang ? BigInt(hutang) : BigInt(0);
+    const limitHutangValue = limitHutang ? Number(limitHutang) : 0;
+    const hutangValue = hutang ? Number(hutang) : 0;
 
-    const sales = await prisma.sales.create({
+    const sales = await prisma.karyawan.create({
       data: {
         nik,
-        namaSales,
+        nama: namaSales,
         alamat,
         noHp,
-        limitHutang: limitHutangValue,
-        hutang: hutangValue,
+        jenis: "SALES",
+        gajiPokok: 0,
+        tunjanganMakan: 0,
+        totalPinjaman: limitHutangValue,
+        sisaPinjaman: hutangValue,
       },
     });
 
@@ -97,11 +107,13 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Get total count
-    const totalCount = await prisma.sales.count();
+    const totalCount = await prisma.karyawan.count({
+      where: { jenis: "SALES", isActive: true },
+    });
 
     // Get sales with pagination
-    const sales = await prisma.sales.findMany({
-      where: { isActive: true },
+    const sales = await prisma.karyawan.findMany({
+      where: { jenis: "SALES", isActive: true },
       orderBy: { id: "desc" },
       skip,
       take: limit,

@@ -134,18 +134,10 @@ export async function PUT(
       body.totalItem !== undefined && body.totalItem !== null
         ? Number(body.totalItem)
         : null;
-    const nextJumlahDus =
-      body.jumlahDus !== undefined
-        ? Number(body.jumlahDus)
-        : toNumber(item.jumlahDus);
-    const nextJumlahPcs =
-      body.jumlahPcs !== undefined
-        ? Number(body.jumlahPcs)
-        : toNumber(item.jumlahPcs);
     const totalPcsNeeded =
       incomingTotalItem !== null
         ? incomingTotalItem
-        : nextJumlahDus * jumlahPerKemasan + nextJumlahPcs;
+        : toNumber(item.totalItem);
 
     updateData.totalItem = BigInt(totalPcsNeeded);
 

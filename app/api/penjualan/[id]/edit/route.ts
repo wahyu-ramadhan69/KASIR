@@ -127,7 +127,9 @@ const calculatePenjualan = (items: any[], diskonNota: number = 0) => {
     );
     const hargaTotal = hargaJual * jumlahDus;
     const hargaPcs =
-      jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
+      jumlahPcs > 0
+        ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
+        : 0;
     const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
     const diskon = diskonPerItem * jumlahDus;
 
@@ -223,7 +225,7 @@ export async function POST(
       penjualan.items.map((item) => [item.id, item])
     );
 
-    const barangIds = Array.from(
+    const barangIds: number[] = Array.from(
       new Set(itemsPayload.map((item: any) => Number(item.barangId)))
     );
 
@@ -501,8 +503,7 @@ export async function POST(
 
       const kembalian =
         jumlahDibayar >= totalHarga ? jumlahDibayar - totalHarga : 0;
-      const statusPembayaran =
-        jumlahDibayar >= totalHarga ? "LUNAS" : "HUTANG";
+      const statusPembayaran = jumlahDibayar >= totalHarga ? "LUNAS" : "HUTANG";
       const sisaHutang =
         statusPembayaran === "HUTANG" ? totalHarga - jumlahDibayar : 0;
 
@@ -717,14 +718,12 @@ export async function POST(
             piutang: toNumber(updated.customer.piutang),
             limit_piutang: toNumber(updated.customer.limit_piutang),
           }
-        : { nama: nextNamaCustomer, namaToko: null },
+        : { nama: null, namaToko: null },
       karyawan: updated.karyawan
         ? {
             id: updated.karyawan.id,
             nama: updated.karyawan.nama,
           }
-        : updated.namaSales
-        ? { nama: updated.namaSales }
         : null,
       items: updated.items.map((item) => ({
         namaBarang: item.barang.namaBarang,
@@ -785,11 +784,9 @@ export async function POST(
       err?.message === "Item penjualan tidak ditemukan"
         ? err.message
         : "Gagal mengupdate penjualan";
-    const status = err?.message === "Item penjualan tidak ditemukan" ? 404 : 500;
-    return NextResponse.json(
-      { success: false, error: message },
-      { status }
-    );
+    const status =
+      err?.message === "Item penjualan tidak ditemukan" ? 404 : 500;
+    return NextResponse.json({ success: false, error: message }, { status });
   } finally {
     await prisma.$disconnect();
   }

@@ -43,8 +43,6 @@ export async function GET(
               select: {
                 id: true,
                 namaBarang: true,
-                satuan: true,
-                ukuran: true,
                 jumlahPerKemasan: true,
                 jenisKemasan: true,
                 hargaBeli: true,
@@ -82,8 +80,6 @@ export async function GET(
               select: {
                 id: true,
                 namaBarang: true,
-                satuan: true,
-                ukuran: true,
                 jumlahPerKemasan: true,
                 jenisKemasan: true,
               },
@@ -282,8 +278,6 @@ export async function PATCH(
               select: {
                 id: true,
                 namaBarang: true,
-                satuan: true,
-                ukuran: true,
                 jumlahPerKemasan: true,
                 jenisKemasan: true,
               },

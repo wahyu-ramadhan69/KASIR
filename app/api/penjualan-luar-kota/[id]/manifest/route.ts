@@ -145,8 +145,6 @@ export async function PATCH(
               select: {
                 id: true,
                 namaBarang: true,
-                satuan: true,
-                ukuran: true,
                 jumlahPerKemasan: true,
                 jenisKemasan: true,
                 hargaBeli: true,

@@ -141,7 +141,7 @@ export async function POST(
       pembelian.items.map((item) => [item.id, item])
     );
 
-    const barangIds = Array.from(
+    const barangIds: number[] = Array.from(
       new Set(itemsPayload.map((item: any) => Number(item.barangId)))
     );
 
@@ -248,7 +248,9 @@ export async function POST(
           return NextResponse.json(
             {
               success: false,
-              error: `Stok ${barang.namaBarang} tidak cukup untuk dikurangi. Tersedia: ${stokTersedia} pcs, Dibutuhkan: ${Math.abs(
+              error: `Stok ${
+                barang.namaBarang
+              } tidak cukup untuk dikurangi. Tersedia: ${stokTersedia} pcs, Dibutuhkan: ${Math.abs(
                 deltaQty
               )} pcs`,
             },
@@ -278,8 +280,10 @@ export async function POST(
     }, 0);
 
     const totalHarga = subtotal - diskonNota;
-    const kembalian = jumlahDibayar > totalHarga ? jumlahDibayar - totalHarga : 0;
-    const sisaHutang = jumlahDibayar < totalHarga ? totalHarga - jumlahDibayar : 0;
+    const kembalian =
+      jumlahDibayar > totalHarga ? jumlahDibayar - totalHarga : 0;
+    const sisaHutang =
+      jumlahDibayar < totalHarga ? totalHarga - jumlahDibayar : 0;
     const statusPembayaran = jumlahDibayar >= totalHarga ? "LUNAS" : "HUTANG";
 
     if (statusPembayaran === "HUTANG") {
