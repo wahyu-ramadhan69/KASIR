@@ -6,11 +6,13 @@ import {
   ArrowLeft,
   Calendar,
   Check,
+  Edit,
   Eye,
   Loader2,
   Package,
   RefreshCw,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
@@ -99,6 +101,10 @@ const RiwayatPengembalianPage = () => {
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [selectedPengembalian, setSelectedPengembalian] =
     useState<PengembalianBarang | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [deleteTarget, setDeleteTarget] =
+    useState<PengembalianBarang | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const [stats, setStats] = useState({
     totalPengembalian: 0,
@@ -258,6 +264,39 @@ const RiwayatPengembalianPage = () => {
   const handleViewDetail = (pengembalian: PengembalianBarang) => {
     setSelectedPengembalian(pengembalian);
     setShowDetailModal(true);
+  };
+
+  const handleOpenDelete = (pengembalian: PengembalianBarang) => {
+    setDeleteTarget(pengembalian);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/penjualan/pengembalian/${deleteTarget.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Pengembalian berhasil dihapus");
+        setShowDeleteModal(false);
+        setDeleteTarget(null);
+        fetchPengembalian(1, true);
+        fetchStats();
+      } else {
+        toast.error(data.error || "Gagal menghapus pengembalian");
+      }
+    } catch (error) {
+      console.error("Error deleting pengembalian:", error);
+      toast.error("Gagal menghapus pengembalian");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const formatDate = (dateString: string): string => {
@@ -592,13 +631,29 @@ const RiwayatPengembalianPage = () => {
                             {truncateText(item.keterangan, 25)}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-center">
-                            <button
-                              onClick={() => handleViewDetail(item)}
-                              className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
-                              title="Lihat Detail"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => handleViewDetail(item)}
+                                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
+                                title="Lihat Detail"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <Link
+                                href={`/dashboard/admin/penjualan/pengembalian?edit=${item.id}`}
+                                className="p-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-all"
+                                title="Edit Pengembalian"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Link>
+                              <button
+                                onClick={() => handleOpenDelete(item)}
+                                className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
+                                title="Hapus Pengembalian"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -717,6 +772,70 @@ const RiwayatPengembalianPage = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showDeleteModal && deleteTarget && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full overflow-hidden">
+              <div className="bg-gradient-to-r from-red-600 to-red-700 p-5 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-white">
+                  <Trash2 className="w-5 h-5" />
+                  <h2 className="text-lg font-bold">Hapus Pengembalian</h2>
+                </div>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
+                  disabled={deleting}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+                  <p className="font-semibold mb-1">
+                    Data pengembalian akan dihapus permanen.
+                  </p>
+                  <p>
+                    Barang:{" "}
+                    <span className="font-semibold">
+                      {deleteTarget.barang?.namaBarang || "-"}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs text-red-600">
+                    Tanggal: {formatDate(deleteTarget.tanggalPengembalian)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-5 bg-gray-50 border-t border-gray-200 flex gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                  className="flex-1 bg-white hover:bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg font-semibold transition-all border border-gray-300 disabled:opacity-60"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {deleting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Menghapus...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Ya, Hapus
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

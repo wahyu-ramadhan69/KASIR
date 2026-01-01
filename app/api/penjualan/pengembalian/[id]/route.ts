@@ -52,11 +52,9 @@ export async function GET(
           select: {
             id: true,
             namaBarang: true,
-            satuan: true,
             jumlahPerKemasan: true,
             hargaJual: true,
             jenisKemasan: true,
-            ukuran: true,
             stok: true,
           },
         },
@@ -269,7 +267,6 @@ export async function PUT(
             select: {
               id: true,
               namaBarang: true,
-              satuan: true,
               jumlahPerKemasan: true,
             },
           },
@@ -288,6 +285,90 @@ export async function PUT(
     console.error("Error updating pengembalian:", error);
     return NextResponse.json(
       { success: false, error: "Gagal memperbarui data pengembalian" },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authData = await getAuthData();
+  if (!authData) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    const pengembalianId = Number(id);
+    if (!Number.isFinite(pengembalianId)) {
+      return NextResponse.json(
+        { success: false, error: "ID tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.pengembalianBarang.findUnique({
+      where: { id: pengembalianId },
+      include: {
+        barang: {
+          select: {
+            id: true,
+            jumlahPerKemasan: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Data pengembalian tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    const roleUpper = authData.role?.toUpperCase();
+    const userId = Number(authData.userId);
+    const shouldFilterByUser = roleUpper !== "ADMIN" && !Number.isNaN(userId);
+    if (shouldFilterByUser && existing.userId !== userId) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
+    const jumlahPerDus = toNumber(existing.barang?.jumlahPerKemasan);
+    const totalPcs = Math.max(
+      0,
+      toNumber(existing.jumlahDus) * jumlahPerDus + toNumber(existing.jumlahPcs)
+    );
+
+    const stockUpdates: any[] = [];
+    if (existing.kondisiBarang === "BAIK" && totalPcs > 0) {
+      stockUpdates.push(
+        prisma.barang.update({
+          where: { id: existing.barangId },
+          data: { stok: { decrement: BigInt(totalPcs) } },
+        })
+      );
+    }
+
+    await prisma.$transaction([
+      ...stockUpdates,
+      prisma.pengembalianBarang.delete({ where: { id: pengembalianId } }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      message: "Pengembalian berhasil dihapus",
+    });
+  } catch (error) {
+    console.error("Error deleting pengembalian:", error);
+    return NextResponse.json(
+      { success: false, error: "Gagal menghapus data pengembalian" },
       { status: 500 }
     );
   } finally {
