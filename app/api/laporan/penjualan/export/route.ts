@@ -247,6 +247,8 @@ async function generateSummaryReport(
           barang: {
             select: {
               jumlahPerKemasan: true,
+              berat: true,
+              jenisKemasan: true,
             },
           },
         },
@@ -256,7 +258,7 @@ async function generateSummaryReport(
   const userNameById = await buildUserNameMap(penjualanList);
 
   // Title
-  worksheet.mergeCells("A1:N1");
+  worksheet.mergeCells("A1:P1");
   const titleCell = worksheet.getCell("A1");
   titleCell.value = "LAPORAN PENJUALAN";
   titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
@@ -269,7 +271,7 @@ async function generateSummaryReport(
   worksheet.getRow(1).height = 30;
 
   // Periode
-  worksheet.mergeCells("A2:N2");
+  worksheet.mergeCells("A2:P2");
   const periodeCell = worksheet.getCell("A2");
   periodeCell.value = `Periode: ${formatDateRange(
     filters.startDate || undefined,
@@ -279,7 +281,7 @@ async function generateSummaryReport(
   periodeCell.alignment = { horizontal: "center" };
 
   // Total transaksi
-  worksheet.mergeCells("A3:N3");
+  worksheet.mergeCells("A3:P3");
   const totalCell = worksheet.getCell("A3");
   totalCell.value = `Total Transaksi: ${penjualanList.length}`;
   totalCell.font = { bold: true };
@@ -292,15 +294,17 @@ async function generateSummaryReport(
     "Status Penjualan",
     "Tanggal",
     "Customer",
-    "Dus",
+    "QTY Kemasan",
+    "QTY Total Item",
     "Tipe Penjualan",
+    "Metode Pembayaran",
     "PIC Penjualan",
-    "Pcs",
     "Total Penjualan",
     "Modal",
     "Laba",
     "Margin %",
     "Status",
+    "Total Berat (kg)",
   ];
   const headerRow = worksheet.getRow(5);
   headers.forEach((header, index) => {
@@ -327,37 +331,52 @@ async function generateSummaryReport(
   worksheet.getColumn(3).width = 18;
   worksheet.getColumn(4).width = 12;
   worksheet.getColumn(5).width = 20;
-  worksheet.getColumn(6).width = 8;
-  worksheet.getColumn(7).width = 14;
-  worksheet.getColumn(8).width = 18;
-  worksheet.getColumn(9).width = 15;
-  worksheet.getColumn(10).width = 15;
+  worksheet.getColumn(6).width = 14;
+  worksheet.getColumn(7).width = 16;
+  worksheet.getColumn(8).width = 14;
+  worksheet.getColumn(9).width = 16;
+  worksheet.getColumn(10).width = 18;
   worksheet.getColumn(11).width = 15;
-  worksheet.getColumn(12).width = 10;
-  worksheet.getColumn(13).width = 10;
-  worksheet.getColumn(14).width = 12;
+  worksheet.getColumn(12).width = 15;
+  worksheet.getColumn(13).width = 15;
+  worksheet.getColumn(14).width = 10;
+  worksheet.getColumn(15).width = 10;
+  worksheet.getColumn(16).width = 14;
 
   // Data rows
   let currentRow = 6;
   let grandTotalPenjualan = 0;
   let grandTotalModal = 0;
   let grandTotalLaba = 0;
-  let grandTotalDus = 0;
+  let grandTotalKemasan = 0;
   let grandTotalPcs = 0;
+  let grandTotalBeratGrams = 0;
 
   penjualanList.forEach((penjualan, index) => {
-    const totalDus = penjualan.items.reduce((sum, item) => {
+    const totalKemasan = penjualan.items.reduce((sum, item) => {
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       const totalPcsItem = getTotalItemPcs(item, jumlahPerKemasan);
-      const { jumlahDus } = deriveDusPcsFromTotal(
-        totalPcsItem,
-        jumlahPerKemasan
-      );
-      return sum + jumlahDus;
+      const perKemasan = Math.max(1, jumlahPerKemasan);
+      return sum + totalPcsItem / perKemasan;
     }, 0);
+    const kemasanLabels = new Set(
+      penjualan.items
+        .map((item) => item.barang?.jenisKemasan?.toLowerCase())
+        .filter((label): label is string => Boolean(label))
+    );
+    const kemasanLabel =
+      kemasanLabels.size === 1
+        ? Array.from(kemasanLabels)[0]
+        : "kemasan";
     const totalPcs = penjualan.items.reduce((sum, item) => {
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       return sum + getTotalItemPcs(item, jumlahPerKemasan);
+    }, 0);
+    const totalBeratGrams = penjualan.items.reduce((sum, item) => {
+      const beratPerItem = toNumber(item.barang.berat);
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+      const totalPcsItem = getTotalItemPcs(item, jumlahPerKemasan);
+      return sum + beratPerItem * totalPcsItem;
     }, 0);
 
     const totalModal = penjualan.items.reduce((sum, item) => {
@@ -388,8 +407,9 @@ async function generateSummaryReport(
     grandTotalPenjualan += penjualanAmount;
     grandTotalModal += totalModal;
     grandTotalLaba += totalLaba;
-    grandTotalDus += totalDus;
+    grandTotalKemasan += totalKemasan;
     grandTotalPcs += totalPcs;
+    grandTotalBeratGrams += totalBeratGrams;
 
     const row = worksheet.getRow(currentRow);
     row.getCell(1).value = index + 1;
@@ -400,24 +420,26 @@ async function generateSummaryReport(
     ).toLocaleDateString("id-ID");
     row.getCell(5).value = getCustomerOrSalesName(penjualan);
 
-    row.getCell(6).value = totalDus;
-    row.getCell(7).value = getCustomerType(penjualan);
-    row.getCell(8).value = getPicPenjualan(penjualan, userNameById);
-    row.getCell(9).value = totalPcs;
-    row.getCell(10).value = penjualanAmount;
-    row.getCell(11).value = totalModal;
-    row.getCell(12).value = totalLaba;
-    row.getCell(13).value = margin;
-    row.getCell(14).value = penjualan.statusPembayaran;
+    row.getCell(6).value = `${Number(totalKemasan.toFixed(2))} ${kemasanLabel}`;
+    row.getCell(7).value = `${totalPcs} item`;
+    row.getCell(8).value = getCustomerType(penjualan);
+    row.getCell(9).value = penjualan.metodePembayaran || "-";
+    row.getCell(10).value = getPicPenjualan(penjualan, userNameById);
+    row.getCell(11).value = penjualanAmount;
+    row.getCell(12).value = totalModal;
+    row.getCell(13).value = totalLaba;
+    row.getCell(14).value = margin;
+    row.getCell(15).value = penjualan.statusPembayaran;
+    row.getCell(16).value = formatKgDisplay(totalBeratGrams);
 
     // Format
-    row.getCell(10).numFmt = "#,##0";
     row.getCell(11).numFmt = "#,##0";
     row.getCell(12).numFmt = "#,##0";
-    row.getCell(13).numFmt = "0.00";
+    row.getCell(13).numFmt = "#,##0";
+    row.getCell(14).numFmt = "0.00";
 
     // Borders
-    for (let i = 1; i <= 14; i++) {
+    for (let i = 1; i <= 16; i++) {
       row.getCell(i).border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -432,17 +454,18 @@ async function generateSummaryReport(
   // Grand total row
   const totalRow = worksheet.getRow(currentRow);
   totalRow.getCell(1).value = "TOTAL";
-  totalRow.getCell(6).value = grandTotalDus;
-  totalRow.getCell(9).value = grandTotalPcs;
-  totalRow.getCell(10).value = grandTotalPenjualan;
-  totalRow.getCell(11).value = grandTotalModal;
-  totalRow.getCell(12).value = grandTotalLaba;
-  totalRow.getCell(13).value =
+  totalRow.getCell(6).value = `${Number(grandTotalKemasan.toFixed(2))} kemasan`;
+  totalRow.getCell(7).value = `${grandTotalPcs} item`;
+  totalRow.getCell(11).value = grandTotalPenjualan;
+  totalRow.getCell(12).value = grandTotalModal;
+  totalRow.getCell(13).value = grandTotalLaba;
+  totalRow.getCell(14).value =
     grandTotalPenjualan > 0 ? (grandTotalLaba / grandTotalPenjualan) * 100 : 0;
+  totalRow.getCell(16).value = formatKgDisplay(grandTotalBeratGrams);
 
   totalRow.font = { bold: true };
   // Limit highlight to data columns only
-  for (let i = 1; i <= 14; i++) {
+  for (let i = 1; i <= 16; i++) {
     totalRow.getCell(i).fill = {
       type: "pattern",
       pattern: "solid",
@@ -450,12 +473,12 @@ async function generateSummaryReport(
     };
   }
 
-  totalRow.getCell(10).numFmt = "#,##0";
   totalRow.getCell(11).numFmt = "#,##0";
   totalRow.getCell(12).numFmt = "#,##0";
-  totalRow.getCell(13).numFmt = "0.00";
+  totalRow.getCell(13).numFmt = "#,##0";
+  totalRow.getCell(14).numFmt = "0.00";
 
-  for (let i = 1; i <= 14; i++) {
+  for (let i = 1; i <= 16; i++) {
     totalRow.getCell(i).border = {
       top: { style: "medium" },
       left: { style: "thin" },
@@ -1122,15 +1145,16 @@ async function generateYearlyReport(
         },
       },
       include: {
-        items: {
-          include: {
-            barang: {
-              select: {
-                jumlahPerKemasan: true,
-              },
+      items: {
+        include: {
+          barang: {
+            select: {
+              jumlahPerKemasan: true,
+              jenisKemasan: true,
             },
           },
         },
+      },
         karyawan: true,
       },
     });
