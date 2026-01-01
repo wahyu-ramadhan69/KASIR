@@ -464,7 +464,7 @@ async function generateLaporanPenjualan(
   });
 
   // Title
-  worksheet.mergeCells("A1:J1");
+  worksheet.mergeCells("A1:K1");
   const titleCell = worksheet.getCell("A1");
   titleCell.value = "LAPORAN PENJUALAN";
   titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
@@ -477,7 +477,7 @@ async function generateLaporanPenjualan(
   worksheet.getRow(1).height = 30;
 
   // Periode
-  worksheet.mergeCells("A2:J2");
+  worksheet.mergeCells("A2:K2");
   const periodeCell = worksheet.getCell("A2");
   periodeCell.value = `Periode: ${formatDateRange(
     startDate || undefined,
@@ -728,7 +728,7 @@ async function generateLaporanPembayaranPenjualan(
   );
 
   // Title
-  worksheet.mergeCells("A1:J1");
+  worksheet.mergeCells("A1:L1");
   const titleCell = worksheet.getCell("A1");
   titleCell.value = "LAPORAN PEMBAYARAN PENJUALAN";
   titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
@@ -741,7 +741,7 @@ async function generateLaporanPembayaranPenjualan(
   worksheet.getRow(1).height = 30;
 
   // Periode
-  worksheet.mergeCells("A2:J2");
+  worksheet.mergeCells("A2:L2");
   const periodeCell = worksheet.getCell("A2");
   periodeCell.value = `Periode: ${formatDateRange(
     startDate || undefined,
@@ -751,7 +751,7 @@ async function generateLaporanPembayaranPenjualan(
   periodeCell.alignment = { horizontal: "center" };
 
   // Total pembayaran
-  worksheet.mergeCells("A3:J3");
+  worksheet.mergeCells("A3:L3");
   const totalCell = worksheet.getCell("A3");
   totalCell.value = `Total Pembayaran: ${pembayaranList.length}`;
   totalCell.font = { bold: true };
@@ -766,6 +766,8 @@ async function generateLaporanPembayaranPenjualan(
     "Metode",
     "Jenis",
     "Nominal",
+    "Total Cash",
+    "Total Transfer",
     "Catatan",
     "Kasir",
   ];
@@ -796,11 +798,15 @@ async function generateLaporanPembayaranPenjualan(
   worksheet.getColumn(6).width = 14;
   worksheet.getColumn(7).width = 14;
   worksheet.getColumn(8).width = 16;
-  worksheet.getColumn(9).width = 24;
-  worksheet.getColumn(10).width = 18;
+  worksheet.getColumn(9).width = 16;
+  worksheet.getColumn(10).width = 16;
+  worksheet.getColumn(11).width = 24;
+  worksheet.getColumn(12).width = 18;
 
   let currentRow = 6;
   let totalNominal = 0;
+  let totalCash = 0;
+  let totalTransfer = 0;
 
   pembayaranList.forEach((pembayaran, index) => {
     const row = worksheet.getRow(currentRow);
@@ -817,14 +823,18 @@ async function generateLaporanPembayaranPenjualan(
     row.getCell(6).value = pembayaran.metode || "-";
     row.getCell(7).value = pembayaran.jenisPembayaran || "-";
     row.getCell(8).value = toNumber(pembayaran.nominal);
-    row.getCell(9).value = pembayaran.catatan || "-";
-    row.getCell(10).value = pembayaran.userId
+    row.getCell(9).value = toNumber(pembayaran.totalCash);
+    row.getCell(10).value = toNumber(pembayaran.totalTransfer);
+    row.getCell(11).value = pembayaran.catatan || "-";
+    row.getCell(12).value = pembayaran.userId
       ? userNameById.get(pembayaran.userId) || "-"
       : "-";
 
     row.getCell(8).numFmt = "#,##0";
+    row.getCell(9).numFmt = "#,##0";
+    row.getCell(10).numFmt = "#,##0";
 
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= 12; i++) {
       row.getCell(i).border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -834,15 +844,21 @@ async function generateLaporanPembayaranPenjualan(
     }
 
     totalNominal += toNumber(pembayaran.nominal);
+    totalCash += toNumber(pembayaran.totalCash);
+    totalTransfer += toNumber(pembayaran.totalTransfer);
     currentRow++;
   });
 
   const totalRow = worksheet.getRow(currentRow);
   totalRow.getCell(1).value = "TOTAL";
   totalRow.getCell(8).value = totalNominal;
+  totalRow.getCell(9).value = totalCash;
+  totalRow.getCell(10).value = totalTransfer;
   totalRow.getCell(8).numFmt = "#,##0";
+  totalRow.getCell(9).numFmt = "#,##0";
+  totalRow.getCell(10).numFmt = "#,##0";
   totalRow.font = { bold: true };
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 1; i <= 12; i++) {
     totalRow.getCell(i).fill = {
       type: "pattern",
       pattern: "solid",

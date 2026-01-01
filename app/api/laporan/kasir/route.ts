@@ -88,6 +88,15 @@ export async function GET(request: NextRequest) {
       _sum: { nominal: true },
     });
 
+    const pembayaranAgg = await prisma.pembayaranPenjualan.aggregate({
+      where: {
+        tanggalBayar: { gte: startDate, lte: endDate },
+        penjualan: { statusTransaksi: "SELESAI" },
+        ...(shouldFilterByUser ? { userId } : {}),
+      },
+      _sum: { totalCash: true, totalTransfer: true },
+    });
+
     const pengeluaranAgg = await prisma.pengeluaran.aggregate({
       where: {
         tanggalInput: { gte: startDate, lte: endDate },
@@ -129,6 +138,8 @@ export async function GET(request: NextRequest) {
 
     const totalPenjualan = Number(penjualanAgg._sum.nominal || 0);
     const totalPiutang = Number(piutangAgg._sum.nominal || 0);
+    const totalCash = Number(pembayaranAgg._sum.totalCash || 0);
+    const totalTransfer = Number(pembayaranAgg._sum.totalTransfer || 0);
     const totalPengeluaran = Number(pengeluaranAgg._sum.jumlah || 0);
     const totalKerugian = calcKerugian(pengembalianRusak);
     const totalSisaPiutang = piutangBelumDibayar.reduce((sum, item) => {
@@ -309,6 +320,8 @@ export async function GET(request: NextRequest) {
       { label: "Total Piutang Customer", value: totalSisaPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
       { label: "Kerugian", value: totalKerugian },
+      { label: "Total Cash", value: totalCash },
+      { label: "Total Transfer", value: totalTransfer },
       { label: "Setoran Akhir", value: totalSetoran },
     ];
 
