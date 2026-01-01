@@ -123,8 +123,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             namaBarang: true,
-            ukuran: true,
-            satuan: true,
+            berat: true,
             jumlahPerKemasan: true,
             jenisKemasan: true,
           },
@@ -137,8 +136,7 @@ export async function GET(request: NextRequest) {
       {
         barangId: number;
         namaBarang: string;
-        ukuran: number;
-        satuan: string;
+        berat: number;
         jumlahPerKemasan: number;
         jenisKemasan: string;
         totalDus: number; // total kemasan terjual (sudah termasuk konversi pcs ke kemasan)
@@ -184,8 +182,7 @@ export async function GET(request: NextRequest) {
         barangMap.set(item.barangId, {
           barangId: item.barangId,
           namaBarang: item.barang.namaBarang,
-          ukuran: toNumber(item.barang.ukuran),
-          satuan: item.barang.satuan,
+          berat: toNumber(item.barang.berat),
           jumlahPerKemasan,
           jenisKemasan: item.barang.jenisKemasan,
           totalDus: 0,

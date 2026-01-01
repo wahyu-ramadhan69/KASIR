@@ -43,13 +43,13 @@ interface Barang {
   jumlahPerKemasan: number;
   ukuran: number;
   satuan: string;
+  jenisKemasan: string;
 }
 
 interface PenjualanItem {
   id: number;
   barangId: number;
-  jumlahDus: number;
-  jumlahPcs: number;
+  totalItem: number;
   hargaJual: number;
   diskonPerItem: number;
   barang: Barang;
@@ -66,7 +66,7 @@ interface PenjualanHeader {
   totalHarga: number;
   jumlahDibayar: number;
   kembalian: number;
-  metodePembayaran: "CASH" | "TRANSFER";
+  metodePembayaran: "CASH" | "TRANSFER" | "CASH_TRANSFER";
   statusPembayaran: "LUNAS" | "HUTANG";
   statusTransaksi: "KERANJANG" | "SELESAI" | "DIBATALKAN";
   tanggalTransaksi: string;
@@ -133,6 +133,18 @@ const getJatuhTempoStatus = (tanggalJatuhTempo: string) => {
   }
 };
 
+const formatMetodePembayaranLabel = (
+  metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+) => {
+  return metode === "CASH_TRANSFER" ? "CASH + TRANSFER" : metode;
+};
+
+const getMetodeBadgeClass = (metode: "CASH" | "TRANSFER" | "CASH_TRANSFER") => {
+  if (metode === "CASH") return "bg-green-100 text-green-700";
+  if (metode === "TRANSFER") return "bg-purple-100 text-purple-700";
+  return "bg-blue-100 text-blue-700";
+};
+
 const RiwayatPenjualanPage = () => {
   // Data state
   const [penjualanList, setPenjualanList] = useState<PenjualanHeader[]>([]);
@@ -168,6 +180,9 @@ const RiwayatPenjualanPage = () => {
   const [pelunasanPenjualan, setPelunasanPenjualan] =
     useState<PenjualanHeader | null>(null);
   const [jumlahBayar, setJumlahBayar] = useState<string>("");
+  const [metodeBayar, setMetodeBayar] = useState<
+    "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  >("CASH");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Ubah Jatuh Tempo modal
@@ -415,6 +430,7 @@ const RiwayatPenjualanPage = () => {
     setPelunasanPenjualan(penjualan);
     const sisaHutang = penjualan.totalHarga - penjualan.jumlahDibayar;
     setJumlahBayar(sisaHutang.toString());
+    setMetodeBayar(penjualan.metodePembayaran || "CASH");
     setShowPelunasanModal(true);
   };
 
@@ -428,7 +444,10 @@ const RiwayatPenjualanPage = () => {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jumlahBayar: parseInt(jumlahBayar) }),
+          body: JSON.stringify({
+            jumlahBayar: parseInt(jumlahBayar),
+            metodePembayaran: metodeBayar,
+          }),
         }
       );
       const data = await res.json();
@@ -797,13 +816,11 @@ const RiwayatPenjualanPage = () => {
                               {pj.kodePenjualan}
                             </p>
                             <span
-                              className={`text-xs px-1.5 py-0.5 rounded ${
-                                pj.metodePembayaran === "CASH"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-purple-100 text-purple-700"
-                              }`}
+                              className={`text-xs px-1.5 py-0.5 rounded ${getMetodeBadgeClass(
+                                pj.metodePembayaran
+                              )}`}
                             >
-                              {pj.metodePembayaran}
+                              {formatMetodePembayaranLabel(pj.metodePembayaran)}
                             </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
@@ -1049,13 +1066,13 @@ const RiwayatPenjualanPage = () => {
                           </span>
                         )}
                         <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            selectedPenjualan.metodePembayaran === "CASH"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-purple-100 text-purple-700"
-                          }`}
+                          className={`px-2 py-1 rounded text-xs font-medium ${getMetodeBadgeClass(
+                            selectedPenjualan.metodePembayaran
+                          )}`}
                         >
-                          {selectedPenjualan.metodePembayaran}
+                          {formatMetodePembayaranLabel(
+                            selectedPenjualan.metodePembayaran
+                          )}
                         </span>
                       </div>
                     </div>
@@ -1107,18 +1124,25 @@ const RiwayatPenjualanPage = () => {
                     </thead>
                     <tbody className="divide-y">
                       {selectedPenjualan.items?.map((item) => {
-                        const hargaPcs =
-                          item.jumlahPcs > 0
-                            ? Math.round(
-                                (item.hargaJual /
-                                  item.barang.jumlahPerKemasan) *
-                                  item.jumlahPcs
-                              )
-                            : 0;
+                        const jumlahPerKemasan = Math.max(
+                          1,
+                          item.barang?.jumlahPerKemasan || 1
+                        );
+                        const totalItem = Math.max(
+                          0,
+                          Number(item.totalItem || 0)
+                        );
+                        const jumlahDus = Math.floor(
+                          totalItem / jumlahPerKemasan
+                        );
+                        const jumlahPcs = totalItem % jumlahPerKemasan;
+                        const hargaPcs = Math.round(
+                          (item.hargaJual / jumlahPerKemasan) * jumlahPcs
+                        );
                         const subtotal =
-                          item.hargaJual * item.jumlahDus +
+                          item.hargaJual * jumlahDus +
                           hargaPcs -
-                          item.diskonPerItem * item.jumlahDus;
+                          item.diskonPerItem * jumlahDus;
 
                         return (
                           <tr key={item.id}>
@@ -1127,28 +1151,35 @@ const RiwayatPenjualanPage = () => {
                                 {item.barang?.namaBarang}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {item.barang?.jumlahPerKemasan} pcs/dus
+                                {item.barang?.jumlahPerKemasan}{" "}
+                                {item.barang?.jenisKemasan}
                               </p>
                             </td>
                             <td className="px-3 py-2 text-center">
-                              {item.jumlahDus > 0 && (
+                              {jumlahDus > 0 && (
                                 <span className="block">
-                                  {item.jumlahDus} dus
+                                  {jumlahDus} {item.barang?.jenisKemasan}
                                 </span>
                               )}
-                              {item.jumlahPcs > 0 && (
+                              {jumlahPcs > 0 && (
                                 <span className="block text-gray-500">
-                                  +{item.jumlahPcs} pcs
+                                  +{jumlahPcs} item
+                                </span>
+                              )}
+                              {jumlahDus === 0 && jumlahPcs === 0 && (
+                                <span className="block text-gray-500">
+                                  0 pcs
                                 </span>
                               )}
                             </td>
                             <td className="px-3 py-2 text-right">
-                              {formatRupiah(item.hargaJual)}/dus
+                              {formatRupiah(item.hargaJual)} /
+                              {item.barang?.jenisKemasan}
                             </td>
                             <td className="px-3 py-2 text-right text-red-500">
                               {item.diskonPerItem > 0
                                 ? `-${formatRupiah(
-                                    item.diskonPerItem * item.jumlahDus
+                                    item.diskonPerItem * jumlahDus
                                   )}`
                                 : "-"}
                             </td>
@@ -1333,6 +1364,39 @@ const RiwayatPenjualanPage = () => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-lg"
                     placeholder="Masukkan jumlah pembayaran"
                   />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Metode Pembayaran <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: "CASH", label: "Cash" },
+                      { value: "TRANSFER", label: "Transfer" },
+                      { value: "CASH_TRANSFER", label: "Cash + Transfer" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setMetodeBayar(
+                            option.value as
+                              | "CASH"
+                              | "TRANSFER"
+                              | "CASH_TRANSFER"
+                          )
+                        }
+                        className={`px-3 py-2 rounded-lg border text-sm font-semibold transition-all ${
+                          metodeBayar === option.value
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-emerald-300"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Quick Amount */}

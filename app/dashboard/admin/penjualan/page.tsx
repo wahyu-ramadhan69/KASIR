@@ -95,7 +95,7 @@ interface PenjualanHeader {
   totalHarga: number;
   jumlahDibayar: number;
   kembalian: number;
-  metodePembayaran: "CASH" | "TRANSFER";
+  metodePembayaran: "CASH" | "TRANSFER" | "CASH_TRANSFER";
   statusPembayaran: "LUNAS" | "HUTANG";
   statusTransaksi: "KERANJANG" | "SELESAI" | "DIBATALKAN";
   tanggalTransaksi: string;
@@ -157,6 +157,12 @@ const calculateBeratGramsFromBarang = (
   return beratPerItem * totalPcs;
 };
 
+const formatMetodePembayaranLabel = (
+  metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+) => {
+  return metode === "CASH_TRANSFER" ? "CASH + TRANSFER" : metode;
+};
+
 const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -190,9 +196,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     "rupiah"
   );
   const [jumlahDibayar, setJumlahDibayar] = useState<string>("");
-  const [metodePembayaran, setMetodePembayaran] = useState<"CASH" | "TRANSFER">(
-    "CASH"
-  );
+  const [metodePembayaran, setMetodePembayaran] = useState<
+    "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  >("CASH");
   const [tanggalTransaksi, setTanggalTransaksi] = useState<string>("");
   const [tanggalJatuhTempo, setTanggalJatuhTempo] = useState<string>("");
 
@@ -2150,7 +2156,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                     Metode Pembayaran
                   </label>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setMetodePembayaran("CASH")}
                     className={`py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 border-2 ${
@@ -2172,6 +2178,17 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   >
                     <CreditCard className="w-5 h-5" />
                     Transfer
+                  </button>
+                  <button
+                    onClick={() => setMetodePembayaran("CASH_TRANSFER")}
+                    className={`py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 border-2 ${
+                      metodePembayaran === "CASH_TRANSFER"
+                        ? "bg-slate-800 border-slate-800 text-white"
+                        : "bg-white border-slate-300 text-slate-700 hover:border-slate-400"
+                    }`}
+                  >
+                    <CreditCard className="w-5 h-5" />
+                    Cash + Transfer
                   </button>
                 </div>
               </div>
@@ -2392,10 +2409,14 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                     className={`px-2 py-0.5 rounded text-xs font-medium ${
                       receiptData.metodePembayaran === "CASH"
                         ? "bg-green-100 text-green-700"
-                        : "bg-purple-100 text-purple-700"
+                        : receiptData.metodePembayaran === "TRANSFER"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-blue-100 text-blue-700"
                     }`}
                   >
-                    {receiptData.metodePembayaran}
+                    {formatMetodePembayaranLabel(
+                      receiptData.metodePembayaran
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between">

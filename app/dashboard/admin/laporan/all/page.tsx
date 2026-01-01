@@ -21,7 +21,7 @@ const getDefaultEndDate = (): string => toInputDate(new Date());
 
 const getDefaultStartDate = (): string => {
   const start = new Date();
-  start.setMonth(start.getMonth() - 3);
+  start.setMonth(start.getMonth() - 1);
   return toInputDate(start);
 };
 
@@ -116,7 +116,7 @@ const LaporanLengkapPage = () => {
       </div>
 
       {/* Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-purple-500">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
@@ -129,13 +129,27 @@ const LaporanLengkapPage = () => {
           </div>
         </div>
 
+        <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-emerald-500">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+              <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Sheet 2</p>
+              <p className="font-semibold text-gray-900">
+                Pembayaran Penjualan
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-blue-500">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
               <ShoppingCart className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Sheet 2</p>
+              <p className="text-sm text-gray-500">Sheet 3</p>
               <p className="font-semibold text-gray-900">Laporan Pembelian</p>
             </div>
           </div>
@@ -147,7 +161,7 @@ const LaporanLengkapPage = () => {
               <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Sheet 3</p>
+              <p className="text-sm text-gray-500">Sheet 4</p>
               <p className="font-semibold text-gray-900">Laporan Penjualan</p>
             </div>
           </div>

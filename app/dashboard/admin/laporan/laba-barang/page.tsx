@@ -17,8 +17,7 @@ import toast, { Toaster } from "react-hot-toast";
 type BarangLaba = {
   barangId: number;
   namaBarang: string;
-  ukuran: number;
-  satuan: string;
+  berat: number;
   jumlahPerKemasan: number;
   jenisKemasan: string;
   totalDus: number;
@@ -65,6 +64,12 @@ const formatDate = (dateString: string): string =>
     year: "numeric",
   });
 
+const formatBeratKg = (grams: number): string => {
+  const kg = Number(grams || 0) / 1000;
+  const trimmed = kg.toFixed(3).replace(/\.?0+$/, "");
+  return trimmed.replace(".", ",");
+};
+
 const LaporanLabaBarangPage = () => {
   const [data, setData] = useState<BarangLaba[]>([]);
   const [summary, setSummary] = useState<Summary>({
@@ -101,7 +106,7 @@ const LaporanLabaBarangPage = () => {
     if (!searchTerm.trim()) return data;
     const term = searchTerm.toLowerCase();
     return data.filter((item) =>
-      `${item.namaBarang} ${item.ukuran} ${item.satuan}`
+      `${item.namaBarang} ${formatBeratKg(item.berat)}`
         .toLowerCase()
         .includes(term)
     );
@@ -442,7 +447,7 @@ const LaporanLabaBarangPage = () => {
                             {item.namaBarang}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {item.ukuran} {item.satuan} /{" "}
+                            {formatBeratKg(item.berat)} kg /{" "}
                             {item.jumlahPerKemasan} item/
                             {item.jenisKemasan.toLowerCase()}
                           </p>

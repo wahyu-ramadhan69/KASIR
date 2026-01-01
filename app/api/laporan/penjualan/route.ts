@@ -133,12 +133,18 @@ export async function GET(request: NextRequest) {
     let totalPenjualan = 0;
     let totalModal = 0;
     let totalLaba = 0;
+    let totalDibayar = 0;
+    let totalSisaHutang = 0;
     let jumlahItem = 0;
     let totalDus = 0;
     let totalPcs = 0;
 
     penjualanList.forEach((penjualan) => {
       totalPenjualan += toNumber(penjualan.totalHarga);
+      const subtotal = toNumber(penjualan.subtotal);
+      const dibayar = toNumber(penjualan.jumlahDibayar);
+      totalDibayar += dibayar;
+      totalSisaHutang += Math.max(0, subtotal - dibayar);
 
       penjualan.items.forEach((item) => {
         const hargaBeli = toNumber(item.hargaBeli);
@@ -194,12 +200,18 @@ export async function GET(request: NextRequest) {
     let totalPenjualanAll = 0;
     let totalModalAll = 0;
     let totalLabaAll = 0;
+    let totalDibayarAll = 0;
+    let totalSisaHutangAll = 0;
     let jumlahItemAll = 0;
     let totalDusAll = 0;
     let totalPcsAll = 0;
 
     allPenjualan.forEach((penjualan) => {
       totalPenjualanAll += toNumber(penjualan.totalHarga);
+      const subtotal = toNumber(penjualan.subtotal);
+      const dibayar = toNumber(penjualan.jumlahDibayar);
+      totalDibayarAll += dibayar;
+      totalSisaHutangAll += Math.max(0, subtotal - dibayar);
 
       penjualan.items.forEach((item) => {
         const hargaBeli = toNumber(item.hargaBeli);
@@ -246,23 +258,27 @@ export async function GET(request: NextRequest) {
         stats: {
           // Stats untuk page ini
           currentPage: {
-            totalPenjualan,
-            totalModal,
-            totalLaba,
-            marginPersen:
-              totalPenjualan > 0 ? (totalLaba / totalPenjualan) * 100 : 0,
-            jumlahItem,
-            totalDus,
-            totalPcs,
-          },
-          // Stats keseluruhan (filtered)
-          overall: {
-            totalPenjualan: totalPenjualanAll,
-            totalModal: totalModalAll,
-            totalLaba: totalLabaAll,
-            marginPersen,
-            jumlahTransaksi: allPenjualan.length,
-            jumlahItem: jumlahItemAll,
+          totalPenjualan,
+          totalModal,
+          totalLaba,
+          totalDibayar,
+          totalSisaHutang,
+          marginPersen:
+            totalPenjualan > 0 ? (totalLaba / totalPenjualan) * 100 : 0,
+          jumlahItem,
+          totalDus,
+          totalPcs,
+        },
+        // Stats keseluruhan (filtered)
+        overall: {
+          totalPenjualan: totalPenjualanAll,
+          totalModal: totalModalAll,
+          totalLaba: totalLabaAll,
+          totalDibayar: totalDibayarAll,
+          totalSisaHutang: totalSisaHutangAll,
+          marginPersen,
+          jumlahTransaksi: allPenjualan.length,
+          jumlahItem: jumlahItemAll,
             totalDus: totalDusAll,
             totalPcs: totalPcsAll,
           },

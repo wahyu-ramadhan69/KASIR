@@ -11,6 +11,13 @@ function toNumber(value: any): number {
   return Number(value || 0);
 }
 
+function formatKgDisplay(grams: any): string {
+  const kg = toNumber(grams) / 1000;
+  if (!Number.isFinite(kg)) return "0";
+  const trimmed = kg.toFixed(3).replace(/\.?0+$/, "");
+  return trimmed.replace(".", ",");
+}
+
 function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
   const perKemasan = Math.max(1, jumlahPerKemasan);
   const jumlahDus = Math.floor(totalItem / perKemasan);
@@ -139,16 +146,15 @@ export async function GET(request: NextRequest) {
         penjualan: penjualanFilter,
       },
       include: {
-        barang: {
-          select: {
-            id: true,
-            namaBarang: true,
-            ukuran: true,
-            satuan: true,
-            jumlahPerKemasan: true,
-            jenisKemasan: true,
+          barang: {
+            select: {
+              id: true,
+              namaBarang: true,
+              berat: true,
+              jumlahPerKemasan: true,
+              jenisKemasan: true,
+            },
           },
-        },
       },
     });
 
@@ -157,8 +163,7 @@ export async function GET(request: NextRequest) {
       {
         barangId: number;
         namaBarang: string;
-        ukuran: number;
-        satuan: string;
+        berat: number;
         jumlahPerKemasan: number;
         jenisKemasan: string;
         totalKemasan: number;
@@ -200,8 +205,7 @@ export async function GET(request: NextRequest) {
         barangMap.set(item.barangId, {
           barangId: item.barangId,
           namaBarang: item.barang.namaBarang,
-          ukuran: toNumber(item.barang.ukuran),
-          satuan: item.barang.satuan,
+          berat: toNumber(item.barang.berat),
           jumlahPerKemasan,
           jenisKemasan: item.barang.jenisKemasan,
           totalKemasan: 0,
@@ -228,7 +232,7 @@ export async function GET(request: NextRequest) {
     const worksheet = workbook.addWorksheet("Laba Per Barang");
 
     // Title
-    worksheet.mergeCells("A1:I1");
+    worksheet.mergeCells("A1:J1");
     const titleCell = worksheet.getCell("A1");
     titleCell.value = "LAPORAN LABA PER BARANG";
     titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
@@ -241,7 +245,7 @@ export async function GET(request: NextRequest) {
     worksheet.getRow(1).height = 30;
 
     // Periode
-    worksheet.mergeCells("A2:I2");
+    worksheet.mergeCells("A2:J2");
     const periodeCell = worksheet.getCell("A2");
     periodeCell.value = `Periode: ${formatDateRange(startDate, endDate)}`;
     periodeCell.font = { italic: true, size: 11 };
@@ -252,6 +256,7 @@ export async function GET(request: NextRequest) {
     const headers = [
       "No",
       "Barang",
+      "Berat (kg)",
       "Kemasan",
       "Qty Kemasan",
       "Qty Item",
@@ -282,6 +287,7 @@ export async function GET(request: NextRequest) {
     worksheet.columns = [
       { key: "no", width: 5 },
       { key: "barang", width: 32 },
+      { key: "berat", width: 12 },
       { key: "kemasan", width: 22 },
       { key: "qtyKemasan", width: 14 },
       { key: "qtyItem", width: 14 },
@@ -306,18 +312,19 @@ export async function GET(request: NextRequest) {
       const excelRow = worksheet.getRow(rowIndex);
       excelRow.getCell("A").value = idx + 1;
       excelRow.getCell("B").value = row.namaBarang;
-      excelRow.getCell("C").value = `${row.jumlahPerKemasan} item/${row.jenisKemasan}`;
-      excelRow.getCell("D").value = row.totalKemasan;
-      excelRow.getCell("E").value = row.totalItem;
-      excelRow.getCell("F").value = row.totalPenjualan;
-      excelRow.getCell("G").value = row.totalModal;
-      excelRow.getCell("H").value = row.totalLaba;
-      excelRow.getCell("I").value = margin;
+      excelRow.getCell("C").value = formatKgDisplay(row.berat);
+      excelRow.getCell("D").value = `${row.jumlahPerKemasan} item/${row.jenisKemasan}`;
+      excelRow.getCell("E").value = row.totalKemasan;
+      excelRow.getCell("F").value = row.totalItem;
+      excelRow.getCell("G").value = row.totalPenjualan;
+      excelRow.getCell("H").value = row.totalModal;
+      excelRow.getCell("I").value = row.totalLaba;
+      excelRow.getCell("J").value = margin;
 
-      ["D", "E", "F", "G", "H", "I"].forEach((key) => {
+      ["E", "F", "G", "H", "I", "J"].forEach((key) => {
         const cell = excelRow.getCell(key);
         cell.alignment = { horizontal: "right" };
-        cell.numFmt = key === "I" ? "0.00" : "#,##0";
+        cell.numFmt = key === "J" ? "0.00" : "#,##0";
       });
 
       totalModal += row.totalModal;
@@ -331,23 +338,34 @@ export async function GET(request: NextRequest) {
     const totalRow = worksheet.getRow(rowIndex + 1);
     totalRow.getCell("B").value = "TOTAL";
     totalRow.getCell("B").font = { bold: true };
-    totalRow.getCell("D").value = totalKemasan;
-    totalRow.getCell("E").value = totalItem;
-    totalRow.getCell("F").value = totalPenjualan;
-    totalRow.getCell("G").value = totalModal;
-    totalRow.getCell("H").value = totalLaba;
-    totalRow.getCell("I").value = totalPenjualan
+    totalRow.getCell("E").value = totalKemasan;
+    totalRow.getCell("F").value = totalItem;
+    totalRow.getCell("G").value = totalPenjualan;
+    totalRow.getCell("H").value = totalModal;
+    totalRow.getCell("I").value = totalLaba;
+    totalRow.getCell("J").value = totalPenjualan
       ? (totalLaba / totalPenjualan) * 100
       : 0;
 
-    ["D", "E", "F", "G", "H", "I"].forEach((key) => {
+    ["E", "F", "G", "H", "I", "J"].forEach((key) => {
       const cell = totalRow.getCell(key);
-      cell.font = { bold: true };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
       cell.alignment = { horizontal: "right" };
-      cell.numFmt = key === "I" ? "0.00" : "#,##0";
-      cell.border = {
-        top: { style: "double" },
-        bottom: { style: "double" },
+      cell.numFmt = key === "J" ? "0.00" : "#,##0";
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF388E3C" },
+      };
+    });
+
+    ["A", "B", "C", "D"].forEach((key) => {
+      const cell = totalRow.getCell(key);
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF388E3C" },
       };
     });
 

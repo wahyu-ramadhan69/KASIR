@@ -561,18 +561,33 @@ const DataPengeluaranPage = () => {
               />
             </div>
 
-            <select
-              value={filterJenis}
-              onChange={(e) => setFilterJenis(e.target.value)}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-[160px]"
-            >
-              <option value="all">Semua Jenis</option>
+            <div className="grid grid-cols-2 gap-2 w-full lg:w-[240px]">
+              <button
+                type="button"
+                onClick={() => setFilterJenis("all")}
+                className={`px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all ${
+                  filterJenis === "all"
+                    ? "bg-purple-600 text-white border-purple-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:border-purple-300"
+                }`}
+              >
+                Semua Jenis
+              </button>
               {jenisPengeluaranOptions.map((option) => (
-                <option key={option.value} value={option.value}>
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFilterJenis(option.value)}
+                  className={`px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all ${
+                    filterJenis === option.value
+                      ? "bg-purple-600 text-white border-purple-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:border-purple-300"
+                  }`}
+                >
                   {option.label}
-                </option>
+                </button>
               ))}
-            </select>
+            </div>
 
             <input
               type="month"
@@ -789,19 +804,22 @@ const DataPengeluaranPage = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Jenis Pengeluaran <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={jenisPengeluaranInput}
-                    onChange={(e) =>
-                      setJenisPengeluaranInput(e.target.value as JenisPengeluaran)
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                  >
+                  <div className="grid grid-cols-2 gap-2">
                     {jenisPengeluaranOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setJenisPengeluaranInput(option.value)}
+                        className={`px-3 py-2 rounded-lg border text-sm font-semibold transition-all ${
+                          jenisPengeluaranInput === option.value
+                            ? "bg-purple-600 text-white border-purple-600"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-purple-300"
+                        }`}
+                      >
                         {option.label}
-                      </option>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div>
@@ -930,18 +948,31 @@ const DataPengeluaranPage = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Jenis Pengeluaran <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="jenisPengeluaran"
-                    value={editingPengeluaran.data.jenisPengeluaran}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                  >
+                  <div className="grid grid-cols-2 gap-2">
                     {jenisPengeluaranOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setEditingPengeluaran({
+                            ...editingPengeluaran,
+                            data: {
+                              ...editingPengeluaran.data,
+                              jenisPengeluaran: option.value,
+                            },
+                          })
+                        }
+                        className={`px-3 py-2 rounded-lg border text-sm font-semibold transition-all ${
+                          editingPengeluaran.data.jenisPengeluaran ===
+                          option.value
+                            ? "bg-purple-600 text-white border-purple-600"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-purple-300"
+                        }`}
+                      >
                         {option.label}
-                      </option>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div>

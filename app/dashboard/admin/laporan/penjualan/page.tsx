@@ -67,8 +67,8 @@ interface PenjualanHeader {
 
 interface Stats {
   totalPenjualan: number;
-  totalModal: number;
-  totalLaba: number;
+  totalDibayar: number;
+  totalSisaHutang: number;
   marginPersen: number;
   jumlahTransaksi: number;
   jumlahItem: number;
@@ -83,8 +83,8 @@ const LaporanPenjualanPage = () => {
   const [fetchBlocked, setFetchBlocked] = useState<boolean>(false);
   const [stats, setStats] = useState<Stats>({
     totalPenjualan: 0,
-    totalModal: 0,
-    totalLaba: 0,
+    totalDibayar: 0,
+    totalSisaHutang: 0,
     marginPersen: 0,
     jumlahTransaksi: 0,
     jumlahItem: 0,
@@ -95,8 +95,12 @@ const LaporanPenjualanPage = () => {
   const [hasMore, setHasMore] = useState<boolean>(true);
 
   // Filter state
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const [endDate, setEndDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -214,8 +218,9 @@ const LaporanPenjualanPage = () => {
   };
 
   const handleClearFilters = () => {
-    setStartDate("");
-    setEndDate("");
+    const today = new Date().toISOString().split("T")[0];
+    setStartDate(today);
+    setEndDate(today);
     setSearchTerm("");
     setStatusFilter("all");
   };
@@ -376,26 +381,6 @@ const LaporanPenjualanPage = () => {
     return penjualan.items?.reduce((sum, item) => sum + item.laba, 0) || 0;
   };
 
-  const getTotalModalPenjualan = (penjualan: PenjualanHeader): number => {
-    return (
-      penjualan.items?.reduce((sum, item) => {
-        const totalItem = getTotalItemPcs(item);
-        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
-          totalItem,
-          item.barang.jumlahPerKemasan
-        );
-        const modalDus = item.hargaBeli * jumlahDus;
-        const modalPcs =
-          jumlahPcs > 0
-            ? Math.round(
-                (item.hargaBeli / item.barang.jumlahPerKemasan) * jumlahPcs
-              )
-            : 0;
-        return sum + modalDus + modalPcs;
-      }, 0) || 0
-    );
-  };
-
   return (
     <div className="w-full max-w-7xl mx-auto pb-20">
       <Toaster position="top-right" />
@@ -486,24 +471,24 @@ const LaporanPenjualanPage = () => {
 
         <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-orange-500">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-500 text-sm font-medium">Total Modal</p>
+            <p className="text-gray-500 text-sm font-medium">Total Dibayar</p>
             <Package className="w-8 h-8 text-orange-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            Rp {formatNumber(stats.totalModal)}
+            Rp {formatNumber(stats.totalDibayar)}
           </p>
           <p className="text-xs text-gray-500 mt-1">{stats.jumlahItem} item</p>
         </div>
 
         <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-green-500">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-500 text-sm font-medium">Total Laba</p>
+            <p className="text-gray-500 text-sm font-medium">Sisa Hutang</p>
             <TrendingUp className="w-8 h-8 text-green-500" />
           </div>
           <p className="text-2xl font-bold text-green-600">
-            Rp {formatNumber(stats.totalLaba)}
+            Rp {formatNumber(stats.totalSisaHutang)}
           </p>
-          <p className="text-xs text-gray-500 mt-1">Keuntungan bersih</p>
+          <p className="text-xs text-gray-500 mt-1">Belum terbayar</p>
         </div>
 
         <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-purple-500">
@@ -615,10 +600,10 @@ const LaporanPenjualanPage = () => {
                     Penjualan
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
-                    Modal
+                    Total Dibayar
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
-                    Laba
+                    Sisa Hutang
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                     Margin
@@ -645,7 +630,11 @@ const LaporanPenjualanPage = () => {
                 ) : (
                   penjualanList.map((pj) => {
                     const totalLaba = getTotalLabaPenjualan(pj);
-                    const totalModal = getTotalModalPenjualan(pj);
+                    const totalDibayar = pj.jumlahDibayar;
+                    const sisaHutang = Math.max(
+                      0,
+                      pj.subtotal - pj.jumlahDibayar
+                    );
                     const margin =
                       pj.totalHarga > 0 ? (totalLaba / pj.totalHarga) * 100 : 0;
 
@@ -687,10 +676,10 @@ const LaporanPenjualanPage = () => {
                           {formatRupiah(pj.totalHarga)}
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-medium text-orange-600">
-                          {formatRupiah(totalModal)}
+                          {formatRupiah(totalDibayar)}
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                          {formatRupiah(totalLaba)}
+                          {formatRupiah(sisaHutang)}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span
@@ -882,15 +871,21 @@ const LaporanPenjualanPage = () => {
                   </span>
                 </div>
                 <div className="flex justify-between font-bold">
-                  <span>Total Modal</span>
+                  <span>Total Dibayar</span>
                   <span className="text-orange-600">
-                    {formatRupiah(getTotalModalPenjualan(selectedPenjualan))}
+                    {formatRupiah(selectedPenjualan.jumlahDibayar)}
                   </span>
                 </div>
                 <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Total Laba</span>
+                  <span>Sisa Hutang</span>
                   <span className="text-green-600">
-                    {formatRupiah(getTotalLabaPenjualan(selectedPenjualan))}
+                    {formatRupiah(
+                      Math.max(
+                        0,
+                        selectedPenjualan.subtotal -
+                          selectedPenjualan.jumlahDibayar
+                      )
+                    )}
                   </span>
                 </div>
               </div>

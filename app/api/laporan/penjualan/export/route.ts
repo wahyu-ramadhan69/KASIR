@@ -40,10 +40,7 @@ function getPicPenjualan(p: any, userNameById: Map<number, string>): string {
   }
 
   return (
-    p.perjalananSales?.karyawan?.nama ||
-    p.karyawan?.nama ||
-    p.namaSales ||
-    "-"
+    p.perjalananSales?.karyawan?.nama || p.karyawan?.nama || p.namaSales || "-"
   );
 }
 
@@ -161,9 +158,11 @@ export async function GET(request: NextRequest) {
     } else if (detail) {
       // DETAIL REPORT (with items breakdown)
       await generateDetailReport(worksheet, { startDate, endDate, search });
+      await generatePembayaranSheet(workbook, { startDate, endDate, search });
     } else {
       // SUMMARY REPORT (no items breakdown)
       await generateSummaryReport(worksheet, { startDate, endDate, search });
+      await generatePembayaranSheet(workbook, { startDate, endDate, search });
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -347,18 +346,15 @@ async function generateSummaryReport(
   let grandTotalPcs = 0;
 
   penjualanList.forEach((penjualan, index) => {
-    const totalDus = penjualan.items.reduce(
-      (sum, item) => {
-        const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
-        const totalPcsItem = getTotalItemPcs(item, jumlahPerKemasan);
-        const { jumlahDus } = deriveDusPcsFromTotal(
-          totalPcsItem,
-          jumlahPerKemasan
-        );
-        return sum + jumlahDus;
-      },
-      0
-    );
+    const totalDus = penjualan.items.reduce((sum, item) => {
+      const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
+      const totalPcsItem = getTotalItemPcs(item, jumlahPerKemasan);
+      const { jumlahDus } = deriveDusPcsFromTotal(
+        totalPcsItem,
+        jumlahPerKemasan
+      );
+      return sum + jumlahDus;
+    }, 0);
     const totalPcs = penjualan.items.reduce((sum, item) => {
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       return sum + getTotalItemPcs(item, jumlahPerKemasan);
@@ -460,6 +456,220 @@ async function generateSummaryReport(
   totalRow.getCell(13).numFmt = "0.00";
 
   for (let i = 1; i <= 14; i++) {
+    totalRow.getCell(i).border = {
+      top: { style: "medium" },
+      left: { style: "thin" },
+      bottom: { style: "medium" },
+      right: { style: "thin" },
+    };
+  }
+}
+
+async function generatePembayaranSheet(
+  workbook: ExcelJS.Workbook,
+  filters: {
+    startDate?: string | null;
+    endDate?: string | null;
+    search?: string | null;
+  }
+) {
+  const worksheet = workbook.addWorksheet("Pembayaran Penjualan");
+
+  const where: any = {
+    penjualan: {
+      statusTransaksi: "SELESAI",
+      isDeleted: false,
+    },
+  };
+
+  if (filters.startDate || filters.endDate) {
+    where.tanggalBayar = {};
+    if (filters.startDate) {
+      const start = new Date(filters.startDate);
+      start.setHours(0, 0, 0, 0);
+      where.tanggalBayar.gte = start;
+    }
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      where.tanggalBayar.lte = end;
+    }
+  }
+
+  if (filters.search) {
+    where.OR = [
+      { kodePembayaran: { contains: filters.search, mode: "insensitive" } },
+      {
+        penjualan: {
+          kodePenjualan: { contains: filters.search, mode: "insensitive" },
+        },
+      },
+      {
+        penjualan: {
+          namaCustomer: { contains: filters.search, mode: "insensitive" },
+        },
+      },
+      {
+        penjualan: {
+          customer: {
+            nama: { contains: filters.search, mode: "insensitive" },
+          },
+        },
+      },
+    ];
+  }
+
+  const pembayaranList = await prisma.pembayaranPenjualan.findMany({
+    where,
+    orderBy: { tanggalBayar: "desc" },
+    include: {
+      penjualan: {
+        include: {
+          customer: true,
+          karyawan: true,
+        },
+      },
+    },
+  });
+  const userIds = Array.from(
+    new Set(
+      pembayaranList
+        .map((pembayaran) => pembayaran.userId)
+        .filter((userId): userId is number => Number.isFinite(userId as number))
+    )
+  );
+  const users = userIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, username: true },
+      })
+    : [];
+  const userNameById = new Map<number, string>(
+    users.map((user) => [user.id, user.username])
+  );
+
+  // Title
+  worksheet.mergeCells("A1:J1");
+  const titleCell = worksheet.getCell("A1");
+  titleCell.value = "LAPORAN PEMBAYARAN PENJUALAN";
+  titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF2196F3" },
+  };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 30;
+
+  // Periode
+  worksheet.mergeCells("A2:J2");
+  const periodeCell = worksheet.getCell("A2");
+  periodeCell.value = `Periode: ${formatDateRange(
+    filters.startDate || undefined,
+    filters.endDate || undefined
+  )}`;
+  periodeCell.font = { italic: true, size: 11 };
+  periodeCell.alignment = { horizontal: "center" };
+
+  // Total pembayaran
+  worksheet.mergeCells("A3:J3");
+  const totalCell = worksheet.getCell("A3");
+  totalCell.value = `Total Pembayaran: ${pembayaranList.length}`;
+  totalCell.font = { bold: true };
+  totalCell.alignment = { horizontal: "center" };
+
+  const headers = [
+    "No",
+    "Kode Pembayaran",
+    "Tanggal Bayar",
+    "Kode Penjualan",
+    "Customer",
+    "Metode",
+    "Pembayaran",
+    "Nominal",
+    "Catatan",
+    "Kasir",
+  ];
+  const headerRow = worksheet.getRow(5);
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF616161" },
+    };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+  });
+
+  worksheet.getColumn(1).width = 5;
+  worksheet.getColumn(2).width = 20;
+  worksheet.getColumn(3).width = 18;
+  worksheet.getColumn(4).width = 18;
+  worksheet.getColumn(5).width = 22;
+  worksheet.getColumn(6).width = 14;
+  worksheet.getColumn(7).width = 14;
+  worksheet.getColumn(8).width = 16;
+  worksheet.getColumn(9).width = 24;
+  worksheet.getColumn(10).width = 18;
+
+  let currentRow = 6;
+  let totalNominal = 0;
+
+  pembayaranList.forEach((pembayaran, index) => {
+    const row = worksheet.getRow(currentRow);
+    row.getCell(1).value = index + 1;
+    row.getCell(2).value = pembayaran.kodePembayaran;
+    row.getCell(3).value = new Date(pembayaran.tanggalBayar).toLocaleDateString(
+      "id-ID"
+    );
+    row.getCell(4).value = pembayaran.penjualan?.kodePenjualan || "-";
+    row.getCell(5).value =
+      pembayaran.penjualan?.customer?.nama ||
+      pembayaran.penjualan?.namaCustomer ||
+      "-";
+    row.getCell(6).value = pembayaran.metode || "-";
+    row.getCell(7).value = pembayaran.jenisPembayaran || "-";
+    row.getCell(8).value = toNumber(pembayaran.nominal);
+    row.getCell(9).value = pembayaran.catatan || "-";
+    row.getCell(10).value = pembayaran.userId
+      ? userNameById.get(pembayaran.userId) || "-"
+      : "-";
+
+    row.getCell(8).numFmt = "#,##0";
+
+    for (let i = 1; i <= 10; i++) {
+      row.getCell(i).border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    }
+
+    totalNominal += toNumber(pembayaran.nominal);
+    currentRow++;
+  });
+
+  const totalRow = worksheet.getRow(currentRow);
+  totalRow.getCell(1).value = "TOTAL";
+  totalRow.getCell(8).value = totalNominal;
+  totalRow.getCell(8).numFmt = "#,##0";
+
+  totalRow.font = { bold: true };
+  for (let i = 1; i <= 10; i++) {
+    totalRow.getCell(i).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFFFF59D" },
+    };
     totalRow.getCell(i).border = {
       top: { style: "medium" },
       left: { style: "thin" },
