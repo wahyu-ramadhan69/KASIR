@@ -1064,6 +1064,22 @@ const RiwayatPenjualanPage = () => {
                   )}
                 </div>
 
+                {/* Tombol Cetak */}
+                <div className="mt-6">
+                  <button
+                    onClick={() => {
+                      window.open(
+                        `/api/penjualan/${selectedPenjualan.id}/print-receipt`,
+                        "_blank"
+                      );
+                    }}
+                    className="w-full bg-gradient-to-r from-green-600 via-emerald-600 to-green-700 hover:from-green-700 hover:via-emerald-700 hover:to-green-800 text-white py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                  >
+                    <Receipt className="w-5 h-5" />
+                    CETAK NOTA
+                  </button>
+                </div>
+
                 {/* Action Buttons */}
                 {selectedPenjualan.statusTransaksi === "SELESAI" &&
                   selectedPenjualan.statusPembayaran === "HUTANG" && (

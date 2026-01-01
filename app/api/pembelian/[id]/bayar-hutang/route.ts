@@ -4,6 +4,24 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
+// Deep serialize to handle all BigInt in nested objects
+function deepSerialize(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") return Number(obj);
+  if (obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(deepSerialize);
+  if (typeof obj === "object") {
+    const serialized: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        serialized[key] = deepSerialize(obj[key]);
+      }
+    }
+    return serialized;
+  }
+  return obj;
+}
+
 // Helper function to convert BigInt to number safely
 function bigIntToNumber(value: bigint | number): number {
   if (typeof value === "bigint") {
@@ -181,26 +199,28 @@ export async function POST(
       return updatedPembelian;
     });
 
-    return NextResponse.json({
-      success: true,
-      message:
-        statusPembayaranBaru === "LUNAS"
-          ? "Hutang berhasil dilunasi"
-          : `Pembayaran berhasil, sisa hutang: Rp ${sisaHutangBaru.toLocaleString(
-              "id-ID"
-            )}`,
-      data: {
-        pembelian: serializePembelian(result),
-        pembayaran: {
-          jumlahBayar: jumlahBayarInt,
-          pembayaranEfektif,
-          kembalian,
-          sisaHutangSebelum: sisaHutangSekarang,
-          sisaHutangSesudah: sisaHutangBaru,
-          statusPembayaran: statusPembayaranBaru,
+    return NextResponse.json(
+      deepSerialize({
+        success: true,
+        message:
+          statusPembayaranBaru === "LUNAS"
+            ? "Hutang berhasil dilunasi"
+            : `Pembayaran berhasil, sisa hutang: Rp ${sisaHutangBaru.toLocaleString(
+                "id-ID"
+              )}`,
+        data: {
+          pembelian: serializePembelian(result),
+          pembayaran: {
+            jumlahBayar: jumlahBayarInt,
+            pembayaranEfektif,
+            kembalian,
+            sisaHutangSebelum: sisaHutangSekarang,
+            sisaHutangSesudah: sisaHutangBaru,
+            statusPembayaran: statusPembayaranBaru,
+          },
         },
-      },
-    });
+      })
+    );
   } catch (err) {
     console.error("Error paying debt:", err);
     return NextResponse.json(

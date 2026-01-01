@@ -24,6 +24,9 @@ export async function GET(
       include: {
         customer: true,
         karyawan: true,
+        pembayaran: {
+          orderBy: { tanggalBayar: "desc" },
+        },
         items: {
           include: {
             barang: true,
@@ -67,6 +70,23 @@ export async function GET(
       return trimmed.replace(".", ",");
     };
 
+    const pembayaranList = penjualan.pembayaran || [];
+    const latestPembayaran = pembayaranList[0];
+    const totalCash =
+      penjualan.statusPembayaran === "LUNAS"
+        ? pembayaranList.reduce(
+            (sum, pembayaran) => sum + Number(pembayaran.totalCash || 0),
+            0
+          )
+        : Number(latestPembayaran?.totalCash || 0);
+    const totalTransfer =
+      penjualan.statusPembayaran === "LUNAS"
+        ? pembayaranList.reduce(
+            (sum, pembayaran) => sum + Number(pembayaran.totalTransfer || 0),
+            0
+          )
+        : Number(latestPembayaran?.totalTransfer || 0);
+
     // Generate HTML untuk nota
     const html = `
 <!DOCTYPE html>
@@ -81,6 +101,14 @@ export async function GET(
       margin: 0;
     }
 
+    @font-face {
+      font-family: 'Roboto Mono';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url('/fonts/RobotoMono-Bold.ttf') format('truetype');
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -88,8 +116,8 @@ export async function GET(
     }
 
     body {
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 13px;
       line-height: 1.5;
       font-weight: 600;
       padding: 2mm;
@@ -111,13 +139,13 @@ export async function GET(
     }
 
     .header p {
-      font-size: 11px;
+      font-size: 13px;
       margin: 2px 0;
     }
 
     .info-section {
       margin: 8px 0;
-      font-size: 10px;
+      font-size: 12px;
     }
 
     .info-row {
@@ -139,7 +167,7 @@ export async function GET(
     .items-table {
       width: 100%;
       margin: 8px 0;
-      font-size: 10px;
+      font-size: 12px;
     }
 
     .items-header {
@@ -166,12 +194,12 @@ export async function GET(
       display: grid;
       grid-template-columns: 1.6fr 0.6fr 0.8fr;
       gap: 4px;
-      font-size: 10px;
+      font-size: 12px;
     }
 
     .item-discount {
       color: #dc2626;
-      font-size: 10px;
+      font-size: 12px;
       margin-top: 2px;
       padding-left: 8px;
     }
@@ -186,12 +214,12 @@ export async function GET(
       display: flex;
       justify-content: space-between;
       margin: 4px 0;
-      font-size: 11px;
+      font-size: 13px;
     }
 
     .summary-row.total {
       font-weight: 800;
-      font-size: 13px;
+      font-size: 15px;
       border-top: 1px solid #000;
       border-bottom: 1px solid #000;
       padding: 6px 0;
@@ -350,6 +378,14 @@ export async function GET(
     <div class="summary-row total">
       <span>TOTAL:</span>
       <span>${formatRupiah(penjualan.totalHarga)}</span>
+    </div>
+    <div class="summary-row">
+      <span>Cash:</span>
+      <span>${formatRupiah(totalCash)}</span>
+    </div>
+    <div class="summary-row">
+      <span>Transfer:</span>
+      <span>${formatRupiah(totalTransfer)}</span>
     </div>
     <div class="summary-row">
       <span>Dibayar:</span>

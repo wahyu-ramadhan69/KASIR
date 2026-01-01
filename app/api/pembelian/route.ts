@@ -196,8 +196,6 @@ export async function GET(request: NextRequest) {
       { success: false, error: "Gagal mengambil data pembelian" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -346,7 +344,5 @@ export async function POST(request: NextRequest) {
       { success: false, error: err.message || "Gagal membuat pembelian" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

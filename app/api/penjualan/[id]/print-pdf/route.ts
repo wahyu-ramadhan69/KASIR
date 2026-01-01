@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import PDFDocument from "pdfkit";
+import path from "path";
 
 // Singleton pattern untuk Prisma Client
 const globalForPrisma = globalThis as unknown as {
@@ -25,6 +26,9 @@ export async function GET(
       include: {
         customer: true,
         karyawan: true,
+        pembayaran: {
+          orderBy: { tanggalBayar: "desc" },
+        },
         items: {
           include: {
             barang: true,
@@ -39,6 +43,23 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    const pembayaranList = penjualan.pembayaran || [];
+    const latestPembayaran = pembayaranList[0];
+    const totalCash =
+      penjualan.statusPembayaran === "LUNAS"
+        ? pembayaranList.reduce(
+            (sum, pembayaran) => sum + Number(pembayaran.totalCash || 0),
+            0
+          )
+        : Number(latestPembayaran?.totalCash || 0);
+    const totalTransfer =
+      penjualan.statusPembayaran === "LUNAS"
+        ? pembayaranList.reduce(
+            (sum, pembayaran) => sum + Number(pembayaran.totalTransfer || 0),
+            0
+          )
+        : Number(latestPembayaran?.totalTransfer || 0);
 
     // 80mm paper width in points (1mm = 2.83465 pt)
     const paperWidth = 80 * 2.83465;
@@ -59,10 +80,18 @@ export async function GET(
       margins: { top: margin, bottom: margin, left: margin, right: margin },
     });
 
-    const chunks: Uint8Array[] = [];
+    const fontPath = path.join(
+      process.cwd(),
+      "public",
+      "fonts",
+      "RobotoMono-Bold.ttf"
+    );
+    doc.registerFont("RobotoMono-Bold", fontPath);
+    doc.registerFont("RobotoMono", fontPath);
 
-    doc.on("data", (chunk) => chunks.push(chunk));
-    doc.on("end", () => {});
+    const chunks: Buffer[] = [];
+
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
     // Format rupiah
     const formatRupiah = (amount: number): string => {
@@ -93,15 +122,15 @@ export async function GET(
     };
 
     // Header
-    doc.fontSize(14).font("Helvetica-Bold").text("NOTA PENJUALAN", {
+    doc.fontSize(16).font("RobotoMono-Bold").text("NOTA PENJUALAN", {
       align: "center",
     });
 
     doc.moveDown(0.3);
-    doc.fontSize(9).font("Helvetica-Bold").text("Toko ABC", {
+    doc.fontSize(11).font("RobotoMono-Bold").text("Toko ABC", {
       align: "center",
     });
-    doc.font("Helvetica").text("Jl. Contoh No. 123, Jakarta", {
+    doc.font("RobotoMono").text("Jl. Contoh No. 123, Jakarta", {
       align: "center",
     });
     doc.text("Telp: 021-12345678", { align: "center" });
@@ -117,16 +146,16 @@ export async function GET(
     const leftCol = margin;
     let currentY = doc.y;
 
-    doc.fontSize(9).font("Helvetica-Bold");
+    doc.fontSize(11).font("RobotoMono-Bold");
     doc.text("No Nota:", leftCol, currentY);
     doc
-      .font("Helvetica")
+      .font("RobotoMono")
       .text(penjualan.kodePenjualan || "-", leftCol + 55, currentY);
 
     currentY += 12;
-    doc.font("Helvetica-Bold").text("Tanggal:", leftCol, currentY);
+    doc.font("RobotoMono-Bold").text("Tanggal:", leftCol, currentY);
     doc
-      .font("Helvetica")
+      .font("RobotoMono")
       .text(
         formatDate(penjualan.createdAt.toISOString()),
         leftCol + 55,
@@ -134,27 +163,27 @@ export async function GET(
       );
 
     currentY += 12;
-    doc.font("Helvetica-Bold").text("Customer:", leftCol, currentY);
+    doc.font("RobotoMono-Bold").text("Customer:", leftCol, currentY);
     doc
-      .font("Helvetica")
+      .font("RobotoMono")
       .text(penjualan.customer?.nama || "-", leftCol + 55, currentY);
 
     currentY += 12;
-    doc.font("Helvetica-Bold").text("Sales:", leftCol, currentY);
+    doc.font("RobotoMono-Bold").text("Sales:", leftCol, currentY);
     doc
-      .font("Helvetica")
+      .font("RobotoMono")
       .text(penjualan.karyawan?.nama || "-", leftCol + 55, currentY);
 
     currentY += 12;
-    doc.font("Helvetica-Bold").text("Metode:", leftCol, currentY);
+    doc.font("RobotoMono-Bold").text("Metode:", leftCol, currentY);
     doc
-      .font("Helvetica")
+      .font("RobotoMono")
       .text(penjualan.metodePembayaran || "-", leftCol + 55, currentY);
 
     currentY += 12;
-    doc.font("Helvetica-Bold").text("Status:", leftCol, currentY);
+    doc.font("RobotoMono-Bold").text("Status:", leftCol, currentY);
     doc
-      .font("Helvetica")
+      .font("RobotoMono")
       .text(penjualan.statusPembayaran || "-", leftCol + 55, currentY);
 
     doc.moveDown(0.5);
@@ -166,7 +195,7 @@ export async function GET(
 
     // Header Tabel
     currentY = doc.y;
-    doc.fontSize(8.5).font("Helvetica-Bold");
+    doc.fontSize(10.5).font("RobotoMono-Bold");
     const colItem = leftCol;
     const colQty = leftCol + 96;
     const colHarga = leftCol + 140;
@@ -187,7 +216,7 @@ export async function GET(
     currentY += 5;
 
     // Items
-    doc.font("Helvetica").fontSize(8.5);
+    doc.font("RobotoMono").fontSize(10.5);
     let subtotal = 0;
 
     for (const item of penjualan.items) {
@@ -254,7 +283,7 @@ export async function GET(
     currentY += 8;
 
     // Summary
-    doc.font("Helvetica").fontSize(9);
+    doc.font("RobotoMono").fontSize(11);
     doc.text("Subtotal:", colHarga, currentY);
     doc.text(formatRupiah(subtotal), colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
@@ -285,7 +314,7 @@ export async function GET(
     }
 
     currentY += 15;
-    doc.font("Helvetica-Bold").fontSize(11);
+    doc.font("RobotoMono-Bold").fontSize(13);
     doc.text("TOTAL:", colHarga, currentY);
     doc.text(formatRupiah(Number(penjualan.totalHarga)), colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
@@ -293,7 +322,21 @@ export async function GET(
     });
 
     currentY += 12;
-    doc.font("Helvetica").fontSize(9);
+    doc.font("RobotoMono").fontSize(11);
+    doc.text("Cash:", colHarga, currentY);
+    doc.text(formatRupiah(totalCash), colTotal, currentY, {
+      width: contentWidth - (colTotal - leftCol),
+      align: "right",
+    });
+
+    currentY += 12;
+    doc.text("Transfer:", colHarga, currentY);
+    doc.text(formatRupiah(totalTransfer), colTotal, currentY, {
+      width: contentWidth - (colTotal - leftCol),
+      align: "right",
+    });
+
+    currentY += 12;
     doc.text("Dibayar:", colHarga, currentY);
     doc.text(
       formatRupiah(Number(penjualan.jumlahDibayar)),
@@ -324,14 +367,17 @@ export async function GET(
     doc.moveDown(0.5);
 
     doc
-      .fontSize(8.5)
-      .font("Helvetica-Bold")
+      .fontSize(10.5)
+      .font("RobotoMono-Bold")
       .text("Terima kasih atas pembelian Anda!", {
         align: "center",
       });
-    doc.fontSize(8).text("Barang yang sudah dibeli tidak dapat dikembalikan", {
-      align: "center",
-    });
+    doc
+      .fontSize(10)
+      .font("RobotoMono")
+      .text("Barang yang sudah dibeli tidak dapat dikembalikan", {
+        align: "center",
+      });
 
     doc.end();
 
