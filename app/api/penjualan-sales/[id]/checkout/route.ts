@@ -34,6 +34,13 @@ function deepSerialize(obj: any): any {
   return obj;
 }
 
+function toNumber(value: any): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return Number(value || 0);
+}
+
 // POST - Proses checkout dan pembayaran
 export async function POST(
   request: NextRequest,
@@ -47,6 +54,8 @@ export async function POST(
       diskonNota = 0,
       jumlahDibayar,
       metodePembayaran,
+      totalCash = 0,
+      totalTransfer = 0,
       tanggalPenjualan,
       tanggalJatuhTempo,
       keterangan,
@@ -181,6 +190,28 @@ export async function POST(
       });
 
       if (dibayar > 0) {
+        const normalizedTotalCash = toNumber(totalCash);
+        const normalizedTotalTransfer = toNumber(totalTransfer);
+        let totalCashFinal = normalizedTotalCash;
+        let totalTransferFinal = normalizedTotalTransfer;
+        const metode = metodePembayaran || "CASH";
+
+        if (metode === "TRANSFER") {
+          totalCashFinal = 0;
+          totalTransferFinal =
+            normalizedTotalTransfer > 0
+              ? normalizedTotalTransfer
+              : Number(dibayar);
+        } else if (metode === "CASH_TRANSFER") {
+          if (normalizedTotalCash === 0 && normalizedTotalTransfer === 0) {
+            totalCashFinal = Number(dibayar);
+          }
+        } else {
+          totalTransferFinal = 0;
+          totalCashFinal =
+            normalizedTotalCash > 0 ? normalizedTotalCash : Number(dibayar);
+        }
+
         const pembayaranDate = tanggalPenjualan
           ? new Date(tanggalPenjualan)
           : new Date();
@@ -217,7 +248,9 @@ export async function POST(
             penjualanId,
             tanggalBayar: pembayaranDate,
             nominal: dibayar,
-            metode: metodePembayaran || "CASH",
+            totalCash: BigInt(totalCashFinal),
+            totalTransfer: BigInt(totalTransferFinal),
+            metode,
           },
         });
       }

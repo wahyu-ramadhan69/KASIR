@@ -109,6 +109,9 @@ export async function GET(
       include: {
         customer: true,
         karyawan: true,
+        pembayaran: {
+          orderBy: { tanggalBayar: "desc" },
+        },
         items: {
           include: {
             barang: true,

@@ -46,7 +46,13 @@ export async function POST(
     const { id } = await params;
     const penjualanId = parseInt(id);
     const body = await request.json();
-    const { jumlahBayar, metodePembayaran = "CASH", catatan } = body;
+    const {
+      jumlahBayar,
+      metodePembayaran = "CASH",
+      totalCash = 0,
+      totalTransfer = 0,
+      catatan,
+    } = body;
     const metodeValid = ["CASH", "TRANSFER", "CASH_TRANSFER"] as const;
 
     if (!jumlahBayar || jumlahBayar <= 0) {
@@ -92,6 +98,9 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    const normalizedTotalCash = toNumber(totalCash);
+    const normalizedTotalTransfer = toNumber(totalTransfer);
 
     // Hitung sisa hutang
     const totalHarga = toNumber(penjualan.totalHarga);
@@ -167,6 +176,25 @@ export async function POST(
         ).padStart(4, "0")}`;
 
         const nominalTercatat = Math.min(jumlahBayar, sisaHutang);
+        let totalCashFinal = 0;
+        let totalTransferFinal = 0;
+
+        if (metodePembayaran === "TRANSFER") {
+          totalTransferFinal =
+            normalizedTotalTransfer > 0
+              ? normalizedTotalTransfer
+              : nominalTercatat;
+        } else if (metodePembayaran === "CASH_TRANSFER") {
+          if (normalizedTotalCash === 0 && normalizedTotalTransfer === 0) {
+            totalCashFinal = nominalTercatat;
+          } else {
+            totalCashFinal = normalizedTotalCash;
+            totalTransferFinal = normalizedTotalTransfer;
+          }
+        } else {
+          totalCashFinal =
+            normalizedTotalCash > 0 ? normalizedTotalCash : nominalTercatat;
+        }
 
         await tx.pembayaranPenjualan.create({
           data: {
@@ -174,6 +202,8 @@ export async function POST(
             penjualanId,
             tanggalBayar: pembayaranDate,
             nominal: BigInt(nominalTercatat),
+            totalCash: BigInt(totalCashFinal),
+            totalTransfer: BigInt(totalTransferFinal),
             metode: metodePembayaran,
             jenisPembayaran: "PIUTANG",
             catatan: catatan || null,

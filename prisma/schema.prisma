@@ -159,6 +159,8 @@ model PembayaranPenjualan {
   penjualan             PenjualanHeader  @relation(fields: [penjualanId], references: [id], onDelete: Cascade)
   tanggalBayar          DateTime         @default(now())
   nominal               BigInt
+  totalCash             BigInt           @default(0)
+  totalTransfer         BigInt           @default(0)
   metode                MetodePembayaran @default(CASH)
   jenisPembayaran       String           @default("PENJUALAN")
   catatan               String?

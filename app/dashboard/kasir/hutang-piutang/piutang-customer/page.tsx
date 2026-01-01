@@ -168,6 +168,8 @@ const RiwayatPenjualanPage = () => {
   const [pelunasanPenjualan, setPelunasanPenjualan] =
     useState<PenjualanHeader | null>(null);
   const [jumlahBayar, setJumlahBayar] = useState<string>("");
+  const [jumlahCash, setJumlahCash] = useState<string>("");
+  const [jumlahTransfer, setJumlahTransfer] = useState<string>("");
   const [metodePembayaranPelunasan, setMetodePembayaranPelunasan] = useState<
     "CASH" | "TRANSFER" | "CASH_TRANSFER"
   >("CASH");
@@ -416,25 +418,73 @@ const RiwayatPenjualanPage = () => {
 
   const handleOpenPelunasan = (penjualan: PenjualanHeader) => {
     setPelunasanPenjualan(penjualan);
-    const sisaHutang = penjualan.totalHarga - penjualan.jumlahDibayar;
-    setJumlahBayar(sisaHutang.toString());
+    setJumlahBayar("");
     setMetodePembayaranPelunasan(penjualan.metodePembayaran || "CASH");
+    setJumlahCash("");
+    setJumlahTransfer("");
     setShowPelunasanModal(true);
   };
 
+  const getPelunasanAmount = () => {
+    if (metodePembayaranPelunasan === "CASH_TRANSFER") {
+      const cash = parseRupiahToNumber(jumlahCash);
+      const transfer = parseRupiahToNumber(jumlahTransfer);
+      return cash + transfer;
+    }
+    return parseRupiahToNumber(jumlahBayar);
+  };
+
+  const getPelunasanBreakdown = () => {
+    const nominal = getPelunasanAmount();
+    if (metodePembayaranPelunasan === "TRANSFER") {
+      return { cash: 0, transfer: nominal };
+    }
+    if (metodePembayaranPelunasan === "CASH_TRANSFER") {
+      return {
+        cash: parseRupiahToNumber(jumlahCash),
+        transfer: parseRupiahToNumber(jumlahTransfer),
+      };
+    }
+    return { cash: nominal, transfer: 0 };
+  };
+
+  const handleMetodePelunasanChange = (
+    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  ) => {
+    if (metode === "CASH_TRANSFER") {
+      if (jumlahBayar) {
+        setJumlahCash(jumlahBayar);
+      }
+      if (!jumlahTransfer) {
+        setJumlahTransfer("");
+      }
+    } else if (metodePembayaranPelunasan === "CASH_TRANSFER") {
+      const total =
+        parseRupiahToNumber(jumlahCash) +
+        parseRupiahToNumber(jumlahTransfer);
+      setJumlahBayar(total ? total.toLocaleString("id-ID") : "");
+    }
+
+    setMetodePembayaranPelunasan(metode);
+  };
+
   const handlePelunasan = async () => {
-    if (!pelunasanPenjualan || !jumlahBayar) return;
+    if (!pelunasanPenjualan || getPelunasanAmount() <= 0) return;
 
     setIsSubmitting(true);
     try {
+      const breakdown = getPelunasanBreakdown();
+      const jumlahBayarFinal = getPelunasanAmount();
       const res = await fetch(
         `/api/penjualan/${pelunasanPenjualan.id}/bayar-hutang`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            jumlahBayar: parseInt(jumlahBayar),
+            jumlahBayar: jumlahBayarFinal,
             metodePembayaran: metodePembayaranPelunasan,
+            totalCash: breakdown.cash,
+            totalTransfer: breakdown.transfer,
           }),
         }
       );
@@ -445,6 +495,8 @@ const RiwayatPenjualanPage = () => {
         setShowPelunasanModal(false);
         setPelunasanPenjualan(null);
         setJumlahBayar("");
+        setJumlahCash("");
+        setJumlahTransfer("");
         handleRefresh();
       } else {
         toast.error(data.error || "Gagal melakukan pembayaran");
@@ -510,6 +562,16 @@ const RiwayatPenjualanPage = () => {
       currency: "IDR",
       minimumFractionDigits: 0,
     }).format(number);
+  };
+
+  const formatRupiahInput = (value: string): string => {
+    const number = value.replace(/[^\d]/g, "");
+    if (!number) return "";
+    return parseInt(number).toLocaleString("id-ID");
+  };
+
+  const parseRupiahToNumber = (value: string): number => {
+    return parseInt(value.replace(/[^\d]/g, "")) || 0;
   };
 
   const formatRupiahSimple = (amount: number): string => {
@@ -1335,7 +1397,7 @@ const RiwayatPenjualanPage = () => {
                   </label>
                   <div className="grid grid-cols-3 gap-2.5">
                     <button
-                      onClick={() => setMetodePembayaranPelunasan("CASH")}
+                      onClick={() => handleMetodePelunasanChange("CASH")}
                       className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
                         metodePembayaranPelunasan === "CASH"
                           ? "bg-emerald-600 text-white border-emerald-600"
@@ -1346,7 +1408,7 @@ const RiwayatPenjualanPage = () => {
                       Cash
                     </button>
                     <button
-                      onClick={() => setMetodePembayaranPelunasan("TRANSFER")}
+                      onClick={() => handleMetodePelunasanChange("TRANSFER")}
                       className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
                         metodePembayaranPelunasan === "TRANSFER"
                           ? "bg-emerald-600 text-white border-emerald-600"
@@ -1358,7 +1420,7 @@ const RiwayatPenjualanPage = () => {
                     </button>
                     <button
                       onClick={() =>
-                        setMetodePembayaranPelunasan("CASH_TRANSFER")
+                        handleMetodePelunasanChange("CASH_TRANSFER")
                       }
                       className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
                         metodePembayaranPelunasan === "CASH_TRANSFER"
@@ -1376,60 +1438,97 @@ const RiwayatPenjualanPage = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Jumlah Pembayaran <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    value={jumlahBayar}
-                    onChange={(e) => setJumlahBayar(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-lg"
-                    placeholder="Masukkan jumlah pembayaran"
-                  />
+                  {metodePembayaranPelunasan === "CASH_TRANSFER" ? (
+                    <>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <input
+                          type="text"
+                          value={jumlahCash}
+                          onChange={(e) =>
+                            setJumlahCash(formatRupiahInput(e.target.value))
+                          }
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-lg"
+                          placeholder="Jumlah Cash"
+                        />
+                        <input
+                          type="text"
+                          value={jumlahTransfer}
+                          onChange={(e) =>
+                            setJumlahTransfer(formatRupiahInput(e.target.value))
+                          }
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-lg"
+                          placeholder="Jumlah Transfer"
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500 font-medium">
+                        Total dibayar: {formatRupiah(getPelunasanAmount())}
+                      </p>
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      value={jumlahBayar}
+                      onChange={(e) =>
+                        setJumlahBayar(formatRupiahInput(e.target.value))
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-lg"
+                      placeholder="Masukkan jumlah pembayaran"
+                    />
+                  )}
                 </div>
 
                 {/* Quick Amount */}
-                <div className="flex gap-2 flex-wrap mb-4">
-                  <button
-                    onClick={() =>
-                      setJumlahBayar(
-                        getSisaHutang(pelunasanPenjualan).toString()
-                      )
-                    }
-                    className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded text-sm hover:bg-emerald-200"
-                  >
-                    Lunasi Semua
-                  </button>
-                  {[50000, 100000, 200000, 500000].map((amount) => (
+                {metodePembayaranPelunasan !== "CASH_TRANSFER" && (
+                  <div className="flex gap-2 flex-wrap mb-4">
                     <button
-                      key={amount}
-                      onClick={() => setJumlahBayar(amount.toString())}
-                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+                      onClick={() =>
+                        setJumlahBayar(
+                          getSisaHutang(pelunasanPenjualan).toLocaleString(
+                            "id-ID"
+                          )
+                        )
+                      }
+                      className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded text-sm hover:bg-emerald-200"
                     >
-                      {formatRupiah(amount)}
+                      Lunasi Semua
                     </button>
-                  ))}
-                </div>
+                    {[50000, 100000, 200000, 500000].map((amount) => (
+                      <button
+                      key={amount}
+                      onClick={() =>
+                        setJumlahBayar(amount.toLocaleString("id-ID"))
+                      }
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+                      >
+                        {formatRupiah(amount)}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Preview */}
-                {jumlahBayar && parseInt(jumlahBayar) > 0 && (
+                {getPelunasanAmount() > 0 && (
                   <div
                     className={`rounded-lg p-4 mb-4 ${
-                      parseInt(jumlahBayar) >= getSisaHutang(pelunasanPenjualan)
+                      getPelunasanAmount() >=
+                      getSisaHutang(pelunasanPenjualan)
                         ? "bg-green-50 border border-green-200"
                         : "bg-yellow-50 border border-yellow-200"
                     }`}
                   >
-                    {parseInt(jumlahBayar) >=
+                    {getPelunasanAmount() >=
                     getSisaHutang(pelunasanPenjualan) ? (
                       <>
                         <div className="flex items-center gap-2 text-green-700 font-medium">
                           <Check className="w-5 h-5" />
                           Piutang akan LUNAS
                         </div>
-                        {parseInt(jumlahBayar) >
+                        {getPelunasanAmount() >
                           getSisaHutang(pelunasanPenjualan) && (
                           <p className="text-green-600 mt-1">
                             Kembalian:{" "}
                             {formatRupiah(
-                              parseInt(jumlahBayar) -
+                              getPelunasanAmount() -
                                 getSisaHutang(pelunasanPenjualan)
                             )}
                           </p>
@@ -1445,7 +1544,7 @@ const RiwayatPenjualanPage = () => {
                           Sisa Piutang:{" "}
                           {formatRupiah(
                             getSisaHutang(pelunasanPenjualan) -
-                              parseInt(jumlahBayar)
+                              getPelunasanAmount()
                           )}
                         </p>
                       </>
@@ -1464,7 +1563,7 @@ const RiwayatPenjualanPage = () => {
                   <button
                     onClick={handlePelunasan}
                     disabled={
-                      isSubmitting || !jumlahBayar || parseInt(jumlahBayar) <= 0
+                      isSubmitting || getPelunasanAmount() <= 0
                     }
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                   >

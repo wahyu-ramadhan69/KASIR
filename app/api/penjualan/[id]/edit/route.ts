@@ -353,6 +353,24 @@ export async function POST(
         : body.metodePembayaran === "CASH_TRANSFER"
         ? "CASH_TRANSFER"
         : "CASH";
+    const normalizedTotalCash = toNumber(body.totalCash);
+    const normalizedTotalTransfer = toNumber(body.totalTransfer);
+    let totalCashFinal = normalizedTotalCash;
+    let totalTransferFinal = normalizedTotalTransfer;
+
+    if (metodePembayaran === "TRANSFER") {
+      totalCashFinal = 0;
+      totalTransferFinal =
+        normalizedTotalTransfer > 0 ? normalizedTotalTransfer : jumlahDibayar;
+    } else if (metodePembayaran === "CASH_TRANSFER") {
+      if (normalizedTotalCash === 0 && normalizedTotalTransfer === 0) {
+        totalCashFinal = jumlahDibayar;
+      }
+    } else {
+      totalTransferFinal = 0;
+      totalCashFinal =
+        normalizedTotalCash > 0 ? normalizedTotalCash : jumlahDibayar;
+    }
 
     const oldTotalHarga = toNumber(penjualan.totalHarga);
     const oldJumlahDibayar = toNumber(penjualan.jumlahDibayar);
@@ -590,6 +608,66 @@ export async function POST(
           },
         },
       });
+
+      if (jumlahDibayar > 0) {
+        const pembayaranDate = updatedHeader.tanggalTransaksi || new Date();
+        const pembayaranDateStr = pembayaranDate
+          .toISOString()
+          .slice(0, 10)
+          .replace(/-/g, "");
+        const lastPembayaran = await tx.pembayaranPenjualan.findFirst({
+          where: {
+            kodePembayaran: {
+              startsWith: `BYR-${pembayaranDateStr}`,
+            },
+          },
+          orderBy: {
+            kodePembayaran: "desc",
+          },
+        });
+
+        const existingPembayaran = await tx.pembayaranPenjualan.findFirst({
+          where: { penjualanId, jenisPembayaran: "PENJUALAN" },
+          orderBy: { tanggalBayar: "desc" },
+        });
+
+        if (existingPembayaran) {
+          await tx.pembayaranPenjualan.update({
+            where: { id: existingPembayaran.id },
+            data: {
+              nominal: BigInt(jumlahDibayar),
+              totalCash: BigInt(totalCashFinal),
+              totalTransfer: BigInt(totalTransferFinal),
+              metode: metodePembayaran,
+              tanggalBayar: pembayaranDate,
+            },
+          });
+        } else {
+          let nextPembayaranNumber = 1;
+          if (lastPembayaran) {
+            const lastNumber = parseInt(
+              lastPembayaran.kodePembayaran.split("-")[2]
+            );
+            nextPembayaranNumber = lastNumber + 1;
+          }
+
+          const kodePembayaran = `BYR-${pembayaranDateStr}-${String(
+            nextPembayaranNumber
+          ).padStart(4, "0")}`;
+
+          await tx.pembayaranPenjualan.create({
+            data: {
+              kodePembayaran,
+              penjualanId,
+              tanggalBayar: pembayaranDate,
+              nominal: BigInt(jumlahDibayar),
+              totalCash: BigInt(totalCashFinal),
+              totalTransfer: BigInt(totalTransferFinal),
+              metode: metodePembayaran,
+            },
+          });
+        }
+      }
 
       if (!updatedHeader.karyawanId) {
         const oldCustomerId = penjualan.customerId;

@@ -64,14 +64,12 @@ export async function GET(request: NextRequest) {
         };
       }
 
-      // Hitung total pcs terjual (dus * jumlahPerKemasan + pcs)
-      const totalPcs = Number(item.jumlahDus) + Number(item.jumlahPcs);
+      // Total item terjual sudah tersimpan sebagai totalItem
+      const totalPcs = Number(item.totalItem || 0);
       groupedData[barangKey].totalTerjual += totalPcs;
 
       // Hitung total penjualan dalam rupiah
-      const subtotal =
-        (Number(item.jumlahDus) + Number(item.jumlahPcs)) *
-        Number(item.hargaJual);
+      const subtotal = totalPcs * Number(item.hargaJual);
       const afterDiskon = subtotal - Number(item.diskonPerItem);
       groupedData[barangKey].totalPenjualan += afterDiskon;
     });

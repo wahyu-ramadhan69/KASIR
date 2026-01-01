@@ -352,7 +352,10 @@ export async function GET(request: NextRequest) {
       .toISOString()
       .slice(0, 10)}.pdf`;
 
-    return new NextResponse(pdfBuffer, {
+    // Convert Buffer to Uint8Array explicitly
+    const uint8Array = new Uint8Array(pdfBuffer);
+
+    return new NextResponse(uint8Array, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,

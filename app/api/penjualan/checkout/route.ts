@@ -166,6 +166,8 @@ export async function POST(request: NextRequest) {
       jumlahDibayar,
       diskonNota = 0,
       metodePembayaran = "CASH",
+      totalCash = 0,
+      totalTransfer = 0,
       tanggalJatuhTempo,
       customerId,
       namaCustomer,
@@ -585,6 +587,27 @@ export async function POST(request: NextRequest) {
       });
 
       if (jumlahDibayar > 0) {
+        const normalizedTotalCash = toNumber(totalCash);
+        const normalizedTotalTransfer = toNumber(totalTransfer);
+        let totalCashFinal = normalizedTotalCash;
+        let totalTransferFinal = normalizedTotalTransfer;
+
+        if (metodePembayaran === "TRANSFER") {
+          totalCashFinal = 0;
+          totalTransferFinal =
+            normalizedTotalTransfer > 0
+              ? normalizedTotalTransfer
+              : jumlahDibayar;
+        } else if (metodePembayaran === "CASH_TRANSFER") {
+          if (normalizedTotalCash === 0 && normalizedTotalTransfer === 0) {
+            totalCashFinal = jumlahDibayar;
+          }
+        } else {
+          totalTransferFinal = 0;
+          totalCashFinal =
+            normalizedTotalCash > 0 ? normalizedTotalCash : jumlahDibayar;
+        }
+
         const pembayaranDate = transaksiDate;
         const pembayaranDateStr = pembayaranDate
           .toISOString()
@@ -619,6 +642,8 @@ export async function POST(request: NextRequest) {
             penjualanId: penjualan.id,
             tanggalBayar: pembayaranDate,
             nominal: BigInt(jumlahDibayar),
+            totalCash: BigInt(totalCashFinal),
+            totalTransfer: BigInt(totalTransferFinal),
             metode: metodePembayaran,
             ...(userId ? { userId } : {}),
           },

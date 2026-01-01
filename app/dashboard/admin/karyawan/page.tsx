@@ -34,7 +34,7 @@ interface Karyawan {
   alamat: string | null;
   jenis: string;
   gajiPokok: number;
-  tunjanganMakanPerHari: number;
+  tunjanganMakan: number;
   totalPinjaman: number;
   sisaPinjaman: number;
   cicilanPerBulan: number;
@@ -50,7 +50,7 @@ interface KaryawanFormData {
   alamat: string;
   jenis: string;
   gajiPokok: string;
-  tunjanganMakanPerHari: string;
+  tunjanganMakan: string;
   totalPinjaman: string;
   sisaPinjaman: string;
   cicilanPerBulan: string;
@@ -82,7 +82,7 @@ const DataKaryawanPage = () => {
     alamat: "",
     jenis: "KASIR",
     gajiPokok: "",
-    tunjanganMakanPerHari: "",
+    tunjanganMakan: "",
     totalPinjaman: "",
     sisaPinjaman: "",
     cicilanPerBulan: "",
@@ -186,7 +186,7 @@ const DataKaryawanPage = () => {
 
     if (
       name === "gajiPokok" ||
-      name === "tunjanganMakanPerHari" ||
+      name === "tunjanganMakan" ||
       name === "totalPinjaman" ||
       name === "sisaPinjaman" ||
       name === "cicilanPerBulan"
@@ -212,7 +212,7 @@ const DataKaryawanPage = () => {
     if (editingKaryawan) {
       if (
         name === "gajiPokok" ||
-        name === "tunjanganMakanPerHari" ||
+        name === "tunjanganMakan" ||
         name === "totalPinjaman" ||
         name === "sisaPinjaman" ||
         name === "cicilanPerBulan"
@@ -248,7 +248,7 @@ const DataKaryawanPage = () => {
         alamat: formData.alamat || null,
         jenis: formData.jenis,
         gajiPokok: parseInt(formData.gajiPokok) || 0,
-        tunjanganMakanPerHari: parseInt(formData.tunjanganMakanPerHari) || 0,
+        tunjanganMakan: parseInt(formData.tunjanganMakan) || 0,
         totalPinjaman: parseInt(formData.totalPinjaman) || 0,
         sisaPinjaman: parseInt(formData.sisaPinjaman) || 0,
         cicilanPerBulan: parseInt(formData.cicilanPerBulan) || 0,
@@ -274,7 +274,7 @@ const DataKaryawanPage = () => {
           alamat: "",
           jenis: "KASIR",
           gajiPokok: "",
-          tunjanganMakanPerHari: "",
+          tunjanganMakan: "",
           totalPinjaman: "",
           sisaPinjaman: "",
           cicilanPerBulan: "",
@@ -303,7 +303,7 @@ const DataKaryawanPage = () => {
         alamat: karyawan.alamat || "",
         jenis: karyawan.jenis,
         gajiPokok: karyawan.gajiPokok.toString(),
-        tunjanganMakanPerHari: karyawan.tunjanganMakanPerHari.toString(),
+        tunjanganMakan: karyawan.tunjanganMakan.toString(),
         totalPinjaman: karyawan.totalPinjaman.toString(),
         sisaPinjaman: karyawan.sisaPinjaman.toString(),
         cicilanPerBulan: karyawan.cicilanPerBulan.toString(),
@@ -326,8 +326,7 @@ const DataKaryawanPage = () => {
         alamat: editingKaryawan.data.alamat || null,
         jenis: editingKaryawan.data.jenis,
         gajiPokok: parseInt(editingKaryawan.data.gajiPokok) || 0,
-        tunjanganMakanPerHari:
-          parseInt(editingKaryawan.data.tunjanganMakanPerHari) || 0,
+        tunjanganMakan: parseInt(editingKaryawan.data.tunjanganMakan) || 0,
         totalPinjaman: parseInt(editingKaryawan.data.totalPinjaman) || 0,
         sisaPinjaman: parseInt(editingKaryawan.data.sisaPinjaman) || 0,
         cicilanPerBulan: parseInt(editingKaryawan.data.cicilanPerBulan) || 0,
@@ -729,8 +728,7 @@ const DataKaryawanPage = () => {
                               {formatRupiah(karyawan.gajiPokok)}
                             </p>
                             <p className="text-xs text-gray-500">
-                              + {formatRupiah(karyawan.tunjanganMakanPerHari)}
-                              /hari
+                              + {formatRupiah(karyawan.tunjanganMakan)}
                             </p>
                           </div>
                         </td>
@@ -931,9 +929,8 @@ const DataKaryawanPage = () => {
                         Tunjangan Makan
                       </p>
                       <p className="text-2xl font-bold text-green-600">
-                        {formatRupiah(selectedKaryawan.tunjanganMakanPerHari)}
+                        {formatRupiah(selectedKaryawan.tunjanganMakan)}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">Per hari</p>
                     </div>
                   </div>
                 </div>
@@ -1161,7 +1158,7 @@ const DataKaryawanPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <DollarSign className="w-4 h-4 text-green-600" />
-                        Tunjangan Makan/Hari{" "}
+                        Tunjangan Makan{" "}
                         <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
@@ -1170,11 +1167,11 @@ const DataKaryawanPage = () => {
                         </span>
                         <input
                           type="text"
-                          name="tunjanganMakanPerHari"
+                          name="tunjanganMakan"
                           value={
-                            formData.tunjanganMakanPerHari
+                            formData.tunjanganMakan
                               ? parseInt(
-                                  formData.tunjanganMakanPerHari
+                                  formData.tunjanganMakan
                                 ).toLocaleString("id-ID")
                               : ""
                           }
@@ -1444,7 +1441,7 @@ const DataKaryawanPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <DollarSign className="w-4 h-4 text-green-600" />
-                        Tunjangan Makan/Hari{" "}
+                        Tunjangan Makan{" "}
                         <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
@@ -1453,11 +1450,11 @@ const DataKaryawanPage = () => {
                         </span>
                         <input
                           type="text"
-                          name="tunjanganMakanPerHari"
+                          name="tunjanganMakan"
                           value={
-                            editingKaryawan.data.tunjanganMakanPerHari
+                            editingKaryawan.data.tunjanganMakan
                               ? parseInt(
-                                  editingKaryawan.data.tunjanganMakanPerHari
+                                  editingKaryawan.data.tunjanganMakan
                                 ).toLocaleString("id-ID")
                               : ""
                           }

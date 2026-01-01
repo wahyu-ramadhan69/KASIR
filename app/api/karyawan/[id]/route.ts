@@ -47,7 +47,7 @@ export async function PUT(
         alamat: body.alamat,
         jenis: body.jenis,
         gajiPokok: body.gajiPokok,
-        tunjanganMakanPerHari: body.tunjanganMakanPerHari,
+        tunjanganMakan: body.tunjanganMakan,
         totalPinjaman: body.totalPinjaman,
         sisaPinjaman: body.sisaPinjaman,
         cicilanPerBulan: body.cicilanPerBulan,

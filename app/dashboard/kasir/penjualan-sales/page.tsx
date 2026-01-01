@@ -166,6 +166,8 @@ const PenjualanPage = () => {
     "rupiah"
   );
   const [jumlahDibayar, setJumlahDibayar] = useState("");
+  const [jumlahCash, setJumlahCash] = useState("");
+  const [jumlahTransfer, setJumlahTransfer] = useState("");
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -437,9 +439,17 @@ const PenjualanPage = () => {
       setSelectedKaryawan(penjualan.karyawan || null);
       setDiskonNotaType("rupiah");
       setDiskonNota(Number(penjualan.diskonNota).toLocaleString("id-ID"));
-      setJumlahDibayar(
-        Number(penjualan.jumlahDibayar).toLocaleString("id-ID")
+      const penjualanDibayar = Number(penjualan.jumlahDibayar).toLocaleString(
+        "id-ID"
       );
+      setJumlahDibayar(penjualanDibayar);
+      if (penjualan.metodePembayaran === "CASH_TRANSFER") {
+        setJumlahCash(penjualanDibayar);
+        setJumlahTransfer("");
+      } else {
+        setJumlahCash("");
+        setJumlahTransfer("");
+      }
       setTanggalPenjualan(
         penjualan.tanggalTransaksi
           ? new Date(penjualan.tanggalTransaksi).toISOString().split("T")[0]
@@ -553,6 +563,76 @@ const PenjualanPage = () => {
     metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
   ) => {
     return metode === "CASH_TRANSFER" ? "CASH + TRANSFER" : metode;
+  };
+
+  const updatePembayaranFromJumlah = (amount: number) => {
+    const total = currentPenjualan.totalHarga;
+    const kembalian = amount > total ? amount - total : 0;
+    setCurrentPenjualan((prev) => ({
+      ...prev,
+      jumlahDibayar: amount,
+      kembalian,
+      statusPembayaran: amount >= total ? "LUNAS" : "HUTANG",
+    }));
+  };
+
+  const getEffectiveJumlahDibayar = (): number => {
+    if (currentPenjualan.metodePembayaran === "CASH_TRANSFER") {
+      return (
+        parseRupiahToNumber(jumlahCash) +
+        parseRupiahToNumber(jumlahTransfer)
+      );
+    }
+    return parseRupiahToNumber(jumlahDibayar);
+  };
+
+  const getPembayaranBreakdown = (): { cash: number; transfer: number } => {
+    if (currentPenjualan.metodePembayaran === "CASH_TRANSFER") {
+      return {
+        cash: parseRupiahToNumber(jumlahCash),
+        transfer: parseRupiahToNumber(jumlahTransfer),
+      };
+    }
+
+    if (currentPenjualan.metodePembayaran === "TRANSFER") {
+      return { cash: 0, transfer: parseRupiahToNumber(jumlahDibayar) };
+    }
+
+    return { cash: parseRupiahToNumber(jumlahDibayar), transfer: 0 };
+  };
+
+  const handleMetodePembayaranChange = (
+    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  ) => {
+    if (metode === "CASH_TRANSFER") {
+      if (jumlahDibayar) {
+        setJumlahCash(jumlahDibayar);
+        updatePembayaranFromJumlah(parseRupiahToNumber(jumlahDibayar));
+      }
+      if (!jumlahTransfer) {
+        setJumlahTransfer("");
+      }
+    } else if (currentPenjualan.metodePembayaran === "CASH_TRANSFER") {
+      const total =
+        parseRupiahToNumber(jumlahCash) +
+        parseRupiahToNumber(jumlahTransfer);
+      setJumlahDibayar(total ? total.toLocaleString("id-ID") : "");
+      updatePembayaranFromJumlah(total);
+      setJumlahCash("");
+      setJumlahTransfer("");
+    }
+
+    setCurrentPenjualan((prev) => ({
+      ...prev,
+      metodePembayaran: metode,
+    }));
+  };
+
+  const setJumlahByNumber = (
+    setter: (value: string) => void,
+    value: number
+  ) => {
+    setter(value ? value.toLocaleString("id-ID") : "");
   };
 
   const handleAddItem = async (barang: Barang) => {
@@ -721,7 +801,7 @@ const PenjualanPage = () => {
     // Diskon nota dihitung dari subtotal SETELAH diskon item
     const diskonNotaRupiah = calculateDiskonNotaRupiah(subtotalSetelahDiskon);
     const totalHarga = subtotalSetelahDiskon - diskonNotaRupiah;
-    const dibayar = parseRupiahToNumber(jumlahDibayar);
+    const dibayar = getEffectiveJumlahDibayar();
     const kembalian = dibayar > totalHarga ? dibayar - totalHarga : 0;
 
     setCurrentPenjualan((prev) => ({
@@ -767,7 +847,7 @@ const PenjualanPage = () => {
     }
 
     const totalHarga = subtotalSetelahDiskon - diskonNotaRupiah;
-    const dibayar = parseRupiahToNumber(jumlahDibayar);
+    const dibayar = getEffectiveJumlahDibayar();
     const kembalian = dibayar > totalHarga ? dibayar - totalHarga : 0;
 
     setCurrentPenjualan((prev) => ({
@@ -1064,10 +1144,7 @@ const PenjualanPage = () => {
       return;
     }
 
-    if (!jumlahDibayar) {
-      toast.error("Jumlah pembayaran harus diisi");
-      return;
-    }
+    const jumlahDibayarFinal = getEffectiveJumlahDibayar();
 
     setLoading(true);
     try {
@@ -1086,13 +1163,16 @@ const PenjualanPage = () => {
           customerId: selectedCustomer?.id,
           karyawanId: selectedKaryawan?.id,
           diskonNota: currentPenjualan.diskonNota,
-          jumlahDibayar: currentPenjualan.jumlahDibayar,
+          jumlahDibayar: jumlahDibayarFinal,
           metodePembayaran: currentPenjualan.metodePembayaran,
           tanggalTransaksi: tanggalPenjualan,
           tanggalJatuhTempo: tanggalJatuhTempo || undefined,
           keterangan: keterangan || undefined,
           rutePengiriman: rutePengiriman || undefined,
         };
+        const { cash, transfer } = getPembayaranBreakdown();
+        updatePayload.totalCash = cash;
+        updatePayload.totalTransfer = transfer;
 
         const updateRes = await fetch(
           `/api/penjualan/${editPenjualanId}/edit`,
@@ -1176,12 +1256,14 @@ const PenjualanPage = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             diskonNota: currentPenjualan.diskonNota,
-            jumlahDibayar: currentPenjualan.jumlahDibayar,
+            jumlahDibayar: jumlahDibayarFinal,
             metodePembayaran: currentPenjualan.metodePembayaran,
             tanggalPenjualan: tanggalPenjualan,
             tanggalJatuhTempo: tanggalJatuhTempo || undefined,
             keterangan: keterangan || undefined,
             rutePengiriman: rutePengiriman || undefined,
+            totalCash: getPembayaranBreakdown().cash,
+            totalTransfer: getPembayaranBreakdown().transfer,
           }),
         }
       );
@@ -1232,6 +1314,8 @@ const PenjualanPage = () => {
     setSelectedKaryawan(null);
     setDiskonNota("0");
     setJumlahDibayar("");
+    setJumlahCash("");
+    setJumlahTransfer("");
     setTanggalPenjualan(new Date().toISOString().split("T")[0]);
     setTanggalJatuhTempo("");
     setKeterangan("");
@@ -1256,7 +1340,7 @@ const PenjualanPage = () => {
   );
 
   const getPaymentStatus = () => {
-    const bayar = currentPenjualan.jumlahDibayar;
+    const bayar = getEffectiveJumlahDibayar();
     const total = currentPenjualan.totalHarga;
 
     if (bayar >= total) {
@@ -1296,7 +1380,11 @@ const PenjualanPage = () => {
     }
   };
 
-  const paymentStatus = jumlahDibayar ? getPaymentStatus() : null;
+  const hasPaymentInput =
+    currentPenjualan.metodePembayaran === "CASH_TRANSFER"
+      ? jumlahCash.trim() !== "" || jumlahTransfer.trim() !== ""
+      : jumlahDibayar.trim() !== "";
+  const paymentStatus = hasPaymentInput ? getPaymentStatus() : null;
 
   const totalDiskonItem = currentPenjualan.items.reduce((sum, item) => {
     const { jumlahDus } = getDerivedQty(item);
@@ -2465,12 +2553,7 @@ const PenjualanPage = () => {
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
                   <button
-                    onClick={() =>
-                      setCurrentPenjualan({
-                        ...currentPenjualan,
-                        metodePembayaran: "CASH",
-                      })
-                    }
+                    onClick={() => handleMetodePembayaranChange("CASH")}
                     className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
                       currentPenjualan.metodePembayaran === "CASH"
                         ? "bg-slate-700 text-white border-slate-700"
@@ -2481,12 +2564,7 @@ const PenjualanPage = () => {
                     Cash
                   </button>
                   <button
-                    onClick={() =>
-                      setCurrentPenjualan({
-                        ...currentPenjualan,
-                        metodePembayaran: "TRANSFER",
-                      })
-                    }
+                    onClick={() => handleMetodePembayaranChange("TRANSFER")}
                     className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
                       currentPenjualan.metodePembayaran === "TRANSFER"
                         ? "bg-slate-700 text-white border-slate-700"
@@ -2498,10 +2576,7 @@ const PenjualanPage = () => {
                   </button>
                   <button
                     onClick={() =>
-                      setCurrentPenjualan({
-                        ...currentPenjualan,
-                        metodePembayaran: "CASH_TRANSFER",
-                      })
+                      handleMetodePembayaranChange("CASH_TRANSFER")
                     }
                     className={`p-3 rounded-lg border transition-all font-semibold text-sm flex items-center justify-center gap-2 ${
                       currentPenjualan.metodePembayaran === "CASH_TRANSFER"
@@ -2515,96 +2590,132 @@ const PenjualanPage = () => {
                 </div>
               </div>
 
-              {/* Jumlah Dibayar & Rute Pengiriman */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Jumlah Dibayar */}
+              <div className="space-y-2.5">
                 {/* Payment Amount */}
                 <div className="space-y-2.5">
                   <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-2">
                     <Banknote className="w-4 h-4 text-slate-600" />
-                    Jumlah Dibayar
+                    {currentPenjualan.metodePembayaran === "CASH_TRANSFER"
+                      ? "Jumlah Pembayaran"
+                      : "Jumlah Dibayar"}
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm">
-                      Rp
-                    </span>
-                    <input
-                      type="text"
-                      value={jumlahDibayar}
-                      onChange={(e) => {
-                        const formatted = formatRupiahInput(e.target.value);
-                        setJumlahDibayar(formatted);
-                        const dibayar = parseRupiahToNumber(formatted);
-                        const kembalian =
-                          dibayar > currentPenjualan.totalHarga
-                            ? dibayar - currentPenjualan.totalHarga
-                            : 0;
-                        setCurrentPenjualan((prev) => ({
-                          ...prev,
-                          jumlahDibayar: dibayar,
-                          kembalian,
-                          statusPembayaran:
-                            dibayar >= currentPenjualan.totalHarga
-                              ? "LUNAS"
-                              : "HUTANG",
-                        }));
-                      }}
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-sm font-semibold transition-all"
-                      placeholder="0"
-                    />
-                  </div>
-                  {/* Payment Suggestions */}
-                  <div className="flex gap-2">
-                    {[
-                      { label: "Semua", percent: 100 },
-                      { label: "70%", percent: 70 },
-                      { label: "50%", percent: 50 },
-                      { label: "30%", percent: 30 },
-                    ].map((suggestion) => (
-                      <button
-                        key={suggestion.percent}
-                        onClick={() => {
-                          const amount = Math.round(
-                            (currentPenjualan.totalHarga * suggestion.percent) /
-                              100
-                          );
-                          const formatted = amount.toLocaleString("id-ID");
-                          setJumlahDibayar(formatted);
-                          const kembalian =
-                            amount > currentPenjualan.totalHarga
-                              ? amount - currentPenjualan.totalHarga
-                              : 0;
-                          setCurrentPenjualan((prev) => ({
-                            ...prev,
-                            jumlahDibayar: amount,
-                            kembalian,
-                            statusPembayaran:
-                              amount >= currentPenjualan.totalHarga
-                                ? "LUNAS"
-                                : "HUTANG",
-                          }));
-                        }}
-                        className="flex-1 px-2 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors border border-slate-200 hover:border-slate-300"
-                      >
-                        {suggestion.label}
-                      </button>
-                    ))}
-                  </div>
+                  {currentPenjualan.metodePembayaran === "CASH_TRANSFER" ? (
+                    <>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm">
+                            Rp
+                          </span>
+                          <input
+                            type="text"
+                            value={jumlahCash}
+                            onChange={(e) => {
+                              const formatted = formatRupiahInput(
+                                e.target.value
+                              );
+                              setJumlahCash(formatted);
+                              updatePembayaranFromJumlah(
+                                parseRupiahToNumber(formatted) +
+                                  parseRupiahToNumber(jumlahTransfer)
+                              );
+                            }}
+                            className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-sm font-semibold transition-all"
+                            placeholder="Jumlah Cash"
+                          />
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm">
+                            Rp
+                          </span>
+                          <input
+                            type="text"
+                            value={jumlahTransfer}
+                            onChange={(e) => {
+                              const formatted = formatRupiahInput(
+                                e.target.value
+                              );
+                              setJumlahTransfer(formatted);
+                              updatePembayaranFromJumlah(
+                                parseRupiahToNumber(jumlahCash) +
+                                  parseRupiahToNumber(formatted)
+                              );
+                            }}
+                            className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-sm font-semibold transition-all"
+                            placeholder="Jumlah Transfer"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 font-medium">
+                        Total dibayar: {formatRupiah(getEffectiveJumlahDibayar())}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm">
+                          Rp
+                        </span>
+                        <input
+                          type="text"
+                          value={jumlahDibayar}
+                          onChange={(e) => {
+                            const formatted = formatRupiahInput(e.target.value);
+                            setJumlahDibayar(formatted);
+                            updatePembayaranFromJumlah(
+                              parseRupiahToNumber(formatted)
+                            );
+                          }}
+                          className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-sm font-semibold transition-all"
+                          placeholder="0"
+                        />
+                      </div>
+                      {/* Payment Suggestions */}
+                      <div className="flex gap-2">
+                        {[
+                          { label: "Semua", percent: 100 },
+                          { label: "70%", percent: 70 },
+                          { label: "50%", percent: 50 },
+                          { label: "30%", percent: 30 },
+                        ].map((suggestion) => (
+                          <button
+                            key={suggestion.percent}
+                            onClick={() => {
+                              const amount = Math.round(
+                                (currentPenjualan.totalHarga *
+                                  suggestion.percent) /
+                                  100
+                              );
+                              setJumlahByNumber(
+                                setJumlahDibayar,
+                                amount
+                              );
+                              updatePembayaranFromJumlah(amount);
+                            }}
+                            className="flex-1 px-2 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors border border-slate-200 hover:border-slate-300"
+                          >
+                            {suggestion.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
+              </div>
 
-                {/* Rute Pengiriman */}
-                <div className="space-y-2.5">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-                    <Package className="w-4 h-4 text-slate-600" />
-                    Rute Pengiriman
-                  </label>
-                  <input
-                    type="text"
-                    value={rutePengiriman}
-                    onChange={(e) => setRutePengiriman(e.target.value)}
-                    className="w-full px-3.5 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-sm font-semibold transition-all"
-                    placeholder="Contoh: Jakarta - Bandung"
-                  />
-                </div>
+              {/* Rute Pengiriman */}
+              <div className="space-y-2.5">
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+                  <Package className="w-4 h-4 text-slate-600" />
+                  Rute Pengiriman
+                </label>
+                <input
+                  type="text"
+                  value={rutePengiriman}
+                  onChange={(e) => setRutePengiriman(e.target.value)}
+                  className="w-full px-3.5 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-sm font-semibold transition-all"
+                  placeholder="Contoh: Jakarta - Bandung"
+                />
               </div>
 
               {/* Payment Status */}

@@ -196,6 +196,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     "rupiah"
   );
   const [jumlahDibayar, setJumlahDibayar] = useState<string>("");
+  const [jumlahCash, setJumlahCash] = useState<string>("");
+  const [jumlahTransfer, setJumlahTransfer] = useState<string>("");
   const [metodePembayaran, setMetodePembayaran] = useState<
     "CASH" | "TRANSFER" | "CASH_TRANSFER"
   >("CASH");
@@ -373,9 +375,20 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       }
 
       setDiskonNotaType("rupiah");
+      const penjualanMetode = resolveMetodePembayaran(penjualan);
+      const penjualanDibayar = Number(penjualan.jumlahDibayar).toLocaleString(
+        "id-ID"
+      );
       setDiskonNota(Number(penjualan.diskonNota).toLocaleString("id-ID"));
-      setJumlahDibayar(Number(penjualan.jumlahDibayar).toLocaleString("id-ID"));
-      setMetodePembayaran(resolveMetodePembayaran(penjualan));
+      setJumlahDibayar(penjualanDibayar);
+      setMetodePembayaran(penjualanMetode);
+      if (penjualanMetode === "CASH_TRANSFER") {
+        setJumlahCash(penjualanDibayar);
+        setJumlahTransfer("");
+      } else {
+        setJumlahCash("");
+        setJumlahTransfer("");
+      }
 
       const transaksiDate = penjualan.tanggalTransaksi
         ? new Date(penjualan.tanggalTransaksi).toISOString().split("T")[0]
@@ -838,16 +851,67 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     return Math.max(0, customer.limit_piutang - customer.piutang);
   };
 
+  const getEffectiveJumlahDibayar = (): number => {
+    if (metodePembayaran === "CASH_TRANSFER") {
+      return (
+        parseRupiahToNumber(jumlahCash) +
+        parseRupiahToNumber(jumlahTransfer)
+      );
+    }
+    return parseRupiahToNumber(jumlahDibayar);
+  };
+
+  const getPembayaranBreakdown = (): { cash: number; transfer: number } => {
+    if (metodePembayaran === "CASH_TRANSFER") {
+      return {
+        cash: parseRupiahToNumber(jumlahCash),
+        transfer: parseRupiahToNumber(jumlahTransfer),
+      };
+    }
+
+    if (metodePembayaran === "TRANSFER") {
+      return { cash: 0, transfer: parseRupiahToNumber(jumlahDibayar) };
+    }
+
+    return { cash: parseRupiahToNumber(jumlahDibayar), transfer: 0 };
+  };
+
+  const handleMetodePembayaranChange = (
+    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  ) => {
+    if (metode === "CASH_TRANSFER") {
+      if (jumlahDibayar) {
+        setJumlahCash(jumlahDibayar);
+      }
+      if (!jumlahTransfer) {
+        setJumlahTransfer("");
+      }
+    } else if (metodePembayaran === "CASH_TRANSFER") {
+      const total =
+        parseRupiahToNumber(jumlahCash) +
+        parseRupiahToNumber(jumlahTransfer);
+      setJumlahDibayar(total ? total.toLocaleString("id-ID") : "");
+      setJumlahCash("");
+      setJumlahTransfer("");
+    }
+
+    setMetodePembayaran(metode);
+  };
+
+  const setJumlahByNumber = (
+    setter: (value: string) => void,
+    value: number
+  ) => {
+    setter(value ? value.toLocaleString("id-ID") : "");
+  };
+
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
       toast.error("Item dijual masih kosong");
       return;
     }
 
-    if (!jumlahDibayar) {
-      toast.error("Jumlah pembayaran wajib diisi");
-      return;
-    }
+    const jumlahDibayarFinal = getEffectiveJumlahDibayar();
 
     if (!selectedCustomer && !manualCustomerName) {
       toast.error("Customer atau nama customer wajib diisi");
@@ -870,12 +934,15 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
             diskonPerItem: item.diskonPerItem,
             berat: getItemBeratGrams(item),
           })),
-          jumlahDibayar: parseRupiahToNumber(jumlahDibayar),
+          jumlahDibayar: jumlahDibayarFinal,
           diskonNota: diskonNotaRupiah,
           metodePembayaran,
           tanggalTransaksi,
           tanggalJatuhTempo,
         };
+        const { cash, transfer } = getPembayaranBreakdown();
+        updatePayload.totalCash = cash;
+        updatePayload.totalTransfer = transfer;
 
         if (selectedCustomer) {
           updatePayload.customerId = selectedCustomer.id;
@@ -922,10 +989,13 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           diskonPerItem: item.diskonPerItem,
           berat: getItemBeratGrams(item),
         })),
-        jumlahDibayar: parseRupiahToNumber(jumlahDibayar),
+        jumlahDibayar: jumlahDibayarFinal,
         diskonNota: diskonNotaRupiah,
         metodePembayaran,
       };
+      const { cash, transfer } = getPembayaranBreakdown();
+      checkoutData.totalCash = cash;
+      checkoutData.totalTransfer = transfer;
 
       if (selectedCustomer) {
         checkoutData.customerId = selectedCustomer.id;
@@ -999,6 +1069,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setDiskonNota("0");
     setDiskonNotaType("rupiah");
     setJumlahDibayar("");
+    setJumlahCash("");
+    setJumlahTransfer("");
     setMetodePembayaran("CASH");
     setTanggalJatuhTempo("");
     setItemDiskonTypes({});
@@ -1040,7 +1112,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   );
 
   const getPaymentStatus = () => {
-    const bayar = parseRupiahToNumber(jumlahDibayar);
+    const bayar = getEffectiveJumlahDibayar();
     const total = Math.max(0, calculatedTotal);
 
     if (bayar >= total) {
@@ -1087,7 +1159,11 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     }
   };
 
-  const paymentStatus = jumlahDibayar ? getPaymentStatus() : null;
+  const hasPaymentInput =
+    metodePembayaran === "CASH_TRANSFER"
+      ? jumlahCash.trim() !== "" || jumlahTransfer.trim() !== ""
+      : jumlahDibayar.trim() !== "";
+  const paymentStatus = hasPaymentInput ? getPaymentStatus() : null;
 
   return (
     <div className="w-full min-h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] overflow-x-hidden overflow-y-auto flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100">
@@ -2178,7 +2254,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <button
-                    onClick={() => setMetodePembayaran("CASH")}
+                    onClick={() => handleMetodePembayaranChange("CASH")}
                     className={`py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 border-2 ${
                       metodePembayaran === "CASH"
                         ? "bg-slate-800 border-slate-800 text-white"
@@ -2189,7 +2265,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                     Cash
                   </button>
                   <button
-                    onClick={() => setMetodePembayaran("TRANSFER")}
+                    onClick={() => handleMetodePembayaranChange("TRANSFER")}
                     className={`py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 border-2 ${
                       metodePembayaran === "TRANSFER"
                         ? "bg-slate-800 border-slate-800 text-white"
@@ -2200,7 +2276,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                     Transfer
                   </button>
                   <button
-                    onClick={() => setMetodePembayaran("CASH_TRANSFER")}
+                    onClick={() =>
+                      handleMetodePembayaranChange("CASH_TRANSFER")
+                    }
                     className={`py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 border-2 ${
                       metodePembayaran === "CASH_TRANSFER"
                         ? "bg-slate-800 border-slate-800 text-white"
@@ -2218,55 +2296,98 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                 <div className="flex items-center gap-2 mb-2">
                   <Banknote className="w-4 h-4 text-slate-700" />
                   <label className="font-bold text-slate-900 uppercase text-xs tracking-wider">
-                    Jumlah Dibayar <span className="text-red-500">*</span>
+                    {metodePembayaran === "CASH_TRANSFER"
+                      ? "Jumlah Pembayaran"
+                      : "Jumlah Dibayar"}{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                 </div>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-semibold">
-                    Rp
-                  </span>
-                  <input
-                    type="text"
-                    value={jumlahDibayar}
-                    onChange={(e) =>
-                      setJumlahDibayar(formatRupiahInput(e.target.value))
-                    }
-                    className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent outline-none text-base font-semibold"
-                    placeholder="0"
-                  />
-                </div>
-                {/* Quick Amount Buttons */}
-                <div className="flex gap-2 flex-wrap mt-2">
-                  <button
-                    onClick={() =>
-                      setJumlahDibayar(
-                        Math.max(0, calculatedTotal).toLocaleString("id-ID")
-                      )
-                    }
-                    className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-md text-xs font-semibold hover:bg-slate-200 transition-colors"
-                  >
-                    Semua
-                  </button>
-                  {[375000, 562500, 750000].map((percent) => (
-                    <button
-                      key={percent}
-                      onClick={() =>
-                        setJumlahDibayar(
-                          Math.round(
-                            Math.max(0, calculatedTotal) * (percent / 750000)
-                          ).toLocaleString("id-ID")
-                        )
+
+                {metodePembayaran === "CASH_TRANSFER" ? (
+                  <>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-semibold">
+                          Rp
+                        </span>
+                        <input
+                          type="text"
+                          value={jumlahCash}
+                          onChange={(e) =>
+                            setJumlahCash(formatRupiahInput(e.target.value))
+                          }
+                          className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent outline-none text-base font-semibold"
+                          placeholder="Jumlah Cash"
+                        />
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-semibold">
+                          Rp
+                        </span>
+                        <input
+                          type="text"
+                          value={jumlahTransfer}
+                          onChange={(e) =>
+                            setJumlahTransfer(formatRupiahInput(e.target.value))
+                          }
+                          className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent outline-none text-base font-semibold"
+                          placeholder="Jumlah Transfer"
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500 font-medium">
+                      Total dibayar: {formatRupiah(getEffectiveJumlahDibayar())}
+                    </p>
+                  </>
+                ) : (
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-semibold">
+                      Rp
+                    </span>
+                    <input
+                      type="text"
+                      value={jumlahDibayar}
+                      onChange={(e) =>
+                        setJumlahDibayar(formatRupiahInput(e.target.value))
                       }
+                      className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent outline-none text-base font-semibold"
+                      placeholder="0"
+                    />
+                  </div>
+                )}
+
+                {/* Quick Amount Buttons */}
+                {metodePembayaran !== "CASH_TRANSFER" && (
+                  <div className="flex gap-2 flex-wrap mt-2">
+                    <button
+                      onClick={() => {
+                        const total = Math.max(0, calculatedTotal);
+                        setJumlahByNumber(setJumlahDibayar, total);
+                      }}
                       className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-md text-xs font-semibold hover:bg-slate-200 transition-colors"
                     >
-                      {percent === 375000
-                        ? "50%"
-                        : percent === 562500
-                        ? "75%"
-                        : "100%"}
+                      Semua
                     </button>
-                  ))}
-                </div>
+                    {[375000, 562500, 750000].map((percent) => (
+                      <button
+                        key={percent}
+                        onClick={() => {
+                          const total = Math.round(
+                            Math.max(0, calculatedTotal) * (percent / 750000)
+                          );
+                          setJumlahByNumber(setJumlahDibayar, total);
+                        }}
+                        className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-md text-xs font-semibold hover:bg-slate-200 transition-colors"
+                      >
+                        {percent === 375000
+                          ? "50%"
+                          : percent === 562500
+                          ? "75%"
+                          : "100%"}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Payment Preview */}
@@ -2362,7 +2483,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   onClick={handleCheckout}
                   disabled={
                     loading ||
-                    !jumlahDibayar ||
+                    !hasPaymentInput ||
                     (!selectedCustomer && !manualCustomerName) ||
                     (paymentStatus !== null && !paymentStatus.canCheckout)
                   }
