@@ -324,6 +324,7 @@ enum KondisiBarang {
 
 enum JenisPengeluaran {
   HARIAN
+  MINGGUAN
   BULANAN
   TAHUNAN
 }

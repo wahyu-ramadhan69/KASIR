@@ -47,6 +47,13 @@ export async function PUT(
   if (!authData) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = Number(authData.userId);
+  if (!Number.isInteger(userId)) {
+    return NextResponse.json(
+      { error: "Unauthorized (user tidak valid)" },
+      { status: 401 }
+    );
+  }
   try {
     const { id } = await params; // ← Await params
     const body = await request.json();
@@ -54,7 +61,7 @@ export async function PUT(
       body;
 
     if (
-      !["HARIAN", "BULANAN", "TAHUNAN"].includes(jenisPengeluaran) ||
+      !["HARIAN", "MINGGUAN", "BULANAN", "TAHUNAN"].includes(jenisPengeluaran) ||
       !namaPengeluaran ||
       !jumlah
     ) {
@@ -74,6 +81,17 @@ export async function PUT(
       );
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized (user tidak ditemukan)" },
+        { status: 401 }
+      );
+    }
+
     const pengeluaran = await prisma.pengeluaran.update({
       where: { id: parseInt(id) },
       data: {
@@ -82,7 +100,7 @@ export async function PUT(
         jumlah: parseInt(jumlah),
         keterangan: keterangan || null,
         tanggalInput: tanggal,
-        userId: parseInt(authData.userId),
+        userId: userId,
       },
       include: {
         user: true,

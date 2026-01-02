@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
@@ -412,9 +412,6 @@ export async function POST(
       }
 
       const updateData: any = {
-        supplier: {
-          connect: { id: targetSupplierId },
-        },
         subtotal: BigInt(subtotal),
         diskonNota: BigInt(diskonNota),
         totalHarga: BigInt(totalHarga),
@@ -430,20 +427,42 @@ export async function POST(
 
       if (statusPembayaran === "HUTANG") {
         updateData.tanggalJatuhTempo = jatuhTempo;
-      } else {
-        updateData.tanggalJatuhTempo = null;
       }
 
-      const updatedPembelian = await tx.pembelianHeader.update({
-        where: { id: pembelianId },
-        data: updateData,
-        include: {
-          supplier: true,
-          items: {
-            include: { barang: true },
+      let updatedPembelian;
+      try {
+        updatedPembelian = await tx.pembelianHeader.update({
+          where: { id: pembelianId },
+          data: {
+            ...updateData,
+            supplier: { connect: { id: targetSupplierId } },
           },
-        },
-      });
+          include: {
+            supplier: true,
+            items: {
+              include: { barang: true },
+            },
+          },
+        });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientValidationError) {
+          updatedPembelian = await tx.pembelianHeader.update({
+            where: { id: pembelianId },
+            data: {
+              ...updateData,
+              supplierId: targetSupplierId,
+            },
+            include: {
+              supplier: true,
+              items: {
+                include: { barang: true },
+              },
+            },
+          });
+        } else {
+          throw err;
+        }
+      }
 
       const oldSupplierId = pembelian.supplierId;
       if (oldSupplierId !== targetSupplierId) {

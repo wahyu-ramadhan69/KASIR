@@ -202,6 +202,11 @@ const adminTransactionLinks = [
         icon: <CalendarDays className="w-4 h-4" />,
       },
       {
+        label: "Pengeluaran Mingguan",
+        href: "/dashboard/admin/pengeluaran/mingguan",
+        icon: <CalendarDays className="w-4 h-4" />,
+      },
+      {
         label: "Pengeluaran Bulanan",
         href: "/dashboard/admin/pengeluaran/bulanan",
         icon: <Calendar1 className="w-4 h-4" />,
@@ -376,6 +381,11 @@ const kasirTransactionLinks = [
       {
         label: "Pengeluaran Harian",
         href: "/dashboard/kasir/pengeluaran/harian",
+        icon: <CalendarDays className="w-4 h-4" />,
+      },
+      {
+        label: "Pengeluaran Mingguan",
+        href: "/dashboard/kasir/pengeluaran/mingguan",
         icon: <CalendarDays className="w-4 h-4" />,
       },
     ],
