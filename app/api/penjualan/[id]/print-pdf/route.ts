@@ -180,12 +180,6 @@ export async function GET(
       .font("RobotoMono")
       .text(penjualan.metodePembayaran || "-", leftCol + 55, currentY);
 
-    currentY += 12;
-    doc.font("RobotoMono-Bold").text("Status:", leftCol, currentY);
-    doc
-      .font("RobotoMono")
-      .text(penjualan.statusPembayaran || "-", leftCol + 55, currentY);
-
     doc.moveDown(0.5);
     doc
       .moveTo(margin, doc.y)

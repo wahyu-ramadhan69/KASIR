@@ -305,10 +305,6 @@ export async function GET(
       <span class="info-label">Metode:</span>
       <span>${penjualan.metodePembayaran}</span>
     </div>
-    <div class="info-row">
-      <span class="info-label">Status:</span>
-      <span>${penjualan.statusPembayaran}</span>
-    </div>
   </div>
 
   <div class="divider"></div>
