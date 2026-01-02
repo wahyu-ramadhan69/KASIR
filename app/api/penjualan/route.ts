@@ -162,7 +162,12 @@ export async function GET(request: NextRequest) {
       baseWhere.OR = [
         { kodePenjualan: { contains: search, mode: "insensitive" } },
         { namaCustomer: { contains: search, mode: "insensitive" } },
-        { namaSales: { contains: search, mode: "insensitive" } },
+        { karyawan: { nama: { contains: search, mode: "insensitive" } } },
+        {
+          perjalananSales: {
+            karyawan: { nama: { contains: search, mode: "insensitive" } },
+          },
+        },
         { customer: { nama: { contains: search, mode: "insensitive" } } },
         { customer: { namaToko: { contains: search, mode: "insensitive" } } },
       ];

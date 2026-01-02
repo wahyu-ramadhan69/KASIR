@@ -45,6 +45,8 @@ function serializePembelian(pembelian: any) {
             hargaJual: bigIntToNumber(item.barang.hargaJual),
             stok: bigIntToNumber(item.barang.stok),
             jumlahPerKemasan: bigIntToNumber(item.barang.jumlahPerKemasan),
+            berat: bigIntToNumber(item.barang.berat),
+            limitStok: bigIntToNumber(item.barang.limitStok),
             ukuran: bigIntToNumber(item.barang.ukuran),
             limitPenjualan: bigIntToNumber(item.barang.limitPenjualan),
           }
