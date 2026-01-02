@@ -76,7 +76,7 @@ const DataCustomerPage = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "high" | "medium" | "low"
+    "all" | "high" | "medium" | "low" | "hutang" | "tanpaHutang"
   >("all");
   const [sortBy, setSortBy] = useState<"name" | "piutang" | "limit" | "date">(
     "name"
@@ -467,6 +467,8 @@ const DataCustomerPage = () => {
 
   const filteredCustomers = customerList.filter((customer) => {
     if (filterStatus === "all") return true;
+    if (filterStatus === "hutang") return customer.piutang > 0;
+    if (filterStatus === "tanpaHutang") return customer.piutang <= 0;
     const percentage = getPiutangPercentage(
       customer.piutang,
       customer.limit_piutang
@@ -644,6 +646,8 @@ const DataCustomerPage = () => {
                 <option value="high">Risiko Tinggi</option>
                 <option value="medium">Risiko Sedang</option>
                 <option value="low">Risiko Rendah</option>
+                <option value="hutang">Customer dengan Hutang</option>
+                <option value="tanpaHutang">Customer Tanpa Hutang</option>
               </select>
 
               <button className="px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2">

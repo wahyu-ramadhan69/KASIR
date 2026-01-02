@@ -185,7 +185,7 @@ const adminTransactionLinks = [
         icon: <ReceiptText className="w-4 h-4" />,
       },
       {
-        label: "Riwayat Bayar Piutang",
+        label: "Riwayat Bayar Piutang CS",
         href: "/dashboard/admin/hutang-piutang/riwayat-pembayaran",
         icon: <ReceiptText className="w-4 h-4" />,
       },
@@ -362,7 +362,7 @@ const kasirTransactionLinks = [
         icon: <ReceiptText className="w-4 h-4" />,
       },
       {
-        label: "Riwayat Bayar Piutang",
+        label: "Riwayat Bayar Piutang CS",
         href: "/dashboard/kasir/hutang-piutang/riwayat-pembayaran",
         icon: <ReceiptText className="w-4 h-4" />,
       },
@@ -750,11 +750,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
                 <span className="text-gray-400 group-hover:text-red-400 flex-shrink-0">
                   <LogOut className="w-5 h-5" />
                 </span>
-                {!isCollapsed && <span>Sign Out</span>}
+                {!isCollapsed && <span>Keluar</span>}
               </button>
               {isCollapsed && (
                 <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
-                  Sign Out
+                  Keluar
                 </div>
               )}
             </div>

@@ -263,7 +263,6 @@ export async function POST(
     // Deteksi tipe penjualan berdasarkan data yang ada
     const isPenjualanSales = penjualan.karyawanId !== null;
     const effectiveCustomerId = customerId ?? penjualan.customerId ?? null;
-    let updatedLimitPiutang: number | null = null;
 
     // Validasi hutang untuk sales
     if (statusPembayaran === "HUTANG" && isPenjualanSales) {
@@ -313,7 +312,7 @@ export async function POST(
       const piutangBaru = piutangSekarang + sisaHutang;
 
       if (limitPiutang > 0 && piutangBaru > limitPiutang) {
-        updatedLimitPiutang = piutangBaru;
+        // Over-limit tetap boleh, tapi limit_piutang tidak diubah
       }
     } else if (statusPembayaran === "HUTANG" && !isPenjualanSales) {
       return NextResponse.json(
@@ -443,9 +442,6 @@ export async function POST(
           where: { id: effectiveCustomerId },
           data: {
             piutang: { increment: BigInt(sisaHutang) },
-            ...(updatedLimitPiutang !== null
-              ? { limit_piutang: BigInt(updatedLimitPiutang) }
-              : {}),
           },
         });
       }

@@ -8,6 +8,7 @@ import {
   CreditCard,
   Eye,
   Loader2,
+  Pencil,
   RefreshCw,
   Search,
   History,
@@ -87,9 +88,19 @@ const HutangKaryawanPage = () => {
 
   const [showTambahPinjamanModal, setShowTambahPinjamanModal] = useState(false);
   const [showPembayaranModal, setShowPembayaranModal] = useState(false);
+  const [showEditPinjamanModal, setShowEditPinjamanModal] = useState(false);
+  const [showEditPembayaranModal, setShowEditPembayaranModal] = useState(false);
   const [jumlahPinjaman, setJumlahPinjaman] = useState("");
   const [jumlahBayar, setJumlahBayar] = useState("");
+  const [editJumlahPinjaman, setEditJumlahPinjaman] = useState("");
+  const [editJumlahBayar, setEditJumlahBayar] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editingPinjaman, setEditingPinjaman] = useState<PinjamanItem | null>(
+    null
+  );
+  const [editingPembayaran, setEditingPembayaran] =
+    useState<PembayaranItem | null>(null);
 
   const [stats, setStats] = useState({
     totalPinjaman: 0,
@@ -97,7 +108,6 @@ const HutangKaryawanPage = () => {
     rataRataHutang: 0,
   });
   const [karyawanOptions, setKaryawanOptions] = useState<Karyawan[]>([]);
-
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -253,38 +263,16 @@ const HutangKaryawanPage = () => {
     setShowPembayaranModal(true);
   };
 
-  const handleTambahPinjaman = async () => {
-    if (!selectedKaryawan || !jumlahPinjaman) return;
-    setIsSubmitting(true);
+  const handleOpenEditPinjaman = (item: PinjamanItem) => {
+    setEditingPinjaman(item);
+    setEditJumlahPinjaman(item.jumlahPinjaman.toString());
+    setShowEditPinjamanModal(true);
+  };
 
-    try {
-      const res = await fetch(
-        `/api/karyawan/${selectedKaryawan.id}/pinjaman`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jumlahPinjaman: parseInt(jumlahPinjaman),
-          }),
-        }
-      );
-      const data = await res.json();
-      if (data.success) {
-        toast.success(data.message || "Pinjaman berhasil ditambahkan");
-        setShowTambahPinjamanModal(false);
-        setSelectedKaryawan(null);
-        setJumlahPinjaman("");
-        fetchKaryawan(1, true);
-        fetchStats();
-      } else {
-        toast.error(data.error || "Gagal menambahkan pinjaman");
-      }
-    } catch (error) {
-      console.error("Error adding loan:", error);
-      toast.error("Terjadi kesalahan");
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleOpenEditPembayaran = (item: PembayaranItem) => {
+    setEditingPembayaran(item);
+    setEditJumlahBayar(item.jumlahbayar.toString());
+    setShowEditPembayaranModal(true);
   };
 
   const handlePembayaran = async () => {
@@ -313,6 +301,108 @@ const HutangKaryawanPage = () => {
       }
     } catch (error) {
       console.error("Error paying debt:", error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdatePinjaman = async () => {
+    if (!editingPinjaman || !editJumlahPinjaman) return;
+    setIsUpdating(true);
+    try {
+      const res = await fetch(`/api/karyawan/pinjaman/${editingPinjaman.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jumlahPinjaman: parseInt(editJumlahPinjaman),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || "Pinjaman berhasil diperbarui");
+        setShowEditPinjamanModal(false);
+        setEditingPinjaman(null);
+        setEditJumlahPinjaman("");
+        fetchGlobalPinjaman();
+        fetchKaryawan(1, true);
+        fetchStats();
+        if (selectedKaryawan?.id === editingPinjaman.karyawanId) {
+          fetchPinjamanHistory(selectedKaryawan.id);
+        }
+      } else {
+        toast.error(data.error || "Gagal memperbarui pinjaman");
+      }
+    } catch (error) {
+      console.error("Error updating pinjaman:", error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUpdatePembayaran = async () => {
+    if (!editingPembayaran || !editJumlahBayar) return;
+    setIsUpdating(true);
+    try {
+      const res = await fetch(
+        `/api/karyawan/pembayaran-hutang/${editingPembayaran.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jumlahBayar: parseInt(editJumlahBayar),
+          }),
+        }
+      );
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || "Pembayaran berhasil diperbarui");
+        setShowEditPembayaranModal(false);
+        setEditingPembayaran(null);
+        setEditJumlahBayar("");
+        fetchGlobalPembayaran();
+        fetchKaryawan(1, true);
+        fetchStats();
+      } else {
+        toast.error(data.error || "Gagal memperbarui pembayaran");
+      }
+    } catch (error) {
+      console.error("Error updating pembayaran:", error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleTambahPinjaman = async () => {
+    if (!selectedKaryawan || !jumlahPinjaman) return;
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch(
+        `/api/karyawan/${selectedKaryawan.id}/pinjaman`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jumlahPinjaman: parseInt(jumlahPinjaman),
+          }),
+        }
+      );
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || "Pinjaman berhasil ditambahkan");
+        setShowTambahPinjamanModal(false);
+        setSelectedKaryawan(null);
+        setJumlahPinjaman("");
+        fetchKaryawan(1, true);
+        fetchStats();
+      } else {
+        toast.error(data.error || "Gagal menambahkan pinjaman");
+      }
+    } catch (error) {
+      console.error("Error adding loan:", error);
       toast.error("Terjadi kesalahan");
     } finally {
       setIsSubmitting(false);
@@ -582,6 +672,25 @@ const HutangKaryawanPage = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          {viewMode === "hutang" && (
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">
+                  Daftar Hutang Karyawan
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Kelola data hutang karyawan
+                </p>
+              </div>
+              <button
+                onClick={() => handleOpenTambahPinjaman()}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all text-sm font-semibold flex items-center gap-2"
+              >
+                <Wallet className="w-4 h-4" />
+                Tambah Piutang
+              </button>
+            </div>
+          )}
           {viewMode === "hutang" && loading && karyawanList.length === 0 ? (
             <div className="flex justify-center items-center py-24">
               <div className="text-center">
@@ -625,14 +734,6 @@ const HutangKaryawanPage = () => {
                       >
                         <Wallet className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                         <p>Tidak ada data hutang karyawan ditemukan</p>
-                        <div className="mt-4 flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleOpenTambahPinjaman()}
-                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all text-sm font-semibold"
-                          >
-                            Tambah Hutang
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -668,13 +769,6 @@ const HutangKaryawanPage = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleOpenTambahPinjaman(karyawan)}
-                              className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
-                              title="Tambah Pinjaman"
-                            >
-                              <Wallet className="w-4 h-4" />
-                            </button>
                             {karyawan.totalPinjaman > 0 && (
                               <button
                                 onClick={() => handleOpenPembayaran(karyawan)}
@@ -706,13 +800,16 @@ const HutangKaryawanPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Nominal
                     </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Aksi
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {loadingGlobal ? (
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={4}
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         Memuat riwayat pinjaman...
@@ -721,7 +818,7 @@ const HutangKaryawanPage = () => {
                   ) : pinjamanGlobal.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={4}
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         Tidak ada riwayat pinjaman ditemukan
@@ -751,6 +848,15 @@ const HutangKaryawanPage = () => {
                           <td className="px-4 py-3 text-right font-semibold text-red-600">
                             {formatRupiah(item.jumlahPinjaman)}
                           </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleOpenEditPinjaman(item)}
+                              className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                              title="Edit Pinjaman"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          </td>
                         </tr>
                       ))
                   )}
@@ -771,13 +877,16 @@ const HutangKaryawanPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Nominal
                     </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Aksi
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {loadingGlobal ? (
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={4}
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         Memuat riwayat pembayaran...
@@ -786,7 +895,7 @@ const HutangKaryawanPage = () => {
                   ) : pembayaranGlobal.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={4}
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         Tidak ada riwayat pembayaran ditemukan
@@ -815,6 +924,15 @@ const HutangKaryawanPage = () => {
                           </td>
                           <td className="px-4 py-3 text-right font-semibold text-emerald-600">
                             {formatRupiah(item.jumlahbayar)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleOpenEditPembayaran(item)}
+                              className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                              title="Edit Pembayaran"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -933,16 +1051,6 @@ const HutangKaryawanPage = () => {
               </div>
 
               <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    handleOpenTambahPinjaman(selectedKaryawan);
-                  }}
-                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-                >
-                  <Wallet className="w-5 h-5" />
-                  Tambah Pinjaman
-                </button>
                 {selectedKaryawan.totalPinjaman > 0 && (
                   <button
                     onClick={() => {
@@ -1134,6 +1242,168 @@ const HutangKaryawanPage = () => {
                   <>
                     <Banknote className="w-4 h-4" />
                     Simpan Pembayaran
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditPinjamanModal && editingPinjaman && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setShowEditPinjamanModal(false);
+            setEditingPinjaman(null);
+            setEditJumlahPinjaman("");
+          }}
+        >
+          <div
+            className="bg-white rounded-xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-6 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Edit Pinjaman</h2>
+              <button
+                onClick={() => {
+                  setShowEditPinjamanModal(false);
+                  setEditingPinjaman(null);
+                  setEditJumlahPinjaman("");
+                }}
+                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Karyawan</p>
+                <p className="mt-1 font-semibold text-gray-800">
+                  {editingPinjaman.karyawan
+                    ? `${editingPinjaman.karyawan.nama} - ${editingPinjaman.karyawan.nik}`
+                    : `#${editingPinjaman.karyawanId}`}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">
+                  Nominal Pinjaman
+                </label>
+                <div className="relative mt-2">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
+                    Rp
+                  </span>
+                  <input
+                    type="text"
+                    value={
+                      editJumlahPinjaman
+                        ? parseInt(editJumlahPinjaman).toLocaleString("id-ID")
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setEditJumlahPinjaman(parseRupiahInput(e.target.value))
+                    }
+                    className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none transition-all"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleUpdatePinjaman}
+                disabled={isUpdating}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-lg font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="w-4 h-4" />
+                    Simpan Perubahan
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditPembayaranModal && editingPembayaran && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setShowEditPembayaranModal(false);
+            setEditingPembayaran(null);
+            setEditJumlahBayar("");
+          }}
+        >
+          <div
+            className="bg-white rounded-xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Edit Pembayaran</h2>
+              <button
+                onClick={() => {
+                  setShowEditPembayaranModal(false);
+                  setEditingPembayaran(null);
+                  setEditJumlahBayar("");
+                }}
+                className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Karyawan</p>
+                <p className="mt-1 font-semibold text-gray-800">
+                  {editingPembayaran.karyawan
+                    ? `${editingPembayaran.karyawan.nama} - ${editingPembayaran.karyawan.nik}`
+                    : `#${editingPembayaran.karyawanId}`}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">
+                  Nominal Pembayaran
+                </label>
+                <div className="relative mt-2">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
+                    Rp
+                  </span>
+                  <input
+                    type="text"
+                    value={
+                      editJumlahBayar
+                        ? parseInt(editJumlahBayar).toLocaleString("id-ID")
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setEditJumlahBayar(parseRupiahInput(e.target.value))
+                    }
+                    className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none transition-all"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleUpdatePembayaran}
+                disabled={isUpdating}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="w-4 h-4" />
+                    Simpan Perubahan
                   </>
                 )}
               </button>
