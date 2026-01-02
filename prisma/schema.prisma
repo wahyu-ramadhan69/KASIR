@@ -57,22 +57,44 @@ model Supplier {
 }
 
 model Karyawan {
-  id                    Int               @id @default(autoincrement())
-  nama                  String
-  nik                   String            @unique
-  noHp                  String?
-  alamat                String?
-  jenis                 JenisKaryawan
-  gajiPokok             Int
-  tunjanganMakan        Int
-  totalPinjaman         Int               @default(0)
-  sisaPinjaman          Int               @default(0)
-  cicilanPerBulan       Int               @default(0)
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
-  penjualanHeaders      PenjualanHeader[]
-  perjalananSales       PerjalananSales[]
-  isActive              Boolean           @default(true)
+  id                        Int               @id @default(autoincrement())
+  nama                      String
+  nik                       String            @unique
+  noHp                      String?
+  alamat                    String?
+  jenis                     JenisKaryawan
+  gajiPokok                 Int
+  tunjanganMakan            Int
+  totalPinjaman             Int               @default(0)
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+  penjualanHeaders          PenjualanHeader[]
+  perjalananSales           PerjalananSales[]
+  pinjamanKaryawan          PinjamanKaryawan[]
+  pembayaranHutangKaryawan  PembayaranHutangKaryawan[]
+  isActive                  Boolean           @default(true)
+}
+
+model PinjamanKaryawan {
+  id              Int        @id @default(autoincrement())
+  karyawan        Karyawan   @relation(fields: [karyawanId], references: [id])
+  karyawanId      Int
+  jumlahPinjaman  Int
+  userId          Int?
+  keterangan      String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model PembayaranHutangKaryawan {
+  id              Int        @id @default(autoincrement())
+  karyawan        Karyawan   @relation(fields: [karyawanId], references: [id])
+  karyawanId      Int
+  jumlahbayar     Int
+  userId          Int?
+  tanggalbayar    DateTime   @default(now())
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 }
 
 model Customer {
@@ -284,6 +306,7 @@ enum Role {
 enum JenisKaryawan {
   KASIR
   SALES
+  KARYAWAN
 }
 
 enum StatusPerjalanan {     

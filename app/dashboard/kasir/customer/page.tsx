@@ -492,11 +492,8 @@ const DataCustomerPage = () => {
 
         {/* Enhanced Header Section */}
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-8 mb-8 shadow-2xl">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
-
           <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
                 <Users className="w-10 h-10 text-white" />
               </div>
@@ -509,7 +506,7 @@ const DataCustomerPage = () => {
                 </p>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={() => setShowAddModal(true)}
                 className="group bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
@@ -532,7 +529,7 @@ const DataCustomerPage = () => {
         </div>
 
         {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
           <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
@@ -565,48 +562,6 @@ const DataCustomerPage = () => {
               </div>
               <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
                 <Store className="w-8 h-8 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Total Piutang
-                </p>
-                <p
-                  className="text-2xl font-bold text-red-600 mt-2 cursor-help"
-                  title={formatRupiah(getTotalPiutang())}
-                >
-                  {formatRupiahSimple(getTotalPiutang())}
-                </p>
-                <p className="text-xs text-red-400 mt-2">Piutang aktif</p>
-              </div>
-              <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Wallet className="w-8 h-8 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Limit Piutang
-                </p>
-                <p
-                  className="text-2xl font-bold text-green-600 mt-2 cursor-help"
-                  title={formatRupiah(getTotalLimitPiutang())}
-                >
-                  {formatRupiahSimple(getTotalLimitPiutang())}
-                </p>
-                <p className="text-xs text-green-400 mt-2">
-                  Total limit tersedia
-                </p>
-              </div>
-              <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <TrendingUp className="w-8 h-8 text-white" />
               </div>
             </div>
           </div>

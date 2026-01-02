@@ -1142,7 +1142,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           status: "HUTANG",
           kembalian: 0,
           sisaHutang,
-          canCheckout: false,
+          canCheckout: true,
           message: `Piutang melebihi limit! Sisa limit: ${formatRupiah(
             sisaLimit
           )}`,

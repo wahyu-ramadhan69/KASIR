@@ -49,8 +49,6 @@ export async function PUT(
         gajiPokok: body.gajiPokok,
         tunjanganMakan: body.tunjanganMakan,
         totalPinjaman: body.totalPinjaman,
-        sisaPinjaman: body.sisaPinjaman,
-        cicilanPerBulan: body.cicilanPerBulan,
       },
     });
 

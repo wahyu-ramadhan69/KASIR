@@ -68,8 +68,6 @@ export async function POST(request: NextRequest) {
         gajiPokok: body.gajiPokok,
         tunjanganMakan: body.tunjanganMakan,
         totalPinjaman: body.totalPinjaman || 0,
-        sisaPinjaman: body.sisaPinjaman || 0,
-        cicilanPerBulan: body.cicilanPerBulan || 0,
       },
     });
 

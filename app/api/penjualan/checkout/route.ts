@@ -270,6 +270,7 @@ export async function POST(request: NextRequest) {
       statusPembayaran === "HUTANG" ? totalHarga - jumlahDibayar : 0;
 
     const isPenjualanSales = Boolean(salesId);
+    let updatedLimitPiutang: number | null = null;
 
     // Validasi hutang untuk sales
     if (statusPembayaran === "HUTANG" && isPenjualanSales) {
@@ -318,20 +319,7 @@ export async function POST(request: NextRequest) {
       const piutangBaru = piutangSekarang + sisaHutang;
 
       if (limitPiutang > 0 && piutangBaru > limitPiutang) {
-        const sisaLimit = limitPiutang - piutangSekarang;
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Piutang melebihi limit! Limit: Rp ${limitPiutang.toLocaleString(
-              "id-ID"
-            )}, Piutang saat ini: Rp ${piutangSekarang.toLocaleString(
-              "id-ID"
-            )}, Sisa limit: Rp ${sisaLimit.toLocaleString(
-              "id-ID"
-            )}, Hutang baru: Rp ${sisaHutang.toLocaleString("id-ID")}`,
-          },
-          { status: 400 }
-        );
+        updatedLimitPiutang = piutangBaru;
       }
     }
 
@@ -556,6 +544,9 @@ export async function POST(request: NextRequest) {
           where: { id: customerId },
           data: {
             piutang: { increment: BigInt(sisaHutang) },
+            ...(updatedLimitPiutang !== null
+              ? { limit_piutang: BigInt(updatedLimitPiutang) }
+              : {}),
           },
         });
       }

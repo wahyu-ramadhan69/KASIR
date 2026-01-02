@@ -14,14 +14,15 @@ function bigIntToNumber(value: bigint | number): number {
 
 // Helper to serialize sales data with conversion
 function serializeSales(karyawan: any) {
+  const totalPinjaman = bigIntToNumber(karyawan.totalPinjaman || 0);
   return {
     id: karyawan.id,
     namaSales: karyawan.nama,
     nik: karyawan.nik,
     alamat: karyawan.alamat,
     noHp: karyawan.noHp,
-    limitHutang: bigIntToNumber(karyawan.totalPinjaman || 0),
-    hutang: bigIntToNumber(karyawan.sisaPinjaman || 0),
+    limitHutang: totalPinjaman,
+    hutang: totalPinjaman,
     isActive: karyawan.isActive,
     createdAt: karyawan.createdAt,
     updatedAt: karyawan.updatedAt,
@@ -57,8 +58,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert to BigInt for database
-    const limitHutangValue = limitHutang ? Number(limitHutang) : 0;
     const hutangValue = hutang ? Number(hutang) : 0;
+    const limitHutangValue = limitHutang ? Number(limitHutang) : 0;
+    const totalPinjamanValue =
+      hutangValue > 0 ? hutangValue : limitHutangValue;
 
     const sales = await prisma.karyawan.create({
       data: {
@@ -69,8 +72,7 @@ export async function POST(request: NextRequest) {
         jenis: "SALES",
         gajiPokok: 0,
         tunjanganMakan: 0,
-        totalPinjaman: limitHutangValue,
-        sisaPinjaman: hutangValue,
+        totalPinjaman: totalPinjamanValue,
       },
     });
 

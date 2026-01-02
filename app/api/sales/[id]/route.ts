@@ -18,14 +18,15 @@ function bigIntToNumber(value: bigint | number): number {
 
 // Helper to serialize sales data with conversion
 function serializeSales(karyawan: any) {
+  const totalPinjaman = bigIntToNumber(karyawan.totalPinjaman || 0);
   return {
     id: karyawan.id,
     namaSales: karyawan.nama,
     nik: karyawan.nik,
     alamat: karyawan.alamat,
     noHp: karyawan.noHp,
-    limitHutang: bigIntToNumber(karyawan.totalPinjaman || 0),
-    hutang: bigIntToNumber(karyawan.sisaPinjaman || 0),
+    limitHutang: totalPinjaman,
+    hutang: totalPinjaman,
     isActive: karyawan.isActive,
     createdAt: karyawan.createdAt,
     updatedAt: karyawan.updatedAt,
@@ -134,18 +135,19 @@ export async function PUT(request: NextRequest, { params }: RouteCtx) {
       alamat?: string;
       noHp?: string;
       totalPinjaman?: number;
-      sisaPinjaman?: number;
     } = {};
 
     if (nik !== undefined) updateData.nik = nik;
     if (namaSales !== undefined) updateData.nama = namaSales;
     if (alamat !== undefined) updateData.alamat = alamat;
     if (noHp !== undefined) updateData.noHp = noHp;
-    if (limitHutang !== undefined) {
-      updateData.totalPinjaman = Number(limitHutang);
-    }
-    if (hutang !== undefined) {
-      updateData.sisaPinjaman = Number(hutang);
+    const limitHutangValue =
+      limitHutang !== undefined ? Number(limitHutang) : undefined;
+    const hutangValue = hutang !== undefined ? Number(hutang) : undefined;
+    if (hutangValue !== undefined) {
+      updateData.totalPinjaman = hutangValue;
+    } else if (limitHutangValue !== undefined) {
+      updateData.totalPinjaman = limitHutangValue;
     }
 
     const updated = await prisma.karyawan.update({

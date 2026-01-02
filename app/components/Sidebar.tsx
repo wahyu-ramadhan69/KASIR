@@ -179,6 +179,11 @@ const adminTransactionLinks = [
         href: "/dashboard/admin/hutang-piutang/piutang-kanvas",
         icon: <ReceiptText className="w-4 h-4" />,
       },
+      {
+        label: "Hutang Karyawan",
+        href: "/dashboard/admin/hutang-piutang/hutang-karyawan",
+        icon: <ReceiptText className="w-4 h-4" />,
+      },
     ],
   },
   {
@@ -344,6 +349,11 @@ const kasirTransactionLinks = [
       {
         label: "Piutang Sales",
         href: "/dashboard/kasir/hutang-piutang/piutang-kanvas",
+        icon: <ReceiptText className="w-4 h-4" />,
+      },
+      {
+        label: "Hutang Karyawan",
+        href: "/dashboard/kasir/hutang-piutang/hutang-karyawan",
         icon: <ReceiptText className="w-4 h-4" />,
       },
     ],

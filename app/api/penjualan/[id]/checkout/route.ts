@@ -262,6 +262,8 @@ export async function POST(
 
     // Deteksi tipe penjualan berdasarkan data yang ada
     const isPenjualanSales = penjualan.karyawanId !== null;
+    const effectiveCustomerId = customerId ?? penjualan.customerId ?? null;
+    let updatedLimitPiutang: number | null = null;
 
     // Validasi hutang untuk sales
     if (statusPembayaran === "HUTANG" && isPenjualanSales) {
@@ -292,21 +294,10 @@ export async function POST(
       // Note: Karyawan tidak memiliki limit hutang, jadi skip validasi limit
     }
 
-    // Validasi piutang customer untuk penjualan toko dengan hutang
-    if (statusPembayaran === "HUTANG" && !isPenjualanSales) {
-      if (!customerId) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Transaksi dengan hutang harus menggunakan customer terdaftar. Customer tidak terdaftar tidak bisa mengambil hutang.",
-          },
-          { status: 400 }
-        );
-      }
-
+    // Validasi piutang customer untuk hutang (toko atau sales jika ada customer)
+    if (statusPembayaran === "HUTANG" && effectiveCustomerId) {
       const customer = await prisma.customer.findUnique({
-        where: { id: customerId },
+        where: { id: effectiveCustomerId },
       });
 
       if (!customer) {
@@ -322,21 +313,17 @@ export async function POST(
       const piutangBaru = piutangSekarang + sisaHutang;
 
       if (limitPiutang > 0 && piutangBaru > limitPiutang) {
-        const sisaLimit = limitPiutang - piutangSekarang;
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Piutang melebihi limit! Limit: Rp ${limitPiutang.toLocaleString(
-              "id-ID"
-            )}, Piutang saat ini: Rp ${piutangSekarang.toLocaleString(
-              "id-ID"
-            )}, Sisa limit: Rp ${sisaLimit.toLocaleString(
-              "id-ID"
-            )}, Hutang baru: Rp ${sisaHutang.toLocaleString("id-ID")}`,
-          },
-          { status: 400 }
-        );
+        updatedLimitPiutang = piutangBaru;
       }
+    } else if (statusPembayaran === "HUTANG" && !isPenjualanSales) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Transaksi dengan hutang harus menggunakan customer terdaftar. Customer tidak terdaftar tidak bisa mengambil hutang.",
+        },
+        { status: 400 }
+      );
     }
 
     // Validasi customer untuk transaksi LUNAS toko
@@ -451,11 +438,14 @@ export async function POST(
       // Jika perlu tracking hutang sales, harus dihandle di tempat lain
 
       // Update piutang customer jika penjualan toko dengan HUTANG
-      if (statusPembayaran === "HUTANG" && customerId && !salesId) {
+      if (statusPembayaran === "HUTANG" && effectiveCustomerId) {
         await tx.customer.update({
-          where: { id: customerId },
+          where: { id: effectiveCustomerId },
           data: {
             piutang: { increment: BigInt(sisaHutang) },
+            ...(updatedLimitPiutang !== null
+              ? { limit_piutang: BigInt(updatedLimitPiutang) }
+              : {}),
           },
         });
       }

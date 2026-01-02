@@ -1362,7 +1362,7 @@ const PenjualanPage = () => {
             status: "HUTANG",
             kembalian: 0,
             sisaHutang,
-            canCheckout: false,
+            canCheckout: true,
             message: `Hutang melebihi limit! Sisa limit: ${formatRupiah(
               sisaLimit
             )}`,

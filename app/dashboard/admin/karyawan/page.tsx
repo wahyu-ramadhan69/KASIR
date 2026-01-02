@@ -36,8 +36,6 @@ interface Karyawan {
   gajiPokok: number;
   tunjanganMakan: number;
   totalPinjaman: number;
-  sisaPinjaman: number;
-  cicilanPerBulan: number;
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
@@ -52,8 +50,6 @@ interface KaryawanFormData {
   gajiPokok: string;
   tunjanganMakan: string;
   totalPinjaman: string;
-  sisaPinjaman: string;
-  cicilanPerBulan: string;
 }
 
 const DataKaryawanPage = () => {
@@ -84,8 +80,6 @@ const DataKaryawanPage = () => {
     gajiPokok: "",
     tunjanganMakan: "",
     totalPinjaman: "",
-    sisaPinjaman: "",
-    cicilanPerBulan: "",
   });
 
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -115,17 +109,26 @@ const DataKaryawanPage = () => {
       const res = await fetch(url);
       const data = await res.json();
 
+      if (!res.ok || !Array.isArray(data.data)) {
+        throw new Error(data.error || "Invalid karyawan response");
+      }
+
       if (reset) {
         setKaryawanList(data.data);
       } else {
         setKaryawanList((prev) => [...prev, ...data.data]);
       }
 
-      setNextCursor(data.nextCursor);
+      setNextCursor(data.nextCursor ?? null);
       setHasMore(data.nextCursor !== null);
     } catch (error) {
       console.error("Error fetching karyawan:", error);
       toast.error("Gagal mengambil data karyawan");
+      if (reset) {
+        setKaryawanList([]);
+      }
+      setNextCursor(null);
+      setHasMore(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -187,9 +190,7 @@ const DataKaryawanPage = () => {
     if (
       name === "gajiPokok" ||
       name === "tunjanganMakan" ||
-      name === "totalPinjaman" ||
-      name === "sisaPinjaman" ||
-      name === "cicilanPerBulan"
+      name === "totalPinjaman"
     ) {
       setFormData((prev) => ({
         ...prev,
@@ -213,9 +214,7 @@ const DataKaryawanPage = () => {
       if (
         name === "gajiPokok" ||
         name === "tunjanganMakan" ||
-        name === "totalPinjaman" ||
-        name === "sisaPinjaman" ||
-        name === "cicilanPerBulan"
+        name === "totalPinjaman"
       ) {
         setEditingKaryawan({
           ...editingKaryawan,
@@ -250,8 +249,6 @@ const DataKaryawanPage = () => {
         gajiPokok: parseInt(formData.gajiPokok) || 0,
         tunjanganMakan: parseInt(formData.tunjanganMakan) || 0,
         totalPinjaman: parseInt(formData.totalPinjaman) || 0,
-        sisaPinjaman: parseInt(formData.sisaPinjaman) || 0,
-        cicilanPerBulan: parseInt(formData.cicilanPerBulan) || 0,
       };
 
       const res = await fetch("/api/karyawan", {
@@ -276,8 +273,6 @@ const DataKaryawanPage = () => {
           gajiPokok: "",
           tunjanganMakan: "",
           totalPinjaman: "",
-          sisaPinjaman: "",
-          cicilanPerBulan: "",
         });
         setKaryawanList([]);
         setNextCursor(null);
@@ -305,8 +300,6 @@ const DataKaryawanPage = () => {
         gajiPokok: karyawan.gajiPokok.toString(),
         tunjanganMakan: karyawan.tunjanganMakan.toString(),
         totalPinjaman: karyawan.totalPinjaman.toString(),
-        sisaPinjaman: karyawan.sisaPinjaman.toString(),
-        cicilanPerBulan: karyawan.cicilanPerBulan.toString(),
       },
     });
     setShowEditModal(true);
@@ -328,8 +321,6 @@ const DataKaryawanPage = () => {
         gajiPokok: parseInt(editingKaryawan.data.gajiPokok) || 0,
         tunjanganMakan: parseInt(editingKaryawan.data.tunjanganMakan) || 0,
         totalPinjaman: parseInt(editingKaryawan.data.totalPinjaman) || 0,
-        sisaPinjaman: parseInt(editingKaryawan.data.sisaPinjaman) || 0,
-        cicilanPerBulan: parseInt(editingKaryawan.data.cicilanPerBulan) || 0,
       };
 
       const res = await fetch(`/api/karyawan/${editingKaryawan.id}`, {
@@ -436,10 +427,6 @@ const DataKaryawanPage = () => {
     return karyawanList.reduce((sum, k) => sum + k.totalPinjaman, 0);
   };
 
-  const getTotalSisaPinjaman = () => {
-    return karyawanList.reduce((sum, k) => sum + k.sisaPinjaman, 0);
-  };
-
   const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field)
       return <ChevronDown className="w-4 h-4 text-gray-400" />;
@@ -505,7 +492,7 @@ const DataKaryawanPage = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
@@ -557,22 +544,6 @@ const DataKaryawanPage = () => {
             </div>
           </div>
 
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Sisa Pinjaman
-                </p>
-                <p className="text-2xl font-bold text-red-600 mt-2">
-                  {formatRupiah(getTotalSisaPinjaman())}
-                </p>
-                <p className="text-xs text-red-400 mt-2">Belum lunas</p>
-              </div>
-              <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <TrendingUp className="w-8 h-8 text-white" />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Search Section */}
@@ -666,15 +637,6 @@ const DataKaryawanPage = () => {
                           <SortIcon field="gajiPokok" />
                         </button>
                       </th>
-                      <th className="px-6 py-4 text-left">
-                        <button
-                          onClick={() => handleSort("sisaPinjaman")}
-                          className="flex items-center gap-2 font-bold uppercase text-sm tracking-wide hover:text-blue-100 transition-colors"
-                        >
-                          Sisa Pinjaman
-                          <SortIcon field="sisaPinjaman" />
-                        </button>
-                      </th>
                       <th className="px-6 py-4 text-center font-bold uppercase text-sm tracking-wide">
                         Aksi
                       </th>
@@ -730,19 +692,6 @@ const DataKaryawanPage = () => {
                             <p className="text-xs text-gray-500">
                               + {formatRupiah(karyawan.tunjanganMakan)}
                             </p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div>
-                            <p className="font-bold text-red-600">
-                              {formatRupiah(karyawan.sisaPinjaman)}
-                            </p>
-                            {karyawan.cicilanPerBulan > 0 && (
-                              <p className="text-xs text-gray-500">
-                                Cicilan:{" "}
-                                {formatRupiah(karyawan.cicilanPerBulan)}
-                              </p>
-                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -946,31 +895,13 @@ const DataKaryawanPage = () => {
                     </h3>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="bg-white rounded-xl p-4 shadow-md">
                       <p className="text-xs text-gray-500 font-semibold uppercase mb-2">
                         Total Pinjaman
                       </p>
                       <p className="text-xl font-bold text-orange-600">
                         {formatRupiah(selectedKaryawan.totalPinjaman)}
-                      </p>
-                    </div>
-
-                    <div className="bg-white rounded-xl p-4 shadow-md">
-                      <p className="text-xs text-gray-500 font-semibold uppercase mb-2">
-                        Sisa Pinjaman
-                      </p>
-                      <p className="text-xl font-bold text-red-600">
-                        {formatRupiah(selectedKaryawan.sisaPinjaman)}
-                      </p>
-                    </div>
-
-                    <div className="bg-white rounded-xl p-4 shadow-md">
-                      <p className="text-xs text-gray-500 font-semibold uppercase mb-2">
-                        Cicilan/Bulan
-                      </p>
-                      <p className="text-xl font-bold text-blue-600">
-                        {formatRupiah(selectedKaryawan.cicilanPerBulan)}
                       </p>
                     </div>
                   </div>
@@ -1108,6 +1039,7 @@ const DataKaryawanPage = () => {
                       >
                         <option value="KASIR">KASIR</option>
                         <option value="SALES">SALES</option>
+                        <option value="KARYAWAN">KARYAWAN</option>
                       </select>
                     </div>
                   </div>
@@ -1158,8 +1090,7 @@ const DataKaryawanPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <DollarSign className="w-4 h-4 text-green-600" />
-                        Tunjangan Makan{" "}
-                        <span className="text-red-500">*</span>
+                        Tunjangan Makan <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
@@ -1184,7 +1115,7 @@ const DataKaryawanPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-1 gap-5">
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <Wallet className="w-4 h-4 text-orange-600" />
@@ -1202,58 +1133,6 @@ const DataKaryawanPage = () => {
                               ? parseInt(formData.totalPinjaman).toLocaleString(
                                   "id-ID"
                                 )
-                              : ""
-                          }
-                          onChange={handleInputChange}
-                          className="w-full pl-12 pr-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Wallet className="w-4 h-4 text-red-600" />
-                        Sisa Pinjaman
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
-                          Rp
-                        </span>
-                        <input
-                          type="text"
-                          name="sisaPinjaman"
-                          value={
-                            formData.sisaPinjaman
-                              ? parseInt(formData.sisaPinjaman).toLocaleString(
-                                  "id-ID"
-                                )
-                              : ""
-                          }
-                          onChange={handleInputChange}
-                          className="w-full pl-12 pr-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Wallet className="w-4 h-4 text-blue-600" />
-                        Cicilan/Bulan
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
-                          Rp
-                        </span>
-                        <input
-                          type="text"
-                          name="cicilanPerBulan"
-                          value={
-                            formData.cicilanPerBulan
-                              ? parseInt(
-                                  formData.cicilanPerBulan
-                                ).toLocaleString("id-ID")
                               : ""
                           }
                           onChange={handleInputChange}
@@ -1391,6 +1270,7 @@ const DataKaryawanPage = () => {
                       >
                         <option value="KASIR">KASIR</option>
                         <option value="SALES">SALES</option>
+                        <option value="KARYAWAN">KARYAWAN</option>
                       </select>
                     </div>
                   </div>
@@ -1441,8 +1321,7 @@ const DataKaryawanPage = () => {
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <DollarSign className="w-4 h-4 text-green-600" />
-                        Tunjangan Makan{" "}
-                        <span className="text-red-500">*</span>
+                        Tunjangan Makan <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
@@ -1467,7 +1346,7 @@ const DataKaryawanPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-1 gap-5">
                     <div className="group">
                       <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                         <Wallet className="w-4 h-4 text-orange-600" />
@@ -1484,58 +1363,6 @@ const DataKaryawanPage = () => {
                             editingKaryawan.data.totalPinjaman
                               ? parseInt(
                                   editingKaryawan.data.totalPinjaman
-                                ).toLocaleString("id-ID")
-                              : ""
-                          }
-                          onChange={handleEditInputChange}
-                          className="w-full pl-12 pr-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Wallet className="w-4 h-4 text-red-600" />
-                        Sisa Pinjaman
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
-                          Rp
-                        </span>
-                        <input
-                          type="text"
-                          name="sisaPinjaman"
-                          value={
-                            editingKaryawan.data.sisaPinjaman
-                              ? parseInt(
-                                  editingKaryawan.data.sisaPinjaman
-                                ).toLocaleString("id-ID")
-                              : ""
-                          }
-                          onChange={handleEditInputChange}
-                          className="w-full pl-12 pr-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Wallet className="w-4 h-4 text-blue-600" />
-                        Cicilan/Bulan
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">
-                          Rp
-                        </span>
-                        <input
-                          type="text"
-                          name="cicilanPerBulan"
-                          value={
-                            editingKaryawan.data.cicilanPerBulan
-                              ? parseInt(
-                                  editingKaryawan.data.cicilanPerBulan
                                 ).toLocaleString("id-ID")
                               : ""
                           }

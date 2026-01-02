@@ -549,8 +549,8 @@ const DataPengeluaranPage = () => {
       <div className="bg-white rounded-lg p-4 mb-6 shadow-md border border-gray-100">
         <div className="flex flex-col gap-4">
           {/* Search and Filter Row */}
-          <div className="flex flex-col lg:flex-row gap-3">
-            <div className="flex-1 relative">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-3 items-center">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
@@ -561,11 +561,11 @@ const DataPengeluaranPage = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 w-full lg:w-[240px]">
+            <div className="flex flex-wrap gap-2 w-full xl:w-auto">
               <button
                 type="button"
                 onClick={() => setFilterJenis("all")}
-                className={`px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all ${
+                className={`px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all whitespace-nowrap ${
                   filterJenis === "all"
                     ? "bg-purple-600 text-white border-purple-600"
                     : "bg-white text-gray-700 border-gray-300 hover:border-purple-300"
@@ -578,7 +578,7 @@ const DataPengeluaranPage = () => {
                   key={option.value}
                   type="button"
                   onClick={() => setFilterJenis(option.value)}
-                  className={`px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all ${
+                  className={`px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all whitespace-nowrap ${
                     filterJenis === option.value
                       ? "bg-purple-600 text-white border-purple-600"
                       : "bg-white text-gray-700 border-gray-300 hover:border-purple-300"
@@ -593,13 +593,13 @@ const DataPengeluaranPage = () => {
               type="month"
               value={selectedMonth}
               onChange={(e) => handleMonthChange(e.target.value)}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-[180px]"
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full xl:w-[180px]"
             />
 
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full lg:w-[140px]"
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none w-full xl:w-[140px]"
             >
               <option value="">Semua Tahun</option>
               {availableYears.map((year) => (
