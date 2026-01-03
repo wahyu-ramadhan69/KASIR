@@ -694,9 +694,6 @@ const DataBarangPage = () => {
                         <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                           Nama Barang
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
-                          Supplier
-                        </th>
 
                         <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
                           Harga Jual
@@ -760,14 +757,6 @@ const DataBarangPage = () => {
                                     )}
                                   </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <Store className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm text-gray-700 font-medium">
-                                  {item.supplier?.namaSupplier || "-"}
-                                </span>
                               </div>
                             </td>
 
@@ -1151,20 +1140,6 @@ const DataBarangPage = () => {
                   </p>
                   <p className="text-gray-900 text-2xl font-bold">
                     {selectedBarang.namaBarang}
-                  </p>
-                </div>
-
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="bg-white p-2 rounded-lg">
-                      <Store className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider">
-                      Supplier
-                    </p>
-                  </div>
-                  <p className="text-gray-900 text-lg font-semibold pl-11">
-                    {selectedBarang.supplier?.namaSupplier || "-"}
                   </p>
                 </div>
 

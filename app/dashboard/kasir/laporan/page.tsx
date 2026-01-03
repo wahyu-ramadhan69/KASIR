@@ -286,7 +286,7 @@ const LaporanLengkapPage = () => {
             </div>
             <div>
               <p className="text-sm text-amber-800">
-                <span className="font-semibold">Tips:</span> File Excel yang
+                <span className="font-semibold">Tips:</span> File PDF yang
                 dihasilkan berisi ringkasan harian yang siap dicetak sebagai
                 arsip kasir.
               </p>
@@ -332,9 +332,7 @@ const LaporanLengkapPage = () => {
               <span className="text-blue-600 text-sm font-bold">3</span>
             </div>
             <div>
-              <p className="font-medium text-gray-900 text-sm">
-                Detail Harian
-              </p>
+              <p className="font-medium text-gray-900 text-sm">Detail Harian</p>
               <p className="text-xs text-gray-600">
                 Penjualan, piutang, pengeluaran, kerugian
               </p>
