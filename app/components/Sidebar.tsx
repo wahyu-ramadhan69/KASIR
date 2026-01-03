@@ -180,7 +180,7 @@ const adminTransactionLinks = [
         icon: <ReceiptText className="w-4 h-4" />,
       },
       {
-        label: "Hutang Karyawan",
+        label: "Piutang Karyawan",
         href: "/dashboard/admin/hutang-piutang/hutang-karyawan",
         icon: <ReceiptText className="w-4 h-4" />,
       },
@@ -362,7 +362,7 @@ const kasirTransactionLinks = [
         icon: <ReceiptText className="w-4 h-4" />,
       },
       {
-        label: "Hutang Karyawan",
+        label: "Piutang Karyawan",
         href: "/dashboard/kasir/hutang-piutang/hutang-karyawan",
         icon: <ReceiptText className="w-4 h-4" />,
       },
