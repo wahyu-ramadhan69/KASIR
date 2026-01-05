@@ -127,8 +127,7 @@ export async function GET(request: NextRequest) {
 
     manifestData.forEach((m) => {
       const barangId = m.barangId;
-      const totalPcs =
-        Number(m.jumlahTerjual) + Number(m.totalItem); // total dialokasikan di manifest hari itu
+      const totalPcs = Number(m.jumlahTerjual) + Number(m.totalItem); // total dialokasikan di manifest hari itu
       summary[barangId] = (summary[barangId] || 0) + totalPcs;
     });
 

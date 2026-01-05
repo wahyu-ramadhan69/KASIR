@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import ExcelJS from "exceljs";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -133,6 +134,10 @@ async function buildUserNameMap(penjualanList: any[]) {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format") || "excel";
     const detail = searchParams.get("detail") !== "false"; // default true
@@ -365,9 +370,7 @@ async function generateSummaryReport(
         .filter((label): label is string => Boolean(label))
     );
     const kemasanLabel =
-      kemasanLabels.size === 1
-        ? Array.from(kemasanLabels)[0]
-        : "kemasan";
+      kemasanLabels.size === 1 ? Array.from(kemasanLabels)[0] : "kemasan";
     const totalPcs = penjualan.items.reduce((sum, item) => {
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       return sum + getTotalItemPcs(item, jumlahPerKemasan);
@@ -1161,16 +1164,16 @@ async function generateYearlyReport(
         },
       },
       include: {
-      items: {
-        include: {
-          barang: {
-            select: {
-              jumlahPerKemasan: true,
-              jenisKemasan: true,
+        items: {
+          include: {
+            barang: {
+              select: {
+                jumlahPerKemasan: true,
+                jenisKemasan: true,
+              },
             },
           },
         },
-      },
         karyawan: true,
       },
     });

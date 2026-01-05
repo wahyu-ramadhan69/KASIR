@@ -119,17 +119,13 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("endDate");
     const summary = searchParams.get("summary") === "1";
 
+    const isAdmin = authData.role === "ADMIN";
     const baseWhere: any = {
       // Filter hanya penjualan dengan karyawan jenis SALES
       karyawan: {
         jenis: "SALES",
       },
-      isDeleted: false,
     };
-    const userId = Number(authData.userId);
-    if (authData.role !== "ADMIN" && !Number.isNaN(userId)) {
-      baseWhere.userId = userId;
-    }
 
     if (status && status !== "all") {
       baseWhere.statusTransaksi = status;
@@ -166,18 +162,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const listWhere: any = { ...baseWhere };
+    const summaryWhere: any = { ...baseWhere, isDeleted: false };
+    const userId = Number(authData.userId);
+    if (!isAdmin && !Number.isNaN(userId)) {
+      listWhere.isDeleted = false;
+      listWhere.userId = userId;
+      summaryWhere.userId = userId;
+    }
+
     if (summary) {
       const totalTransaksi = await prisma.penjualanHeader.count({
-        where: baseWhere,
+        where: summaryWhere,
       });
       const totalHutangTransaksi = await prisma.penjualanHeader.count({
-        where: { ...baseWhere, statusPembayaran: "HUTANG" },
+        where: { ...summaryWhere, statusPembayaran: "HUTANG" },
       });
       const totalLunas = await prisma.penjualanHeader.count({
-        where: { ...baseWhere, statusPembayaran: "LUNAS" },
+        where: { ...summaryWhere, statusPembayaran: "LUNAS" },
       });
       const hutangList = await prisma.penjualanHeader.findMany({
-        where: { ...baseWhere, statusPembayaran: "HUTANG" },
+        where: { ...summaryWhere, statusPembayaran: "HUTANG" },
         select: { totalHarga: true, jumlahDibayar: true },
       });
       const totalHutang = hutangList.reduce(
@@ -190,13 +195,13 @@ export async function GET(request: NextRequest) {
       jatuhTempoLimit.setDate(jatuhTempoLimit.getDate() + 7);
       const hutangJatuhTempo = await prisma.penjualanHeader.count({
         where: {
-          ...baseWhere,
+          ...summaryWhere,
           statusPembayaran: "HUTANG",
           tanggalJatuhTempo: { lte: jatuhTempoLimit },
         },
       });
       let totalPembayaran = 0;
-      const pembayaranPenjualanWhere: any = { ...baseWhere };
+      const pembayaranPenjualanWhere: any = { ...summaryWhere };
       delete pembayaranPenjualanWhere.tanggalTransaksi;
       const pembayaranIds = await prisma.penjualanHeader.findMany({
         where: pembayaranPenjualanWhere,
@@ -242,7 +247,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const totalCount = await prisma.penjualanHeader.count({ where: baseWhere });
+    const totalCount = await prisma.penjualanHeader.count({ where: listWhere });
 
     let orderBy: any;
     if (pembayaran === "HUTANG") {
@@ -256,7 +261,7 @@ export async function GET(request: NextRequest) {
     }
 
     const penjualan = await prisma.penjualanHeader.findMany({
-      where: baseWhere,
+      where: listWhere,
       include: {
         customer: true,
         karyawan: true,

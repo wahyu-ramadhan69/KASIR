@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -8,6 +9,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { id } = await params;
     const pembayaranId = parseInt(id);
     const body = await request.json();
@@ -73,11 +78,12 @@ export async function PATCH(
     const message =
       error instanceof Error ? error.message : "Gagal memperbarui pembayaran";
     const status =
-      message === "Pembayaran tidak ditemukan" || message === "Karyawan tidak ditemukan"
+      message === "Pembayaran tidak ditemukan" ||
+      message === "Karyawan tidak ditemukan"
         ? 404
         : message === "Total pinjaman tidak boleh kurang dari 0"
-          ? 400
-          : 500;
+        ? 400
+        : 500;
     return NextResponse.json({ success: false, error: message }, { status });
   }
 }

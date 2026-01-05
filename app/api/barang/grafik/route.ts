@@ -1,11 +1,16 @@
 // app/api/reports/top-products/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const searchParams = request.nextUrl.searchParams;
     const periode = searchParams.get("periode") || "HARIAN";
     const rentangHari = parseInt(searchParams.get("rentangHari") || "30");

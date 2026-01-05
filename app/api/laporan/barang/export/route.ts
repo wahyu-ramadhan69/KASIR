@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import ExcelJS from "exceljs";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -96,6 +97,10 @@ function formatDateRange(startDate?: Date, endDate?: Date): string {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const period = normalizePeriod(
       searchParams.get("periode") || searchParams.get("period")
@@ -103,7 +108,9 @@ export async function GET(request: NextRequest) {
     const dateParam = searchParams.get("date") || searchParams.get("tanggal");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
-    const statusParam = (searchParams.get("statusPembayaran") || "all").toUpperCase();
+    const statusParam = (
+      searchParams.get("statusPembayaran") || "all"
+    ).toUpperCase();
 
     let startDate: Date | undefined;
     let endDate: Date | undefined;
@@ -121,7 +128,11 @@ export async function GET(request: NextRequest) {
         e.setHours(23, 59, 59, 999);
         endDate = e;
       }
-    } else if (dateParam || searchParams.has("periode") || searchParams.has("period")) {
+    } else if (
+      dateParam ||
+      searchParams.has("periode") ||
+      searchParams.has("period")
+    ) {
       const range = getDateRange(period, dateParam);
       startDate = range.startDate;
       endDate = range.endDate;
@@ -146,15 +157,15 @@ export async function GET(request: NextRequest) {
         penjualan: penjualanFilter,
       },
       include: {
-          barang: {
-            select: {
-              id: true,
-              namaBarang: true,
-              berat: true,
-              jumlahPerKemasan: true,
-              jenisKemasan: true,
-            },
+        barang: {
+          select: {
+            id: true,
+            namaBarang: true,
+            berat: true,
+            jumlahPerKemasan: true,
+            jenisKemasan: true,
           },
+        },
       },
     });
 
@@ -175,7 +186,10 @@ export async function GET(request: NextRequest) {
     >();
 
     for (const item of items) {
-      const jumlahPerKemasan = Math.max(1, toNumber(item.barang.jumlahPerKemasan));
+      const jumlahPerKemasan = Math.max(
+        1,
+        toNumber(item.barang.jumlahPerKemasan)
+      );
       const totalItemTerjual = toNumber(item.totalItem);
       const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
         totalItemTerjual,
@@ -186,12 +200,16 @@ export async function GET(request: NextRequest) {
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
-        jumlahPcs > 0 ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs) : 0;
+        jumlahPcs > 0
+          ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
+          : 0;
       const totalModalItem = modalDus + modalPcs;
 
       const penjualanDus = hargaJual * jumlahDus;
       const penjualanPcs =
-        jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
+        jumlahPcs > 0
+          ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
+          : 0;
       const totalPenjualanItem = penjualanDus + penjualanPcs;
 
       const labaItem =
@@ -313,7 +331,9 @@ export async function GET(request: NextRequest) {
       excelRow.getCell("A").value = idx + 1;
       excelRow.getCell("B").value = row.namaBarang;
       excelRow.getCell("C").value = formatKgDisplay(row.berat);
-      excelRow.getCell("D").value = `${row.jumlahPerKemasan} item/${row.jenisKemasan}`;
+      excelRow.getCell(
+        "D"
+      ).value = `${row.jumlahPerKemasan} item/${row.jenisKemasan}`;
       excelRow.getCell("E").value = row.totalKemasan;
       excelRow.getCell("F").value = row.totalItem;
       excelRow.getCell("G").value = row.totalPenjualan;
@@ -387,10 +407,7 @@ export async function GET(request: NextRequest) {
     const message =
       error instanceof Error ? error.message : "Failed to generate report";
     const status = message === "Tanggal tidak valid" ? 400 : 500;
-    return NextResponse.json(
-      { success: false, error: message },
-      { status }
-    );
+    return NextResponse.json({ success: false, error: message }, { status });
   } finally {
     await prisma.$disconnect();
   }

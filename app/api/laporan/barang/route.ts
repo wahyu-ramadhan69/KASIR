@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -71,12 +72,20 @@ function getDateRange(period: Period, dateParam: string | null) {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
-    const period = normalizePeriod(searchParams.get("periode") || searchParams.get("period"));
+    const period = normalizePeriod(
+      searchParams.get("periode") || searchParams.get("period")
+    );
     const dateParam = searchParams.get("date") || searchParams.get("tanggal");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
-    const statusParam = (searchParams.get("statusPembayaran") || "all").toUpperCase();
+    const statusParam = (
+      searchParams.get("statusPembayaran") || "all"
+    ).toUpperCase();
 
     let startDate: Date | undefined;
     let endDate: Date | undefined;
@@ -94,7 +103,11 @@ export async function GET(request: NextRequest) {
         e.setHours(23, 59, 59, 999);
         endDate = e;
       }
-    } else if (dateParam || searchParams.has("periode") || searchParams.has("period")) {
+    } else if (
+      dateParam ||
+      searchParams.has("periode") ||
+      searchParams.has("period")
+    ) {
       const range = getDateRange(period, dateParam);
       startDate = range.startDate;
       endDate = range.endDate;
@@ -163,12 +176,16 @@ export async function GET(request: NextRequest) {
 
       const modalDus = hargaBeli * jumlahDus;
       const modalPcs =
-        jumlahPcs > 0 ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs) : 0;
+        jumlahPcs > 0
+          ? Math.round((hargaBeli / jumlahPerKemasan) * jumlahPcs)
+          : 0;
       const totalModalItem = modalDus + modalPcs;
 
       const penjualanDus = hargaJual * jumlahDus;
       const penjualanPcs =
-        jumlahPcs > 0 ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs) : 0;
+        jumlahPcs > 0
+          ? Math.round((hargaJual / jumlahPerKemasan) * jumlahPcs)
+          : 0;
       const totalPenjualanItem = penjualanDus + penjualanPcs;
 
       const labaItem =
@@ -223,7 +240,8 @@ export async function GET(request: NextRequest) {
         success: true,
         filters: {
           period,
-          statusPembayaran: statusParam === "ALL" ? "all" : statusParam.toLowerCase(),
+          statusPembayaran:
+            statusParam === "ALL" ? "all" : statusParam.toLowerCase(),
           date: startDate,
           startDate,
           endDate,
@@ -238,12 +256,12 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error generating laporan laba per barang:", error);
-    const message = error instanceof Error ? error.message : "Gagal mengambil laporan laba per barang";
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Gagal mengambil laporan laba per barang";
     const status = message === "Tanggal tidak valid" ? 400 : 500;
-    return NextResponse.json(
-      { success: false, error: message },
-      { status }
-    );
+    return NextResponse.json({ success: false, error: message }, { status });
   } finally {
     await prisma.$disconnect();
   }

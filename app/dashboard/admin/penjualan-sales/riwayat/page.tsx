@@ -93,6 +93,7 @@ interface PenjualanHeader {
   metodePembayaran: "CASH" | "TRANSFER";
   statusPembayaran: "LUNAS" | "HUTANG";
   statusTransaksi: "KERANJANG" | "SELESAI" | "DIBATALKAN";
+  isDeleted: boolean;
   tanggalTransaksi: string;
   tanggalJatuhTempo: string;
   customer: Customer | null;
@@ -659,7 +660,7 @@ const RiwayatPenjualanPage = () => {
                       Total
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Metode
+                      Status
                     </th>
 
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -700,16 +701,15 @@ const RiwayatPenjualanPage = () => {
                               <p className="font-medium text-gray-900 text-sm">
                                 {pj.kodePenjualan}
                               </p>
-                              {/* Label Status Pembayaran */}
-                              {pj.statusPembayaran === "HUTANG" ? (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
-                                  HUTANG
-                                </span>
-                              ) : (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">
-                                  LUNAS
-                                </span>
-                              )}
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                                  pj.metodePembayaran === "CASH"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-purple-100 text-purple-700"
+                                }`}
+                              >
+                                {pj.metodePembayaran}
+                              </span>
                             </div>
                           </td>
 
@@ -747,13 +747,18 @@ const RiwayatPenjualanPage = () => {
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span
                               className={`text-xs px-2 py-1 rounded font-medium ${
-                                pj.metodePembayaran === "CASH"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-purple-100 text-purple-700"
+                                pj.statusPembayaran === "HUTANG"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-green-100 text-green-700"
                               }`}
                             >
-                              {pj.metodePembayaran}
+                              {pj.statusPembayaran}
                             </span>
+                            {pj.isDeleted && (
+                              <span className="text-xs px-2 py-1 rounded font-medium bg-red-100 text-red-700">
+                                DELETED
+                              </span>
+                            )}
                           </td>
 
                           <td className="px-4 py-3 whitespace-nowrap text-center">

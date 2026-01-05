@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import ExcelJS from "exceljs";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -124,6 +125,10 @@ function formatDateRange(startDate?: string, endDate?: string): string {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -812,9 +817,9 @@ async function generateLaporanPembayaranPenjualan(
     const row = worksheet.getRow(currentRow);
     row.getCell(1).value = index + 1;
     row.getCell(2).value = pembayaran.kodePembayaran;
-    row.getCell(3).value = new Date(
-      pembayaran.tanggalBayar
-    ).toLocaleDateString("id-ID");
+    row.getCell(3).value = new Date(pembayaran.tanggalBayar).toLocaleDateString(
+      "id-ID"
+    );
     row.getCell(4).value = pembayaran.penjualan?.kodePenjualan || "-";
     row.getCell(5).value =
       pembayaran.penjualan?.customer?.nama ||

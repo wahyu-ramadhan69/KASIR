@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import ExcelJS from "exceljs";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -216,8 +217,7 @@ async function exportSummary(
     pb.items.forEach((item: any) => {
       const totalItem = toNumber(item.totalItem);
       const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan);
-      const jumlahDus =
-        jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
+      const jumlahDus = jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
       totalDus += jumlahDus;
     });
 
@@ -324,15 +324,15 @@ async function exportDetail(
   const worksheet = workbook.addWorksheet("Laporan Detail Pembelian");
 
   worksheet.columns = [
-    { key: "col1", width: 5 },   // No
-    { key: "col2", width: 12 },  // Tanggal
-    { key: "col3", width: 20 },  // Kode Pembelian
-    { key: "col4", width: 24 },  // Supplier
-    { key: "col5", width: 18 },  // Status Pembayaran
-    { key: "col6", width: 12 },  // Kode Barang
-    { key: "col7", width: 22 },  // Nama Barang
-    { key: "col8", width: 12 },  // Ukuran
-    { key: "col9", width: 14 },  // Qty
+    { key: "col1", width: 5 }, // No
+    { key: "col2", width: 12 }, // Tanggal
+    { key: "col3", width: 20 }, // Kode Pembelian
+    { key: "col4", width: 24 }, // Supplier
+    { key: "col5", width: 18 }, // Status Pembayaran
+    { key: "col6", width: 12 }, // Kode Barang
+    { key: "col7", width: 22 }, // Nama Barang
+    { key: "col8", width: 12 }, // Ukuran
+    { key: "col9", width: 14 }, // Qty
     { key: "col10", width: 14 }, // Harga Beli
     { key: "col11", width: 12 }, // Diskon/Item
     { key: "col12", width: 14 }, // Total Harga
@@ -401,8 +401,7 @@ async function exportDetail(
       const diskonPerItem = toNumber(item.diskonPerItem);
       const jumlahPerKemasan = toNumber(item.barang.jumlahPerKemasan);
       const ukuran = toNumber(item.barang.ukuran);
-      const jumlahDus =
-        jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
+      const jumlahDus = jumlahPerKemasan > 0 ? totalItem / jumlahPerKemasan : 0;
 
       const totalHarga = hargaPokok * jumlahDus;
       const totalDiskon = diskonPerItem * jumlahDus;
@@ -734,6 +733,10 @@ async function exportYearly(year: number): Promise<NextResponse> {
 // =====================================================
 export async function GET(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format") || "excel";
     const period = searchParams.get("period") || "current";

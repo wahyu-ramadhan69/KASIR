@@ -567,7 +567,8 @@ const DataBarangPage = () => {
 
   const getTotalNilaiBarang = () => {
     return barangList.reduce(
-      (sum, item) => sum + item.hargaBeli * item.stok,
+      (sum, item) =>
+        sum + item.hargaBeli * (item.stok / item.jumlahPerKemasan),
       0
     );
   };

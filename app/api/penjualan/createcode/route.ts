@@ -1,6 +1,8 @@
 // app/api/penjualan/createcode/route.ts
 
+import { isAuthenticated } from "@/app/AuthGuard";
 import { PrismaClient } from "@prisma/client";
+import { NextResponse } from "next/server";
 
 const prisma = new PrismaClient();
 
@@ -19,6 +21,10 @@ function stringToHash(str: string): number {
 export async function GET() {
   try {
     // Generate kode penjualan berdasarkan tanggal hari ini
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, "0");
@@ -34,9 +40,7 @@ export async function GET() {
       async (tx) => {
         // Acquire advisory lock - ini akan block sampai lock didapat
         // Lock ini akan otomatis di-release setelah transaction selesai
-        await tx.$executeRawUnsafe(
-          `SELECT pg_advisory_xact_lock(${lockKey})`
-        );
+        await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${lockKey})`);
 
         // Sekarang kita punya exclusive lock untuk date prefix ini
         // Cari kode penjualan terakhir hari ini

@@ -1,7 +1,7 @@
 // app/api/penjualan/[id]/ubah-jatuh-tempo/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { getAuthData } from "@/app/AuthGuard";
+import { getAuthData, isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -28,6 +28,10 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await isAuthenticated();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   // Cek autentikasi dan role
   const authData = await getAuthData();
 

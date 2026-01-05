@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -44,6 +45,10 @@ function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
@@ -258,27 +263,27 @@ export async function GET(request: NextRequest) {
         stats: {
           // Stats untuk page ini
           currentPage: {
-          totalPenjualan,
-          totalModal,
-          totalLaba,
-          totalDibayar,
-          totalSisaHutang,
-          marginPersen:
-            totalPenjualan > 0 ? (totalLaba / totalPenjualan) * 100 : 0,
-          jumlahItem,
-          totalDus,
-          totalPcs,
-        },
-        // Stats keseluruhan (filtered)
-        overall: {
-          totalPenjualan: totalPenjualanAll,
-          totalModal: totalModalAll,
-          totalLaba: totalLabaAll,
-          totalDibayar: totalDibayarAll,
-          totalSisaHutang: totalSisaHutangAll,
-          marginPersen,
-          jumlahTransaksi: allPenjualan.length,
-          jumlahItem: jumlahItemAll,
+            totalPenjualan,
+            totalModal,
+            totalLaba,
+            totalDibayar,
+            totalSisaHutang,
+            marginPersen:
+              totalPenjualan > 0 ? (totalLaba / totalPenjualan) * 100 : 0,
+            jumlahItem,
+            totalDus,
+            totalPcs,
+          },
+          // Stats keseluruhan (filtered)
+          overall: {
+            totalPenjualan: totalPenjualanAll,
+            totalModal: totalModalAll,
+            totalLaba: totalLabaAll,
+            totalDibayar: totalDibayarAll,
+            totalSisaHutang: totalSisaHutangAll,
+            marginPersen,
+            jumlahTransaksi: allPenjualan.length,
+            jumlahItem: jumlahItemAll,
             totalDus: totalDusAll,
             totalPcs: totalPcsAll,
           },
