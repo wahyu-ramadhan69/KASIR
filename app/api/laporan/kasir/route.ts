@@ -235,58 +235,58 @@ export async function GET(request: NextRequest) {
     doc.fillColor("#0f172a");
 
     const summaryTop = 130;
-    const cardGap = 12;
-    const cardWidth = (contentWidth - cardGap * 2) / 3;
+    // const cardGap = 12;
+    // const cardWidth = (contentWidth - cardGap * 2) / 3;
     const cardHeight = 90;
 
-    const drawCard = (
-      x: number,
-      y: number,
-      title: string,
-      value: string,
-      subtitle: string,
-      color: string
-    ) => {
-      doc.roundedRect(x, y, cardWidth, cardHeight, 10).fill(color);
-      doc
-        .fillColor("#ffffff")
-        .font("Helvetica-Bold")
-        .fontSize(12)
-        .text(title, x + 16, y + 14, { width: cardWidth - 32 });
-      doc.fontSize(16).text(value, x + 16, y + 36, { width: cardWidth - 32 });
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .fillColor("#e2e8f0")
-        .text(subtitle, x + 16, y + 60, { width: cardWidth - 32 });
-    };
+    // const drawCard = (
+    //   x: number,
+    //   y: number,
+    //   title: string,
+    //   value: string,
+    //   subtitle: string,
+    //   color: string
+    // ) => {
+    //   doc.roundedRect(x, y, cardWidth, cardHeight, 10).fill(color);
+    //   doc
+    //     .fillColor("#ffffff")
+    //     .font("Helvetica-Bold")
+    //     .fontSize(12)
+    //     .text(title, x + 16, y + 14, { width: cardWidth - 32 });
+    //   doc.fontSize(16).text(value, x + 16, y + 36, { width: cardWidth - 32 });
+    //   doc
+    //     .font("Helvetica")
+    //     .fontSize(9)
+    //     .fillColor("#e2e8f0")
+    //     .text(subtitle, x + 16, y + 60, { width: cardWidth - 32 });
+    // };
 
-    drawCard(
-      doc.page.margins.left,
-      summaryTop,
-      "Penjualan",
-      formatRupiah(totalPenjualan),
-      "Jenis pembayaran: PENJUALAN",
-      "#6366f1"
-    );
+    // drawCard(
+    //   doc.page.margins.left,
+    //   summaryTop,
+    //   "Pembayaran Penjualan",
+    //   formatRupiah(totalPenjualan),
+    //   "Jenis pembayaran: PENJUALAN",
+    //   "#6366f1"
+    // );
 
-    drawCard(
-      doc.page.margins.left + cardWidth + cardGap,
-      summaryTop,
-      "Pembayaran Piutang",
-      formatRupiah(totalPiutang),
-      "Jenis pembayaran: PIUTANG",
-      "#0ea5e9"
-    );
+    // drawCard(
+    //   doc.page.margins.left + cardWidth + cardGap,
+    //   summaryTop,
+    //   "Pembayaran Piutang",
+    //   formatRupiah(totalPiutang),
+    //   "Jenis pembayaran: PIUTANG",
+    //   "#0ea5e9"
+    // );
 
-    drawCard(
-      doc.page.margins.left + (cardWidth + cardGap) * 2,
-      summaryTop,
-      "Setoran",
-      formatRupiah(totalSetoran),
-      "Penjualan + Piutang - Pengeluaran - Kerugian",
-      "#10b981"
-    );
+    // drawCard(
+    //   doc.page.margins.left + (cardWidth + cardGap) * 2,
+    //   summaryTop,
+    //   "Setoran",
+    //   formatRupiah(totalSetoran),
+    //   "Penjualan + Piutang - Pengeluaran - Kerugian",
+    //   "#10b981"
+    // );
 
     const detailTop = summaryTop + cardHeight + 30;
     doc
@@ -315,14 +315,12 @@ export async function GET(request: NextRequest) {
     });
 
     const rows = [
-      { label: "Total Transaksi", value: totalPenjualan },
+      { label: "Pembayaran Penjualan", value: totalPenjualan },
       { label: "Pembayaran Piutang Customer", value: totalPiutang },
       { label: "Total Piutang Customer", value: totalSisaPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
-      { label: "Kerugian", value: totalKerugian },
-      { label: "Total Cash", value: totalCash },
-      { label: "Total Transfer", value: totalTransfer },
-      { label: "Setoran Akhir", value: totalSetoran },
+      { label: "Setoran Transfer", value: totalTransfer },
+      { label: "Setoran Cash", value: totalCash },
     ];
 
     rows.forEach((row, index) => {

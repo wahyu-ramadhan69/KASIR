@@ -337,6 +337,8 @@ export async function GET(request: Request) {
 
     type DailyValue = {
       penjualan: number;
+      pembayaranPenjualan: number;
+      pembayaranPiutang: number;
       piutang: number;
       pembelian: number;
       pengeluaran: number;
@@ -365,6 +367,8 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
           piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
@@ -389,6 +393,8 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
           piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
@@ -400,12 +406,52 @@ export async function GET(request: Request) {
       dataMap[key].penjualan += h.nominal;
     }
 
+    // Isi data pembayaran penjualan
+    for (const h of pembayaranPenjualanEntries) {
+      const key = getKey(h.tanggal);
+      if (!dataMap[key]) {
+        dataMap[key] = {
+          penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
+          piutang: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          kerugian: 0,
+          laba: 0,
+        };
+      }
+      dataMap[key].pembayaranPenjualan += h.nominal;
+    }
+
+    // Isi data pembayaran piutang
+    for (const h of piutangEntries) {
+      const key = getKey(h.tanggal);
+      if (!dataMap[key]) {
+        dataMap[key] = {
+          penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
+          piutang: 0,
+          pembelian: 0,
+          pengeluaran: 0,
+          labaKotor: 0,
+          kerugian: 0,
+          laba: 0,
+        };
+      }
+      dataMap[key].pembayaranPiutang += h.nominal;
+    }
+
     // Isi data total piutang
     for (const h of piutangOutstandingEntries) {
       const key = getKey(h.tanggal);
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
           piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
@@ -423,6 +469,8 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
           piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
@@ -440,6 +488,8 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
           piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
@@ -457,6 +507,8 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
           piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
@@ -482,6 +534,8 @@ export async function GET(request: Request) {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
+          pembayaranPenjualan: 0,
+          pembayaranPiutang: 0,
           piutang: 0,
           pembelian: 0,
           pengeluaran: 0,
@@ -519,6 +573,8 @@ export async function GET(request: Request) {
       .map(([date, value]) => ({
         date,
         penjualan: value.penjualan,
+        pembayaranPenjualan: value.pembayaranPenjualan,
+        pembayaranPiutang: value.pembayaranPiutang,
         piutang: value.piutang,
         pembelian: value.pembelian,
         pengeluaran: value.pengeluaran,

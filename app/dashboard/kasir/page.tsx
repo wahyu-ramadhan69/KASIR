@@ -106,7 +106,7 @@ const CustomTooltip = ({ active, payload, period }: any) => {
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500" />
-            <span className="text-sm text-gray-600">Penjualan</span>
+            <span className="text-sm text-gray-600">Pembayaran Penjualan</span>
           </div>
           <span className="font-bold text-purple-600">
             {formatRupiah(d.penjualan)}
@@ -570,7 +570,7 @@ const Penjualan30HariPage = () => {
         {/* ✅ UPDATED: STATS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <StatCard
-            title="Penjualan"
+            title="Pembayaran Penjualan"
             value={formatNumber(totalPenjualan)}
             subtitle={formatRupiah(totalPenjualan)}
             icon={ShoppingCart}
