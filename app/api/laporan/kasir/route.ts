@@ -231,13 +231,7 @@ export async function GET(request: NextRequest) {
         72
       );
 
-    doc.moveDown(6);
     doc.fillColor("#0f172a");
-
-    const summaryTop = 130;
-    // const cardGap = 12;
-    // const cardWidth = (contentWidth - cardGap * 2) / 3;
-    const cardHeight = 90;
 
     // const drawCard = (
     //   x: number,
@@ -288,7 +282,7 @@ export async function GET(request: NextRequest) {
     //   "#10b981"
     // );
 
-    const detailTop = summaryTop + cardHeight + 30;
+    const detailTop = 120;
     doc
       .fillColor("#0f172a")
       .font("Helvetica-Bold")
