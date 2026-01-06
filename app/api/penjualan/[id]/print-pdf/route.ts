@@ -140,7 +140,7 @@ export async function GET(
     }, 0);
 
     // Header
-    doc.fontSize(16).font("RobotoMono-Bold").text("NOTA PENJUALAN", {
+    doc.fontSize(11).font("RobotoMono-Bold").text("NOTA PENJUALAN", {
       align: "center",
     });
 
@@ -148,7 +148,7 @@ export async function GET(
     doc.fontSize(11).font("RobotoMono-Bold").text("Toko ABC", {
       align: "center",
     });
-    doc.font("RobotoMono").text("Jl. Contoh No. 123, Jakarta", {
+    doc.fontSize(9).font("RobotoMono").text("Jl. Contoh No. 123, Jakarta", {
       align: "center",
     });
     doc.text("Telp: 021-12345678", { align: "center" });
@@ -164,7 +164,7 @@ export async function GET(
     const leftCol = margin;
     let currentY = doc.y;
 
-    doc.fontSize(11).font("RobotoMono-Bold");
+    doc.fontSize(10).font("RobotoMono-Bold");
     doc.text("No Nota:", leftCol, currentY);
     doc
       .font("RobotoMono")
@@ -207,14 +207,11 @@ export async function GET(
 
     // Header Tabel
     currentY = doc.y;
-    doc.fontSize(10.5).font("RobotoMono-Bold");
+    doc.fontSize(10).font("RobotoMono-Bold");
     const colItem = leftCol;
-    const colQty = leftCol + 96;
-    const colHarga = leftCol + 140;
-    const colTotal = leftCol + 178;
-    doc.text("Item", colItem, currentY, { width: 92 });
-    doc.text("Qty", colQty, currentY, { width: 40, align: "center" });
-    doc.text("Harga", colHarga, currentY, { width: 35, align: "right" });
+    const itemWidth = contentWidth - 60;
+    const colTotal = leftCol + itemWidth;
+    doc.text("Item", colItem, currentY, { width: itemWidth });
     doc.text("Total", colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
       align: "right",
@@ -228,7 +225,7 @@ export async function GET(
     currentY += 5;
 
     // Items
-    doc.font("RobotoMono").fontSize(10.5);
+    doc.font("RobotoMono").fontSize(10);
     let subtotal = 0;
 
     for (const item of penjualan.items) {
@@ -253,33 +250,33 @@ export async function GET(
 
       subtotal += totalSetelahDiskon;
 
-      // Nama barang (bisa multiline jika panjang)
-      doc.text(item.barang.namaBarang, leftCol, currentY, { width: 92 });
-      const textHeight = doc.heightOfString(item.barang.namaBarang, {
-        width: 92,
-      });
-
-      // Qty
       const labelKemasan = item.barang?.jenisKemasan || "dus";
-      const qtyText = `${jumlahDus} ${labelKemasan} + ${jumlahPcs} item`;
-      doc.text(qtyText, colQty, currentY, {
-        width: 40,
-        align: "center",
+      const qtyLabel =
+        jumlahPcs > 0
+          ? `${jumlahDus} ${labelKemasan} + ${jumlahPcs} pcs`
+          : `${jumlahDus} ${labelKemasan}`;
+      const hargaLine = `${formatRupiah(hargaSatuan)} x ${qtyLabel}`;
+
+      // Nama barang (bisa multiline jika panjang)
+      doc.text(item.barang.namaBarang, leftCol, currentY, { width: itemWidth });
+      const textHeight = doc.heightOfString(item.barang.namaBarang, {
+        width: itemWidth,
       });
 
-      // Harga
-      doc.text(formatRupiah(hargaSatuan), colHarga, currentY, {
-        width: 35,
-        align: "right",
+      doc.fontSize(10).text(hargaLine, leftCol, currentY + textHeight + 1, {
+        width: itemWidth,
       });
 
-      // Total
+      doc.fontSize(10);
       doc.text(formatRupiah(totalSetelahDiskon), colTotal, currentY, {
         width: contentWidth - (colTotal - leftCol),
         align: "right",
       });
 
-      currentY += Math.max(textHeight, 10) + 2;
+      const hargaLineHeight = doc.heightOfString(hargaLine, {
+        width: itemWidth,
+      });
+      currentY += Math.max(textHeight + hargaLineHeight + 1, 12) + 2;
 
       // Tampilkan diskon jika ada
       if (diskonTotal > 0) {
@@ -302,15 +299,15 @@ export async function GET(
     currentY += 8;
 
     // Summary
-    doc.font("RobotoMono").fontSize(11);
-    doc.text("Subtotal:", colHarga, currentY);
+    doc.font("RobotoMono").fontSize(10);
+    doc.text("Subtotal:", colTotal - 60, currentY);
     doc.text(formatRupiah(subtotal), colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
       align: "right",
     });
 
     currentY += 12;
-    doc.text("Total Berat:", colHarga, currentY);
+    doc.text("Total Berat:", colTotal - 60, currentY);
     doc.text(`${formatBeratKg(totalBerat)} kg`, colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
       align: "right",
@@ -319,7 +316,7 @@ export async function GET(
     if (Number(penjualan.diskonNota) > 0) {
       currentY += 12;
       doc.fillColor("#DC2626");
-      doc.text("Diskon Nota:", colHarga, currentY);
+      doc.text("Diskon Nota:", colTotal - 60, currentY);
       doc.text(
         `-${formatRupiah(Number(penjualan.diskonNota))}`,
         colTotal,
@@ -333,30 +330,30 @@ export async function GET(
     }
 
     currentY += 15;
-    doc.font("RobotoMono-Bold").fontSize(13);
-    doc.text("TOTAL:", colHarga, currentY);
+    doc.font("RobotoMono-Bold").fontSize(10);
+    doc.text("TOTAL:", colTotal - 60, currentY);
     doc.text(formatRupiah(Number(penjualan.totalHarga)), colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
       align: "right",
     });
 
     currentY += 12;
-    doc.font("RobotoMono").fontSize(11);
-    doc.text("Cash:", colHarga, currentY);
+    doc.font("RobotoMono").fontSize(9);
+    doc.text("Cash:", colTotal - 60, currentY);
     doc.text(formatRupiah(totalCash), colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
       align: "right",
     });
 
     currentY += 12;
-    doc.text("Transfer:", colHarga, currentY);
+    doc.text("Transfer:", colTotal - 60, currentY);
     doc.text(formatRupiah(totalTransfer), colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
       align: "right",
     });
 
     currentY += 12;
-    doc.text("Dibayar:", colHarga, currentY);
+    doc.text("Dibayar:", colTotal - 60, currentY);
     doc.text(
       formatRupiah(Number(penjualan.jumlahDibayar)),
       colTotal,
@@ -369,7 +366,7 @@ export async function GET(
 
     currentY += 12;
     doc.fillColor("#059669");
-    doc.text("Kembalian:", colHarga, currentY);
+    doc.text("Kembalian:", colTotal - 60, currentY);
     doc.text(formatRupiah(Number(penjualan.kembalian)), colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
       align: "right",
@@ -386,13 +383,13 @@ export async function GET(
     doc.moveDown(0.5);
 
     doc
-      .fontSize(10.5)
+      .fontSize(8)
       .font("RobotoMono-Bold")
       .text("Terima kasih atas pembelian Anda!", {
         align: "center",
       });
     doc
-      .fontSize(10)
+      .fontSize(8)
       .font("RobotoMono")
       .text("Barang yang sudah dibeli tidak dapat dikembalikan", {
         align: "center",

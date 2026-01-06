@@ -353,7 +353,7 @@ const DataPengeluaranPage = () => {
   );
 
   const filteredPengeluaran = harianPengeluaran.filter((item) => {
-
+    const itemDate = new Date(item.tanggalInput).toISOString().split("T")[0];
     const matchSearch =
       getJenisLabel(item.namaPengeluaran)
         .toLowerCase()
@@ -364,7 +364,11 @@ const DataPengeluaranPage = () => {
     const matchJenis =
       filterJenis === "all" || item.namaPengeluaran === filterJenis;
 
-    return matchSearch && matchJenis;
+    const matchDate =
+      (!startDate || itemDate >= startDate) &&
+      (!endDate || itemDate <= endDate);
+
+    return matchSearch && matchJenis && matchDate;
   });
 
   const totalPengeluaran = filteredPengeluaran.reduce(
@@ -374,7 +378,7 @@ const DataPengeluaranPage = () => {
 
   const getTodayPengeluaran = () => {
     const today = new Date().toISOString().split("T")[0];
-    return harianPengeluaran
+    return filteredPengeluaran
       .filter(
         (item) =>
           new Date(item.tanggalInput).toISOString().split("T")[0] === today
@@ -387,7 +391,7 @@ const DataPengeluaranPage = () => {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    return harianPengeluaran
+    return filteredPengeluaran
       .filter((item) => {
         const itemDate = new Date(item.tanggalInput);
         return (

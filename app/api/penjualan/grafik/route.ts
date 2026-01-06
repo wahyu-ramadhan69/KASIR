@@ -92,6 +92,7 @@ export async function GET(request: Request) {
 
     let penjualanEntries: PenjualanEntry[] = [];
     let piutangEntries: PenjualanEntry[] = [];
+    let piutangOutstandingEntries: PenjualanEntry[] = [];
     let pembayaranPenjualanEntries: PenjualanEntry[] = [];
 
     if (isKasir) {
@@ -139,6 +140,30 @@ export async function GET(request: Request) {
       piutangEntries = pembayaranPiutang.map((item) => ({
         tanggal: item.tanggalBayar,
         nominal: Number(item.nominal),
+      }));
+
+      const piutangOutstanding = await prisma.penjualanHeader.findMany({
+        where: {
+          tanggalTransaksi: {
+            gte: startDate,
+            lte: today,
+          },
+          statusTransaksi: "SELESAI",
+          statusPembayaran: "HUTANG",
+          ...(shouldFilterByUser ? { userId } : {}),
+        },
+        select: {
+          tanggalTransaksi: true,
+          totalHarga: true,
+          jumlahDibayar: true,
+        },
+      });
+      piutangOutstandingEntries = piutangOutstanding.map((item) => ({
+        tanggal: item.tanggalTransaksi,
+        nominal: Math.max(
+          0,
+          Number(item.totalHarga) - Number(item.jumlahDibayar || 0)
+        ),
       }));
     } else {
       // Fetch data penjualan berdasarkan header (admin/role lain)
@@ -200,6 +225,30 @@ export async function GET(request: Request) {
       piutangEntries = pembayaranPiutang.map((item) => ({
         tanggal: item.tanggalBayar,
         nominal: Number(item.nominal),
+      }));
+
+      const piutangOutstanding = await prisma.penjualanHeader.findMany({
+        where: {
+          tanggalTransaksi: {
+            gte: startDate,
+            lte: today,
+          },
+          statusTransaksi: "SELESAI",
+          statusPembayaran: "HUTANG",
+          ...(shouldFilterByUser ? { userId } : {}),
+        },
+        select: {
+          tanggalTransaksi: true,
+          totalHarga: true,
+          jumlahDibayar: true,
+        },
+      });
+      piutangOutstandingEntries = piutangOutstanding.map((item) => ({
+        tanggal: item.tanggalTransaksi,
+        nominal: Math.max(
+          0,
+          Number(item.totalHarga) - Number(item.jumlahDibayar || 0)
+        ),
       }));
     }
 
@@ -351,8 +400,8 @@ export async function GET(request: Request) {
       dataMap[key].penjualan += h.nominal;
     }
 
-    // Isi data pembayaran piutang
-    for (const h of piutangEntries) {
+    // Isi data total piutang
+    for (const h of piutangOutstandingEntries) {
       const key = getKey(h.tanggal);
       if (!dataMap[key]) {
         dataMap[key] = {
@@ -486,6 +535,10 @@ export async function GET(request: Request) {
       (sum, item) => sum + item.nominal,
       0
     );
+    const totalPiutangOutstanding = piutangOutstandingEntries.reduce(
+      (sum, item) => sum + item.nominal,
+      0
+    );
 
     return NextResponse.json(
       deepSerialize({
@@ -497,6 +550,7 @@ export async function GET(request: Request) {
           penjualan: totalPembayaranPenjualan,
           piutang: totalPembayaranPiutang,
         },
+        totalPiutang: totalPiutangOutstanding,
       })
     );
   } catch (error) {

@@ -132,10 +132,9 @@ const RiwayatPembelianPage = () => {
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [filterStatus, setFilterStatus] = useState<string>("SELESAI");
-  const [filterPembayaran, setFilterPembayaran] = useState<string>("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const todayDate = new Date().toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState<string>(todayDate);
+  const [endDate, setEndDate] = useState<string>(todayDate);
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -175,15 +174,11 @@ const RiwayatPembelianPage = () => {
     };
   }, [searchTerm]);
 
-  // Fetch data when filters change
+  // Fetch data & stats when filters change
   useEffect(() => {
     fetchPembelian(1, true);
-  }, [filterStatus, filterPembayaran, startDate, endDate, debouncedSearch]);
-
-  // Fetch stats on mount
-  useEffect(() => {
     fetchStats();
-  }, []);
+  }, [startDate, endDate, debouncedSearch]);
 
   // Setup intersection observer for infinite scroll
   useEffect(() => {
@@ -217,22 +212,32 @@ const RiwayatPembelianPage = () => {
     params.append("page", page.toString());
     params.append("limit", "20");
 
-    // Status filter - for riwayat we want SELESAI or DIBATALKAN only
-    if (filterStatus !== "all") {
-      params.append("status", filterStatus);
-    }
-
-    // Pembayaran filter
-    if (filterPembayaran !== "all") {
-      params.append("pembayaran", filterPembayaran);
-    }
-
     // Search filter
     if (debouncedSearch) {
       params.append("search", debouncedSearch);
     }
 
     // Date range filter
+    if (startDate) {
+      params.append("startDate", startDate);
+    }
+
+    if (endDate) {
+      params.append("endDate", endDate);
+    }
+
+    return params.toString();
+  };
+
+  const buildStatsQueryParams = (status: "SELESAI" | "DIBATALKAN") => {
+    const params = new URLSearchParams();
+    params.append("status", status);
+    params.append("limit", "1000");
+
+    if (debouncedSearch) {
+      params.append("search", debouncedSearch);
+    }
+
     if (startDate) {
       params.append("startDate", startDate);
     }
@@ -257,15 +262,11 @@ const RiwayatPembelianPage = () => {
       const data = await res.json();
 
       if (data.success) {
-        // Filter out KERANJANG since this is riwayat page
-        let filtered = data.data;
-        if (filterStatus === "all") {
-          filtered = data.data.filter(
-            (p: PembelianHeader) =>
-              p.statusTransaksi === "SELESAI" ||
-              p.statusTransaksi === "DIBATALKAN"
-          );
-        }
+        const filtered = data.data.filter(
+          (p: PembelianHeader) =>
+            p.statusTransaksi === "SELESAI" ||
+            p.statusTransaksi === "DIBATALKAN"
+        );
 
         if (reset) {
           setPembelianList(filtered);
@@ -287,13 +288,13 @@ const RiwayatPembelianPage = () => {
     try {
       // Fetch stats for SELESAI transactions
       const selesaiRes = await fetch(
-        "/api/pembelian?status=SELESAI&limit=1000"
+        `/api/pembelian?${buildStatsQueryParams("SELESAI")}`
       );
       const selesaiData = await selesaiRes.json();
 
       // Fetch stats for DIBATALKAN transactions
       const dibatalkanRes = await fetch(
-        "/api/pembelian?status=DIBATALKAN&limit=1000"
+        `/api/pembelian?${buildStatsQueryParams("DIBATALKAN")}`
       );
       const dibatalkanData = await dibatalkanRes.json();
 
@@ -350,10 +351,8 @@ const RiwayatPembelianPage = () => {
   const handleClearFilters = () => {
     setSearchTerm("");
     setDebouncedSearch("");
-    setFilterStatus("SELESAI");
-    setFilterPembayaran("all");
-    setStartDate("");
-    setEndDate("");
+    setStartDate(todayDate);
+    setEndDate(todayDate);
   };
 
   const handleViewDetail = (pembelian: PembelianHeader) => {
@@ -396,11 +395,7 @@ const RiwayatPembelianPage = () => {
   };
 
   const hasActiveFilters =
-    filterStatus !== "SELESAI" ||
-    filterPembayaran !== "all" ||
-    startDate ||
-    endDate ||
-    debouncedSearch;
+    debouncedSearch || startDate !== todayDate || endDate !== todayDate;
 
   return (
     <div className="w-full max-w-7xl mx-auto">
@@ -471,7 +466,7 @@ const RiwayatPembelianPage = () => {
             <div>
               <p className="text-gray-500 text-sm font-medium">Total Hutang</p>
               <p className="text-2xl font-bold text-red-600 mt-1">
-                {formatRupiah(stats.totalHutang)}
+                {formatShortRupiah(stats.totalHutang)}
               </p>
             </div>
             <div className="bg-red-100 p-3 rounded-lg">
@@ -529,8 +524,8 @@ const RiwayatPembelianPage = () => {
       {/* Filter & Search */}
       <div className="bg-white rounded-lg p-4 mb-6 shadow-md border border-gray-100">
         <div className="flex flex-col gap-4">
-          {/* Row 1: Search and Status Filters */}
-          <div className="flex flex-col md:flex-row gap-4">
+          {/* Row 1: Search and Date Range */}
+          <div className="flex flex-col md:flex-row gap-4 items-end">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -541,31 +536,7 @@ const RiwayatPembelianPage = () => {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none"
               />
             </div>
-            <div className="flex gap-2">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none"
-              >
-                <option value="all">Semua Status</option>
-                <option value="SELESAI">Selesai</option>
-                <option value="DIBATALKAN">Dibatalkan</option>
-              </select>
-              <select
-                value={filterPembayaran}
-                onChange={(e) => setFilterPembayaran(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none"
-              >
-                <option value="all">Semua Pembayaran</option>
-                <option value="LUNAS">Lunas</option>
-                <option value="HUTANG">Hutang</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Row 2: Date Range */}
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1">
+            <div className="w-full md:max-w-[220px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 <Calendar className="w-4 h-4 inline mr-1" />
                 Tanggal Mulai
@@ -577,7 +548,7 @@ const RiwayatPembelianPage = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none"
               />
             </div>
-            <div className="flex-1">
+            <div className="w-full md:max-w-[220px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 <Calendar className="w-4 h-4 inline mr-1" />
                 Tanggal Akhir
@@ -600,15 +571,6 @@ const RiwayatPembelianPage = () => {
             )}
           </div>
 
-          {/* Info sorting */}
-          {filterPembayaran === "HUTANG" && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-yellow-600" />
-              <span className="text-sm text-yellow-700">
-                Data diurutkan berdasarkan tanggal jatuh tempo terdekat
-              </span>
-            </div>
-          )}
         </div>
       </div>
 

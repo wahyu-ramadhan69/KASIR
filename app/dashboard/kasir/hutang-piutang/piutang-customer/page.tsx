@@ -226,15 +226,11 @@ const RiwayatPenjualanPage = () => {
     };
   }, [searchTerm]);
 
-  // Fetch data when filters change
+  // Fetch data & stats when filters change
   useEffect(() => {
     fetchPenjualan(1, true);
-  }, [filterStatus, filterPembayaran, startDate, endDate, debouncedSearch]);
-
-  // Fetch stats on mount
-  useEffect(() => {
     fetchStats();
-  }, []);
+  }, [filterStatus, filterPembayaran, startDate, endDate, debouncedSearch]);
 
   // Setup intersection observer for infinite scroll
   useEffect(() => {
@@ -277,6 +273,36 @@ const RiwayatPenjualanPage = () => {
     }
 
     // Selalu hanya piutang tanpa perjalanan sales
+    params.append("tipePenjualan", "toko");
+
+    if (debouncedSearch) {
+      params.append("search", debouncedSearch);
+    }
+
+    if (startDate) {
+      params.append("startDate", startDate);
+    }
+
+    if (endDate) {
+      params.append("endDate", endDate);
+    }
+
+    return params.toString();
+  };
+
+  const buildStatsQueryParams = () => {
+    const params = new URLSearchParams();
+    params.append("page", "1");
+    params.append("limit", "1000");
+
+    if (filterStatus !== "all") {
+      params.append("status", filterStatus);
+    }
+
+    if (filterPembayaran !== "all") {
+      params.append("pembayaran", filterPembayaran);
+    }
+
     params.append("tipePenjualan", "toko");
 
     if (debouncedSearch) {
@@ -341,15 +367,24 @@ const RiwayatPenjualanPage = () => {
 
   const fetchStats = async () => {
     try {
-      const selesaiRes = await fetch(
-        "/api/penjualan?status=SELESAI&limit=1000&tipePenjualan=toko"
-      );
-      const selesaiData = await selesaiRes.json();
+      const queryParams = buildStatsQueryParams();
+      const res = await fetch(`/api/penjualan?${queryParams}`);
+      const data = await res.json();
 
-      if (selesaiData.success) {
-        const selesaiList = selesaiData.data as PenjualanHeader[];
+      if (data.success) {
+        let filtered = data.data as PenjualanHeader[];
 
-        const hutangList = selesaiList.filter(
+        if (filterStatus === "all") {
+          filtered = filtered.filter(
+            (p) =>
+              p.statusTransaksi === "SELESAI" ||
+              p.statusTransaksi === "DIBATALKAN"
+          );
+        }
+
+        filtered = filtered.filter((p) => p.perjalananSalesId === null);
+
+        const hutangList = filtered.filter(
           (p) => p.statusPembayaran === "HUTANG"
         );
 
@@ -358,7 +393,7 @@ const RiwayatPenjualanPage = () => {
           0
         );
 
-        const totalPendapatan = selesaiList.reduce(
+        const totalPendapatan = filtered.reduce(
           (sum, p) => sum + p.jumlahDibayar,
           0
         );
@@ -373,12 +408,12 @@ const RiwayatPenjualanPage = () => {
           return diffDays <= 7;
         }).length;
 
-        const totalLunas = selesaiList.filter(
+        const totalLunas = filtered.filter(
           (p) => p.statusPembayaran === "LUNAS"
         ).length;
 
         setStats({
-          totalTransaksi: selesaiList.length,
+          totalTransaksi: filtered.length,
           totalPendapatan,
           totalHutang,
           totalHutangTransaksi: hutangList.length,

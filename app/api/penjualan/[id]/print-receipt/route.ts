@@ -140,8 +140,8 @@ export async function GET(
 
     body {
       font-family: 'Roboto Mono', monospace;
-      font-size: 13px;
-      line-height: 1.5;
+      font-size: 10px;
+      line-height: 1.4;
       font-weight: 600;
       padding: 2mm;
       width: 78mm;
@@ -156,19 +156,19 @@ export async function GET(
     }
 
     .header h1 {
-      font-size: 17px;
+      font-size: 11px;
       font-weight: 800;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .header p {
-      font-size: 13px;
+      font-size: 9px;
       margin: 2px 0;
     }
 
     .info-section {
       margin: 8px 0;
-      font-size: 12px;
+      font-size: 10px;
     }
 
     .info-row {
@@ -190,7 +190,7 @@ export async function GET(
     .items-table {
       width: 100%;
       margin: 8px 0;
-      font-size: 12px;
+      font-size: 10px;
     }
 
     .items-header {
@@ -199,7 +199,7 @@ export async function GET(
       padding-bottom: 4px;
       margin-bottom: 4px;
       display: grid;
-      grid-template-columns: 1.6fr 0.6fr 0.8fr;
+      grid-template-columns: 2.2fr 0.8fr;
       gap: 4px;
     }
 
@@ -215,9 +215,9 @@ export async function GET(
 
     .item-details {
       display: grid;
-      grid-template-columns: 1.6fr 0.6fr 0.8fr;
+      grid-template-columns: 2.2fr 0.8fr;
       gap: 4px;
-      font-size: 12px;
+      font-size: 10px;
     }
 
     .item-discount {
@@ -237,12 +237,12 @@ export async function GET(
       display: flex;
       justify-content: space-between;
       margin: 4px 0;
-      font-size: 13px;
+      font-size: 10px;
     }
 
     .summary-row.total {
       font-weight: 800;
-      font-size: 15px;
+      font-size: 10px;
       border-top: 1px solid #000;
       border-bottom: 1px solid #000;
       padding: 6px 0;
@@ -254,6 +254,10 @@ export async function GET(
       font-weight: 800;
     }
 
+    .summary-row.payment {
+      font-size: 9px;
+    }
+
     .summary-row.discount {
       color: #dc2626;
     }
@@ -263,7 +267,7 @@ export async function GET(
       text-align: center;
       border-top: 1px dashed #000;
       padding-top: 8px;
-      font-size: 10px;
+      font-size: 8px;
     }
 
     .footer p {
@@ -271,21 +275,21 @@ export async function GET(
     }
 
     .signature-section {
-      margin-top: 20px;
+      margin-top: 16px;
       display: flex;
       justify-content: flex-end;
     }
 
     .signature-box {
       text-align: center;
-      width: 120px;
+      width: 150px;
     }
 
     .signature-line {
       border-top: 1px solid #000;
-      margin-top: 50px;
-      padding-top: 4px;
-      font-size: 10px;
+      margin: 38px auto 0;
+      width: 120px;
+      height: 1px;
     }
 
     @media print {
@@ -335,7 +339,6 @@ export async function GET(
   <div class="items-table">
     <div class="items-header">
       <span>Item</span>
-      <span style="text-align: center;">Qty</span>
       <span style="text-align: right;">Total</span>
     </div>
 
@@ -360,13 +363,17 @@ export async function GET(
         const diskonTotal = Number(item.diskonPerItem) * jumlahDus;
         const totalSetelahDiskon = totalHargaSebelumDiskon - diskonTotal;
         const labelKemasan = item.barang?.jenisKemasan || "dus";
+        const qtyLabel =
+          jumlahPcs > 0
+            ? `${jumlahDus} ${labelKemasan} + ${jumlahPcs} pcs`
+            : `${jumlahDus} ${labelKemasan}`;
+        const hargaLine = `${formatRupiah(hargaSatuan)} x ${qtyLabel}`;
 
         return `
     <div class="item-row">
       <div class="item-name">${item.barang.namaBarang}</div>
       <div class="item-details">
-        <span>${formatRupiah(hargaSatuan)}</span>
-        <span style="text-align: center;">${jumlahDus} ${labelKemasan} + ${jumlahPcs} item</span>
+        <span>${hargaLine}</span>
         <span style="text-align: right;">${formatRupiah(
           totalSetelahDiskon
         )}</span>
@@ -405,19 +412,19 @@ export async function GET(
       <span>TOTAL:</span>
       <span>${formatRupiah(penjualan.totalHarga)}</span>
     </div>
-    <div class="summary-row">
+    <div class="summary-row payment">
       <span>Cash:</span>
       <span>${formatRupiah(totalCash)}</span>
     </div>
-    <div class="summary-row">
+    <div class="summary-row payment">
       <span>Transfer:</span>
       <span>${formatRupiah(totalTransfer)}</span>
     </div>
-    <div class="summary-row">
+    <div class="summary-row payment">
       <span>Dibayar:</span>
       <span>${formatRupiah(penjualan.jumlahDibayar)}</span>
     </div>
-    <div class="summary-row change">
+    <div class="summary-row change payment">
       <span>Kembalian:</span>
       <span>${formatRupiah(penjualan.kembalian)}</span>
     </div>
@@ -430,10 +437,8 @@ export async function GET(
 
   <div class="signature-section">
     <div class="signature-box">
-      <p style="font-size: 9px; margin-bottom: 5px;">Tanda Terima,</p>
-      <div class="signature-line">
-        ( _________________ )
-      </div>
+      <p style="font-size: 8px; margin-bottom: 4px;">Tanda Terima,</p>
+      <div class="signature-line"></div>
     </div>
   </div>
 

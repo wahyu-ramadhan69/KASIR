@@ -163,11 +163,8 @@ const HutangPembelianPage = () => {
 
   useEffect(() => {
     fetchPembelian(1, true);
-  }, [debouncedSearch, startDate, endDate]);
-
-  useEffect(() => {
     fetchStats();
-  }, []);
+  }, [debouncedSearch, startDate, endDate]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -224,6 +221,18 @@ const HutangPembelianPage = () => {
     return params.toString();
   };
 
+  const buildStatsQueryParams = () => {
+    const params = new URLSearchParams();
+    params.append("page", "1");
+    params.append("limit", "1000");
+    params.append("status", "SELESAI");
+    params.append("pembayaran", "HUTANG");
+    if (debouncedSearch) params.append("search", debouncedSearch);
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+    return params.toString();
+  };
+
   const fetchPembelian = async (page = 1, reset = false) => {
     if (reset) setLoading(true);
     else setLoadingMore(true);
@@ -250,9 +259,8 @@ const HutangPembelianPage = () => {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch(
-        "/api/pembelian?status=SELESAI&limit=1000&pembayaran=HUTANG"
-      );
+      const queryParams = buildStatsQueryParams();
+      const res = await fetch(`/api/pembelian?${queryParams}`);
       const data = await res.json();
       if (data.success) {
         const hutangList: PembelianHeader[] = data.data || [];

@@ -31,13 +31,13 @@ import {
   CalendarDays,
   CalendarRange,
   CalendarClock,
-  Package,
   AlertTriangle,
 } from "lucide-react";
 
 interface DailySales {
   date: string;
   penjualan: number;
+  piutang: number;
   pembelian: number;
   pengeluaran: number;
   labaKotor: number;
@@ -106,8 +106,6 @@ const CustomTooltip = ({ active, payload, period }: any) => {
     d.penjualan > 0 ? ((d.laba / d.penjualan) * 100).toFixed(1) : "0";
   const marginKerugian =
     d.penjualan > 0 ? ((d.kerugian / d.penjualan) * 100).toFixed(1) : "0";
-  const totalKeluar = d.pembelian + d.pengeluaran;
-
   return (
     <div className="bg-white/95 backdrop-blur-xl p-5 rounded-2xl shadow-2xl border border-purple-100 transform transition-all">
       <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-100">
@@ -129,10 +127,10 @@ const CustomTooltip = ({ active, payload, period }: any) => {
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500" />
-            <span className="text-sm text-gray-600">Pembelian</span>
+            <span className="text-sm text-gray-600">Total Piutang</span>
           </div>
           <span className="font-bold text-orange-600">
-            {formatRupiah(d.pembelian)}
+            {formatRupiah(d.piutang)}
           </span>
         </div>
 
@@ -175,12 +173,6 @@ const CustomTooltip = ({ active, payload, period }: any) => {
         </div>
 
         <div className="pt-3 border-t border-gray-100 space-y-2">
-          <div className="flex items-center justify-between gap-8">
-            <span className="text-xs text-gray-500">Total Keluar</span>
-            <span className="text-sm font-bold text-gray-700">
-              {formatRupiah(totalKeluar)}
-            </span>
-          </div>
           <div className="flex items-center justify-between gap-8">
             <span className="text-xs text-gray-500">Rasio Kerugian</span>
             <span
@@ -292,9 +284,10 @@ const Penjualan30HariPage = () => {
     penjualan: 0,
     piutang: 0,
   });
+  const [totalPiutang, setTotalPiutang] = useState<number>(0);
   const [visibleLines, setVisibleLines] = useState({
     penjualan: true,
-    pembelian: true,
+    piutang: true,
     pengeluaran: true,
     kerugian: true,
     laba: true,
@@ -326,6 +319,7 @@ const Penjualan30HariPage = () => {
           penjualan: json.paymentTotals?.penjualan ?? 0,
           piutang: json.paymentTotals?.piutang ?? 0,
         });
+        setTotalPiutang(json.totalPiutang ?? 0);
       } else {
         console.error(json.error);
       }
@@ -343,7 +337,6 @@ const Penjualan30HariPage = () => {
 
   // Calculations
   const totalPenjualan = data.reduce((sum, item) => sum + item.penjualan, 0);
-  const totalPembelian = data.reduce((sum, item) => sum + item.pembelian, 0);
   const totalPengeluaran = data.reduce(
     (sum, item) => sum + item.pengeluaran,
     0
@@ -453,7 +446,7 @@ const Penjualan30HariPage = () => {
                 Dashboard Keuangan
               </h1>
               <p className="text-purple-100 text-base max-w-2xl">
-                Analisis lengkap penjualan, pembelian, pengeluaran, kerugian,
+            Analisis lengkap penjualan, piutang, pengeluaran, kerugian,
                 dan laba bersih
               </p>
             </div>
@@ -642,11 +635,11 @@ const Penjualan30HariPage = () => {
           />
 
           <StatCard
-            title="Pembelian"
-            value={formatNumber(totalPembelian)}
-            subtitle={formatRupiah(totalPembelian)}
-            icon={Package}
-            gradient="bg-gradient-to-br from-orange-500 to-amber-600"
+            title="Total Piutang"
+            value={formatNumber(totalPiutang)}
+            subtitle={formatRupiah(totalPiutang)}
+            icon={Wallet}
+            gradient="bg-gradient-to-br from-amber-500 to-orange-600"
             delay={50}
           />
 
@@ -762,15 +755,15 @@ const Penjualan30HariPage = () => {
               Penjualan
             </button>
             <button
-              onClick={() => toggleLine("pembelian")}
+              onClick={() => toggleLine("piutang")}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                visibleLines.pembelian
+                visibleLines.piutang
                   ? "bg-orange-100 text-orange-700 border-2 border-orange-300"
                   : "bg-gray-100 text-gray-400 border-2 border-gray-200"
               }`}
             >
               <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500" />
-              Pembelian
+              Total Piutang
             </button>
             <button
               onClick={() => toggleLine("pengeluaran")}
@@ -852,7 +845,7 @@ const Penjualan30HariPage = () => {
                         />
                       </linearGradient>
                       <linearGradient
-                        id="colorPembelian"
+                        id="colorPiutang"
                         x1="0"
                         y1="0"
                         x2="0"
@@ -958,14 +951,14 @@ const Penjualan30HariPage = () => {
                       />
                     )}
 
-                    {visibleLines.pembelian && (
+                    {visibleLines.piutang && (
                       <Area
                         type="monotone"
-                        dataKey="pembelian"
-                        name="Pembelian"
+                        dataKey="piutang"
+                        name="Total Piutang"
                         stroke="#f97316"
                         strokeWidth={3}
-                        fill="url(#colorPembelian)"
+                        fill="url(#colorPiutang)"
                         dot={{ r: 4, fill: "#f97316", strokeWidth: 2 }}
                         activeDot={{ r: 7 }}
                       />
@@ -1042,10 +1035,10 @@ const Penjualan30HariPage = () => {
                       />
                     )}
 
-                    {visibleLines.pembelian && (
+                    {visibleLines.piutang && (
                       <Bar
-                        dataKey="pembelian"
-                        name="Pembelian"
+                        dataKey="piutang"
+                        name="Total Piutang"
                         fill="#f97316"
                         radius={[8, 8, 0, 0]}
                       />
@@ -1087,9 +1080,9 @@ const Penjualan30HariPage = () => {
             <p className="text-xs text-gray-600 leading-relaxed">
               <span className="font-bold text-purple-700">💡 Info:</span>{" "}
               Menampilkan data <strong>{getPeriodLabel().toLowerCase()}</strong>
-              . Grafik menampilkan 5 metrik: Penjualan, Pembelian, Pengeluaran,
-              Kerugian (pengembalian barang rusak/kadaluarsa), dan Laba Bersih
-              (Laba Kotor - Pengeluaran - Kerugian).
+              . Grafik menampilkan 5 metrik: Penjualan, Total Piutang,
+              Pengeluaran, Kerugian (pengembalian barang rusak/kadaluarsa), dan
+              Laba Bersih (Laba Kotor - Pengeluaran - Kerugian).
             </p>
           </div>
         </div>
