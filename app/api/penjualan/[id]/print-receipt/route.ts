@@ -330,10 +330,17 @@ export async function GET(
             : 0;
         const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
         const jumlahPcs = jumlahTotal % jumlahPerKemasan;
-        const hargaSatuan = Number(item.hargaJual || item.barang.hargaJual);
-        const totalHarga = jumlahTotal * hargaSatuan;
+        const hargaSatuan = Number(
+          item.hargaJual ?? item.barang?.hargaJual ?? 0
+        );
+        const hargaTotal = hargaSatuan * jumlahDus;
+        const hargaPcs =
+          jumlahPcs > 0
+            ? Math.round((hargaSatuan / jumlahPerKemasan) * jumlahPcs)
+            : 0;
+        const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
         const diskonTotal = Number(item.diskonPerItem) * jumlahDus;
-        const totalSetelahDiskon = totalHarga - diskonTotal;
+        const totalSetelahDiskon = totalHargaSebelumDiskon - diskonTotal;
         const labelKemasan = item.barang?.jenisKemasan || "dus";
 
         return `
