@@ -75,6 +75,24 @@ export async function GET(
       return trimmed.replace(".", ",");
     };
 
+    const totalBerat = penjualan.items.reduce((sum, item) => {
+      const jumlahPerKemasan = Number(item.barang?.jumlahPerKemasan) || 1;
+      const jumlahTotal =
+        item.totalItem !== undefined && item.totalItem !== null
+          ? Number(item.totalItem)
+          : 0;
+      const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
+      const jumlahPcs = jumlahTotal % jumlahPerKemasan;
+      const beratPerKemasan = Number(item.barang?.berat) || 0;
+      const beratDus = beratPerKemasan * jumlahDus;
+      const beratPcs =
+        jumlahPcs > 0
+          ? Math.round((beratPerKemasan / jumlahPerKemasan) * jumlahPcs)
+          : 0;
+
+      return sum + beratDus + beratPcs;
+    }, 0);
+
     const pembayaranList = penjualan.pembayaran || [];
     const latestPembayaran = pembayaranList[0];
     const totalCash =
@@ -372,7 +390,7 @@ export async function GET(
     </div>
     <div class="summary-row">
       <span>Total Berat:</span>
-      <span>${formatBeratKg(penjualan.beratTotal)} kg</span>
+      <span>${formatBeratKg(totalBerat)} kg</span>
     </div>
     ${
       Number(penjualan.diskonNota) > 0

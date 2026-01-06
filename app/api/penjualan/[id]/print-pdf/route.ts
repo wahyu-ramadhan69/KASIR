@@ -121,6 +121,24 @@ export async function GET(
       return trimmed.replace(".", ",");
     };
 
+    const totalBerat = penjualan.items.reduce((sum, item) => {
+      const jumlahPerKemasan = Number(item.barang?.jumlahPerKemasan) || 1;
+      const jumlahTotal =
+        item.totalItem !== undefined && item.totalItem !== null
+          ? Number(item.totalItem)
+          : 0;
+      const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
+      const jumlahPcs = jumlahTotal % jumlahPerKemasan;
+      const beratPerKemasan = Number(item.barang?.berat) || 0;
+      const beratDus = beratPerKemasan * jumlahDus;
+      const beratPcs =
+        jumlahPcs > 0
+          ? Math.round((beratPerKemasan / jumlahPerKemasan) * jumlahPcs)
+          : 0;
+
+      return sum + beratDus + beratPcs;
+    }, 0);
+
     // Header
     doc.fontSize(16).font("RobotoMono-Bold").text("NOTA PENJUALAN", {
       align: "center",
@@ -293,7 +311,7 @@ export async function GET(
 
     currentY += 12;
     doc.text("Total Berat:", colHarga, currentY);
-    doc.text(`${formatBeratKg(penjualan.beratTotal)} kg`, colTotal, currentY, {
+    doc.text(`${formatBeratKg(totalBerat)} kg`, colTotal, currentY, {
       width: contentWidth - (colTotal - leftCol),
       align: "right",
     });
