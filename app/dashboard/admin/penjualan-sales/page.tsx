@@ -168,6 +168,9 @@ const PenjualanPage = () => {
   const [itemDiskonValues, setItemDiskonValues] = useState<{
     [key: number]: string;
   }>({});
+  const [itemHargaValues, setItemHargaValues] = useState<{
+    [key: number]: string;
+  }>({});
 
   const [diskonNota, setDiskonNota] = useState("0");
   const [diskonNotaType, setDiskonNotaType] = useState<"rupiah" | "persen">(
@@ -434,14 +437,19 @@ const PenjualanPage = () => {
 
       const diskonTypes: { [key: number]: "rupiah" | "persen" } = {};
       const diskonValues: { [key: number]: string } = {};
+      const hargaValues: { [key: number]: string } = {};
 
       hydratedItems.forEach((item, index) => {
         diskonTypes[index] = "rupiah";
         diskonValues[index] = Number(item.diskonPerItem).toLocaleString("id-ID");
+        hargaValues[index] = Number(
+          item.hargaJualPerDus ?? item.barang.hargaJual
+        ).toLocaleString("id-ID");
       });
 
       setItemDiskonTypes(diskonTypes);
       setItemDiskonValues(diskonValues);
+      setItemHargaValues(hargaValues);
       setOriginalQtyByBarangId(originalQtyMap);
       setSelectedCustomer(penjualan.customer || null);
       setSelectedKaryawan(penjualan.karyawan || null);
@@ -759,6 +767,10 @@ const PenjualanPage = () => {
 
         setItemDiskonTypes((prev) => ({ ...prev, [newIndex]: "rupiah" }));
         setItemDiskonValues((prev) => ({ ...prev, [newIndex]: "0" }));
+        setItemHargaValues((prev) => ({
+          ...prev,
+          [newIndex]: formatRupiahInput(String(newItem.hargaJualPerDus ?? 0)),
+        }));
 
         updateItemCalculation(updatedItems, newIndex);
         toast.success(
@@ -1019,6 +1031,30 @@ const PenjualanPage = () => {
     updateItemCalculation(updatedItems, index);
   };
 
+  const handleItemHargaChange = (index: number, value: string) => {
+    const displayValue = value === "" ? "" : formatRupiahInput(value);
+    const hargaJualPerDus = parseRupiahToNumber(value);
+
+    setItemHargaValues((prev) => ({
+      ...prev,
+      [index]: displayValue,
+    }));
+
+    const updatedItems = [...currentPenjualan.items];
+    updatedItems[index].hargaJualPerDus = hargaJualPerDus;
+    updateItemCalculation(updatedItems, index);
+  };
+
+  const getItemHargaDisplayValue = (index: number): string => {
+    const storedValue = itemHargaValues[index];
+    if (storedValue !== undefined) {
+      return storedValue;
+    }
+
+    const item = currentPenjualan.items[index];
+    return getHargaJualPerDus(item).toLocaleString("id-ID");
+  };
+
   const toggleItemDiskonType = (index: number) => {
     const currentType = itemDiskonTypes[index] || "rupiah";
     const newType = currentType === "rupiah" ? "persen" : "rupiah";
@@ -1069,11 +1105,14 @@ const PenjualanPage = () => {
 
     const newDiskonTypes = { ...itemDiskonTypes };
     const newDiskonValues = { ...itemDiskonValues };
+    const newHargaValues = { ...itemHargaValues };
     delete newDiskonTypes[index];
     delete newDiskonValues[index];
+    delete newHargaValues[index];
 
     const reindexedTypes: { [key: number]: "rupiah" | "persen" } = {};
     const reindexedValues: { [key: number]: string } = {};
+    const reindexedHargaValues: { [key: number]: string } = {};
 
     Object.keys(newDiskonTypes).forEach((key) => {
       const oldIndex = parseInt(key);
@@ -1082,8 +1121,15 @@ const PenjualanPage = () => {
       reindexedValues[newIndex] = newDiskonValues[oldIndex];
     });
 
+    Object.keys(newHargaValues).forEach((key) => {
+      const oldIndex = parseInt(key);
+      const newIndex = oldIndex > index ? oldIndex - 1 : oldIndex;
+      reindexedHargaValues[newIndex] = newHargaValues[oldIndex];
+    });
+
     setItemDiskonTypes(reindexedTypes);
     setItemDiskonValues(reindexedValues);
+    setItemHargaValues(reindexedHargaValues);
 
     recalculateTotal(updatedItems);
     toast.success("Item dihapus");
@@ -1243,6 +1289,7 @@ const PenjualanPage = () => {
             jumlahDus: item.jumlahDus,
             jumlahPcs: item.jumlahPcs,
             totalItem: getTotalItemPcs(item),
+            hargaJual: getHargaJualPerDus(item),
             diskonPerItem: item.diskonPerItem,
             berat: getItemBeratGrams(item),
           }),
@@ -1338,6 +1385,7 @@ const PenjualanPage = () => {
     setRutePengiriman("");
     setItemDiskonTypes({});
     setItemDiskonValues({});
+    setItemHargaValues({});
     setSearchCustomer("");
     setSearchKaryawan("");
     setCustomerList([]);
@@ -2141,8 +2189,8 @@ const PenjualanPage = () => {
                               {item.barang.namaBarang}
                             </h4>
                             <p className="text-xs text-gray-600 font-semibold truncate bg-gray-100 px-2 py-0.5 rounded-md inline-block">
-                              {formatRupiah(getHargaJualPerDus(item))}/
-                              {item.barang.jenisKemasan}
+                              Harga default {formatRupiah(item.barang.hargaJual)}
+                              / {item.barang.jenisKemasan}
                             </p>
                           </div>
                           <button
@@ -2151,6 +2199,37 @@ const PenjualanPage = () => {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                        </div>
+
+                        {/* Harga Jual */}
+                        <div className="my-2 space-y-1">
+                          <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 p-2 rounded-xl border border-blue-200">
+                            <span className="text-xs font-bold text-gray-700 uppercase">
+                              Harga:
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-extrabold text-blue-700">
+                                Rp
+                              </span>
+                              <input
+                                type="text"
+                                value={getItemHargaDisplayValue(index)}
+                                onChange={(e) =>
+                                  handleItemHargaChange(index, e.target.value)
+                                }
+                                className="w-24 text-right text-xs border-2 border-blue-300 rounded-lg px-2 py-1 font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                placeholder={formatRupiahInput(
+                                  String(item.barang.hargaJual)
+                                )}
+                              />
+                            </div>
+                          </div>
+                          {getHargaJualPerDus(item) < item.barang.hargaJual && (
+                            <p className="text-xs text-red-600 font-semibold">
+                              Harga di bawah default, berpotensi menimbulkan
+                              kerugian.
+                            </p>
+                          )}
                         </div>
 
                         {/* Quantity Controls - Enhanced */}

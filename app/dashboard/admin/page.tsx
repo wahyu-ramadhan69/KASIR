@@ -256,6 +256,9 @@ const Penjualan30HariPage = () => {
   const [chartType, setChartType] = useState<"bar" | "area">("area");
   const [period, setPeriod] = useState<Period>("daily");
   const [range, setRange] = useState<number>(1);
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
   const [paymentTotals, setPaymentTotals] = useState<PaymentTotals>({
     penjualan: 0,
     piutang: 0,
@@ -286,7 +289,7 @@ const Penjualan30HariPage = () => {
       else setRefreshing(true);
 
       const res = await fetch(
-        `/api/penjualan/grafik?period=${period}&range=${debouncedRange}`
+        `/api/penjualan/grafik?period=${period}&range=${debouncedRange}&date=${selectedDate}`
       );
       const json = await res.json();
 
@@ -306,7 +309,7 @@ const Penjualan30HariPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, debouncedRange]);
+  }, [period, debouncedRange, selectedDate]);
 
   useEffect(() => {
     fetchData();
@@ -383,8 +386,10 @@ const Penjualan30HariPage = () => {
       : null;
 
   const getFilterDateLabel = () => {
-    const today = new Date();
-    const startDate = new Date();
+    const endDate = selectedDate
+      ? new Date(`${selectedDate}T00:00:00`)
+      : new Date();
+    const startDate = new Date(endDate);
 
     if (period === "daily") {
       startDate.setDate(startDate.getDate() - (range - 1));
@@ -393,7 +398,7 @@ const Penjualan30HariPage = () => {
         month: "long",
         year: "numeric",
       });
-      const endLabel = today.toLocaleDateString("id-ID", {
+      const endLabel = endDate.toLocaleDateString("id-ID", {
         day: "2-digit",
         month: "long",
         year: "numeric",
@@ -408,7 +413,7 @@ const Penjualan30HariPage = () => {
         month: "long",
         year: "numeric",
       });
-      const endLabel = today.toLocaleDateString("id-ID", {
+      const endLabel = endDate.toLocaleDateString("id-ID", {
         month: "long",
         year: "numeric",
       });
@@ -419,7 +424,7 @@ const Penjualan30HariPage = () => {
     const startLabel = startDate.toLocaleDateString("id-ID", {
       year: "numeric",
     });
-    const endLabel = today.toLocaleDateString("id-ID", {
+    const endLabel = endDate.toLocaleDateString("id-ID", {
       year: "numeric",
     });
     return range === 1 ? endLabel : `${startLabel} - ${endLabel}`;
@@ -466,10 +471,19 @@ const Penjualan30HariPage = () => {
             </div>
 
             <div className="flex flex-col items-end gap-3">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm shadow-lg">
-                <Clock className="w-4 h-4" />
-                <span className="font-semibold">{getFilterDateLabel()}</span>
-              </div>
+              <label className="relative cursor-pointer">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="absolute inset-0 z-10 opacity-0 cursor-pointer"
+                  aria-label="Filter tanggal"
+                />
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm shadow-lg">
+                  <Calendar className="w-4 h-4" />
+                  <span className="font-semibold">{getFilterDateLabel()}</span>
+                </div>
+              </label>
               <button
                 onClick={fetchData}
                 disabled={refreshing}

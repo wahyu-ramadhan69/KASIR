@@ -61,16 +61,19 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "daily";
     const range = parseInt(searchParams.get("range") || "30");
+    const dateParam = searchParams.get("date");
     const roleUpper = authData.role?.toUpperCase();
     const isAdmin = roleUpper === "ADMIN";
     const isKasir = roleUpper === "KASIR";
     const userId = Number(authData.userId);
     const shouldFilterByUser = !isAdmin && !Number.isNaN(userId);
 
-    const today = new Date();
+    const today = dateParam
+      ? new Date(`${dateParam}T00:00:00`)
+      : new Date();
     today.setHours(23, 59, 59, 999);
 
-    const startDate = new Date();
+    const startDate = new Date(today);
 
     if (period === "daily") {
       startDate.setDate(startDate.getDate() - (range - 1));
