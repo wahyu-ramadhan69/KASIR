@@ -18,6 +18,7 @@ import {
   Loader2,
   Clock,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -184,6 +185,10 @@ const RiwayatPenjualanPage = () => {
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [selectedPenjualan, setSelectedPenjualan] =
     useState<PenjualanHeader | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [deleteTarget, setDeleteTarget] = useState<PenjualanHeader | null>(
+    null
+  );
 
   // Statistik
   const [stats, setStats] = useState({
@@ -355,6 +360,32 @@ const RiwayatPenjualanPage = () => {
   const handleViewDetail = (penjualan: PenjualanHeader) => {
     setSelectedPenjualan(penjualan);
     setShowDetailModal(true);
+  };
+
+  const handleOpenDeleteModal = (penjualan: PenjualanHeader) => {
+    setDeleteTarget(penjualan);
+    setShowDeleteModal(true);
+  };
+
+  const handleSoftDelete = async (penjualanId: number) => {
+    try {
+      const res = await fetch(`/api/penjualan/${penjualanId}/soft-delete`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Penjualan berhasil dihapus");
+        setShowDeleteModal(false);
+        setDeleteTarget(null);
+        fetchPenjualan(1, true);
+        fetchStats();
+      } else {
+        toast.error(data.error || "Gagal menghapus penjualan");
+      }
+    } catch (error) {
+      console.error("Error deleting penjualan:", error);
+      toast.error("Terjadi kesalahan saat menghapus penjualan");
+    }
   };
 
   const formatRupiah = (number: number): string => {
@@ -746,13 +777,15 @@ const RiwayatPenjualanPage = () => {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span
-                              className={`text-xs px-2 py-1 rounded font-medium ${
+                              className={`text-xs px-2 py-1 mr-2 rounded font-medium ${
                                 pj.statusPembayaran === "HUTANG"
-                                  ? "bg-red-100 text-red-700"
+                                  ? "bg-yellow-100 text-yellow-700"
                                   : "bg-green-100 text-green-700"
                               }`}
                             >
-                              {pj.statusPembayaran}
+                              {pj.statusPembayaran === "HUTANG"
+                                ? "PIUTANG"
+                                : pj.statusPembayaran}
                             </span>
                             {pj.isDeleted && (
                               <span className="text-xs px-2 py-1 rounded font-medium bg-red-100 text-red-700">
@@ -771,13 +804,22 @@ const RiwayatPenjualanPage = () => {
                                 <Eye className="w-4 h-4" />
                               </button>
                               {pj.statusTransaksi === "SELESAI" && (
-                                <Link
-                                  href={`/dashboard/admin/penjualan-sales?editId=${pj.id}`}
-                                  className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
-                                  title="Edit Penjualan"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </Link>
+                                <>
+                                  <button
+                                    onClick={() => handleOpenDeleteModal(pj)}
+                                    className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
+                                    title="Hapus Penjualan"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                  <Link
+                                    href={`/dashboard/admin/penjualan-sales?editId=${pj.id}`}
+                                    className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                    title="Edit Penjualan"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Link>
+                                </>
                               )}
                             </div>
                           </td>
@@ -1085,6 +1127,51 @@ const RiwayatPenjualanPage = () => {
                     CETAK NOTA
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showDeleteModal && deleteTarget && (
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowDeleteModal(false);
+              setDeleteTarget(null);
+            }}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b">
+                <h3 className="text-lg font-bold text-gray-900">
+                  Hapus Penjualan
+                </h3>
+                <p className="text-sm text-gray-600 mt-2">
+                  Yakin ingin menghapus penjualan{" "}
+                  <span className="font-semibold">
+                    {deleteTarget.kodePenjualan}
+                  </span>
+                  ?
+                </p>
+              </div>
+              <div className="p-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteTarget(null);
+                  }}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2.5 rounded-lg font-medium transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => handleSoftDelete(deleteTarget.id)}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-medium transition-all"
+                >
+                  Hapus
+                </button>
               </div>
             </div>
           </div>
