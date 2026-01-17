@@ -14,17 +14,41 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const periode = searchParams.get("periode") || "HARIAN";
     const rentangHari = parseInt(searchParams.get("rentangHari") || "30");
+    const dateParam = searchParams.get("date") || searchParams.get("tanggal");
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
 
-    // Hitung tanggal mulai berdasarkan rentang hari
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - rentangHari);
+    let startDate = new Date();
+    let endDate = new Date();
+
+    if (dateParam) {
+      startDate = new Date(dateParam);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(dateParam);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (startDateParam || endDateParam) {
+      if (startDateParam) {
+        const s = new Date(startDateParam);
+        s.setHours(0, 0, 0, 0);
+        startDate = s;
+      }
+      if (endDateParam) {
+        const e = new Date(endDateParam);
+        e.setHours(23, 59, 59, 999);
+        endDate = e;
+      }
+    } else {
+      startDate = new Date();
+      endDate = new Date();
+      startDate.setDate(startDate.getDate() - rentangHari);
+    }
 
     // Query untuk mendapatkan data penjualan
     const penjualanItems = await prisma.penjualanItem.findMany({
       where: {
         penjualan: {
           statusTransaksi: "SELESAI",
+          isDeleted: false,
           tanggalTransaksi: {
             gte: startDate,
             lte: endDate,

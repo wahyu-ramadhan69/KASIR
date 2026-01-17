@@ -80,8 +80,6 @@ interface PaginationInfo {
   hasMore: boolean;
 }
 
-type QuickFilterType = 1 | 7 | 30 | 90;
-
 interface ChartData {
   namaBarang: string;
   totalTerjual: number;
@@ -156,8 +154,6 @@ const DataBarangPage = () => {
 
   const [view, setView] = useState<ViewMode>("products");
 
-  const [rentangHari, setRentangHari] = useState<number>(30);
-  const [quickFilter, setQuickFilter] = useState<QuickFilterType>(30);
   const [data, setData] = useState<ChartData[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalProducts: 0,
@@ -615,10 +611,23 @@ const DataBarangPage = () => {
   };
 
   const fetchData = async () => {
-    setLoading(true);
+    setLoadingChart(true);
     try {
+      const params = new URLSearchParams();
+      if (penjualanQuery.mode === "date" && penjualanQuery.date) {
+        params.set("date", penjualanQuery.date);
+      }
+      if (penjualanQuery.mode === "range") {
+        if (penjualanQuery.startDate) {
+          params.set("startDate", penjualanQuery.startDate);
+        }
+        if (penjualanQuery.endDate) {
+          params.set("endDate", penjualanQuery.endDate);
+        }
+      }
+
       const response = await fetch(
-        `/api/barang/grafik?rentangHari=${rentangHari}`
+        `/api/barang/grafik${params.toString() ? `?${params}` : ""}`
       );
       const result = await response.json();
 
@@ -647,18 +656,15 @@ const DataBarangPage = () => {
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
-      setLoading(false);
+      setLoadingChart(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, [rentangHari]);
-
-  const handleQuickFilter = (days: QuickFilterType) => {
-    setQuickFilter(days);
-    setRentangHari(days);
-  };
+    if (view === "chart") {
+      fetchData();
+    }
+  }, [view, penjualanQuery]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -1279,55 +1285,87 @@ const DataBarangPage = () => {
         ) : view === "chart" ? (
           <>
             <div className="mb-6 bg-white rounded-xl p-4 shadow-md border border-gray-100">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      Rentang Hari
-                    </p>
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-1.5 rounded-lg border border-blue-200 shadow-md">
-                      <span className="text-xl font-bold text-white">
-                        {rentangHari}
-                      </span>
-                      <span className="text-xs text-blue-100 ml-1.5">Hari</span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="365"
-                    value={rentangHari}
-                    onChange={(e) => setRentangHari(Number(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1.5 font-medium">
-                    <span>1 hari</span>
-                    <span>365 hari</span>
-                  </div>
+              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setPenjualanFilterMode("date")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      penjualanFilterMode === "date"
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    Tanggal Tertentu
+                  </button>
+                  <button
+                    onClick={() => setPenjualanFilterMode("range")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      penjualanFilterMode === "range"
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    Rentang Tanggal
+                  </button>
                 </div>
 
-                <div>
-                  <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
-                    Quick Filter
-                  </p>
-                  <div className="flex gap-2">
-                    {[1, 7, 30, 90].map((days) => (
-                      <button
-                        key={days}
-                        onClick={() =>
-                          handleQuickFilter(days as QuickFilterType)
-                        }
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                          quickFilter === days
-                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md scale-105"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105"
-                        }`}
-                      >
-                        {days} Hari
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex-1 flex flex-col sm:flex-row gap-3">
+                  {penjualanFilterMode === "date" ? (
+                    <div className="flex items-center gap-3">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <input
+                        type="date"
+                        value={penjualanDate}
+                        onChange={(e) => setPenjualanDate(e.target.value)}
+                        className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <input
+                          type="date"
+                          value={penjualanStartDate}
+                          onChange={(e) =>
+                            setPenjualanStartDate(e.target.value)
+                          }
+                          className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <input
+                          type="date"
+                          value={penjualanEndDate}
+                          onChange={(e) => setPenjualanEndDate(e.target.value)}
+                          className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
+
+                <button
+                  onClick={resetPenjualanFilter}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <span>
+                  {penjualanQuery.mode === "date" && penjualanQuery.date
+                    ? `Tanggal: ${penjualanQuery.date}`
+                    : penjualanQuery.mode === "range" &&
+                      (penjualanQuery.startDate || penjualanQuery.endDate)
+                    ? `Rentang: ${penjualanQuery.startDate || "-"} s/d ${
+                        penjualanQuery.endDate || "-"
+                      }`
+                    : "Semua tanggal"}
+                </span>
               </div>
             </div>
 

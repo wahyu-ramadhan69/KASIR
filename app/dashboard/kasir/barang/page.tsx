@@ -3,8 +3,6 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Search,
   Package,
-  TrendingUp,
-  TrendingDown,
   RefreshCw,
   X,
   Store,
@@ -19,16 +17,6 @@ import {
   ShoppingBag,
 } from "lucide-react";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 import toast, { Toaster } from "react-hot-toast";
 
 interface Supplier {
@@ -75,16 +63,6 @@ interface PaginationInfo {
   hasMore: boolean;
 }
 
-type QuickFilterType = 1 | 7 | 30 | 90;
-
-interface ChartData {
-  namaBarang: string;
-  totalTerjual: number;
-  totalPenjualan: number;
-  sisaStok: number;
-  persentase?: number;
-}
-
 interface PenjualanBarang {
   barangId: number;
   namaBarang: string;
@@ -94,14 +72,7 @@ interface PenjualanBarang {
   totalTerjualKemasan: number;
 }
 
-interface Stats {
-  totalProducts: number;
-  totalRevenue: number;
-  totalUnitsSold: number;
-  avgRevenuePerProduct: number;
-}
-
-type ViewMode = "products" | "chart" | "sales";
+type ViewMode = "products" | "sales";
 type PenjualanFilterMode = "date" | "range";
 
 const DataBarangPage = () => {
@@ -126,18 +97,6 @@ const DataBarangPage = () => {
 
   const [view, setView] = useState<ViewMode>("products");
 
-  const [rentangHari, setRentangHari] = useState<number>(30);
-  const [quickFilter, setQuickFilter] = useState<QuickFilterType>(30);
-  const [data, setData] = useState<ChartData[]>([]);
-  const [stats, setStats] = useState<Stats>({
-    totalProducts: 0,
-    totalRevenue: 0,
-    totalUnitsSold: 0,
-    avgRevenuePerProduct: 0,
-  });
-  const [loadingChart, setLoadingChart] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
-  const [animationKey, setAnimationKey] = useState(0);
   const [penjualanBarang, setPenjualanBarang] = useState<PenjualanBarang[]>(
     []
   );
@@ -411,116 +370,8 @@ const DataBarangPage = () => {
     }, 0);
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/barang/grafik?rentangHari=${rentangHari}`
-      );
-      const result = await response.json();
-
-      const totalRev = result.reduce(
-        (sum: number, item: ChartData) => sum + item.totalPenjualan,
-        0
-      );
-      const totalUnits = result.reduce(
-        (sum: number, item: ChartData) => sum + item.totalTerjual,
-        0
-      );
-
-      const dataWithPercentage = result.map((item: ChartData) => ({
-        ...item,
-        persentase: totalUnits > 0 ? (item.totalTerjual / totalUnits) * 100 : 0,
-      }));
-
-      setData(dataWithPercentage);
-      setStats({
-        totalProducts: result.length,
-        totalRevenue: totalRev,
-        totalUnitsSold: totalUnits,
-        avgRevenuePerProduct: totalRev / result.length || 0,
-      });
-      setAnimationKey((prev) => prev + 1);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [rentangHari]);
-
-  const handleQuickFilter = (days: QuickFilterType) => {
-    setQuickFilter(days);
-    setRentangHari(days);
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatCurrencySimple = (amount: number): string => {
-    const absAmount = Math.abs(amount);
-    if (absAmount >= 1e9) {
-      return `Rp ${(amount / 1e9).toFixed(1)}M`;
-    } else if (absAmount >= 1e6) {
-      return `Rp ${(amount / 1e6).toFixed(1)}Jt`;
-    } else if (absAmount >= 1e3) {
-      return `Rp ${(amount / 1e3).toFixed(0)}Rb`;
-    } else {
-      return `Rp ${amount}`;
-    }
-  };
-
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat("id-ID").format(value);
-  };
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-4 rounded-xl shadow-2xl border-2 border-blue-200">
-          <p className="font-bold text-gray-800 mb-2 text-base">
-            {payload[0].payload.namaBarang}
-          </p>
-          <div className="space-y-1">
-            <p className="text-sm text-gray-600">
-              Total Terjual:{" "}
-              <span className="font-semibold text-purple-600">
-                {formatNumber(payload[0].payload.totalTerjual)} pcs
-              </span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Sisa Stok:{" "}
-              <span className="font-semibold text-orange-600">
-                {formatNumber(payload[0].payload.sisaStok)} pcs
-              </span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Total Penjualan:{" "}
-              <span className="font-semibold text-green-600">
-                {formatCurrency(payload[0].payload.totalPenjualan)}
-              </span>
-            </p>
-            {payload[0].payload.persentase && (
-              <p className="text-sm text-gray-600">
-                Kontribusi:{" "}
-                <span className="font-semibold text-blue-600">
-                  {payload[0].payload.persentase.toFixed(1)}%
-                </span>
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
-    return null;
   };
 
   return (
@@ -578,17 +429,6 @@ const DataBarangPage = () => {
                 >
                   <BarChart3 className="w-4 h-4" />
                   Terjual
-                </button>
-                <button
-                  onClick={() => setView("chart")}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-                    view === "chart"
-                      ? "bg-white text-blue-700 shadow-md"
-                      : "text-white/90 hover:bg-white/20"
-                  }`}
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Terlaris
                 </button>
               </div>
               <button
@@ -932,266 +772,6 @@ const DataBarangPage = () => {
                     </span>
                   )}
                 </span>
-              </div>
-            </div>
-          </>
-        ) : view === "chart" ? (
-          <>
-            <div className="mb-6 bg-white rounded-xl p-4 shadow-md border border-gray-100">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      Rentang Hari
-                    </p>
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-1.5 rounded-lg border border-blue-200 shadow-md">
-                      <span className="text-xl font-bold text-white">
-                        {rentangHari}
-                      </span>
-                      <span className="text-xs text-blue-100 ml-1.5">Hari</span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="365"
-                    value={rentangHari}
-                    onChange={(e) => setRentangHari(Number(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1.5 font-medium">
-                    <span>1 hari</span>
-                    <span>365 hari</span>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
-                    Quick Filter
-                  </p>
-                  <div className="flex gap-2">
-                    {[1, 7, 30, 90].map((days) => (
-                      <button
-                        key={days}
-                        onClick={() =>
-                          handleQuickFilter(days as QuickFilterType)
-                        }
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                          quickFilter === days
-                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md scale-105"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105"
-                        }`}
-                      >
-                        {days} Hari
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 shadow-xl border border-gray-200 mb-8 relative overflow-hidden">
-              {/* Decorative background elements */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -z-0"></div>
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -z-0"></div>
-
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                        <BarChart3 className="w-6 h-6 text-white" />
-                      </div>
-                      10 Barang Terlaris
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-1 ml-13">
-                      Analisis performa produk terbaik
-                    </p>
-                  </div>
-                  {data.length > 0 && (
-                    <div className="flex gap-4">
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 px-4 py-2 rounded-xl border border-blue-200">
-                        <p className="text-xs text-blue-600 font-semibold">
-                          Total Produk
-                        </p>
-                        <p className="text-2xl font-bold text-blue-700">
-                          {data.length}
-                        </p>
-                      </div>
-                      <div className="bg-gradient-to-br from-orange-50 to-orange-100 px-4 py-2 rounded-xl border border-orange-200">
-                        <p className="text-xs text-orange-600 font-semibold">
-                          Total Terjual
-                        </p>
-                        <p className="text-2xl font-bold text-orange-700">
-                          {data.reduce(
-                            (sum, item) => sum + item.totalTerjual,
-                            0
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {loadingChart ? (
-                  <div className="h-96 flex flex-col items-center justify-center">
-                    <div className="relative">
-                      <div className="w-28 h-28 border-8 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-                      <div
-                        className="w-28 h-28 border-8 border-indigo-100 border-b-indigo-600 rounded-full animate-spin absolute top-0 left-0"
-                        style={{
-                          animationDirection: "reverse",
-                          animationDuration: "1.5s",
-                        }}
-                      ></div>
-                      <BarChart3 className="w-12 h-12 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-                    </div>
-                    <p className="text-gray-600 mt-8 text-lg font-semibold animate-pulse">
-                      Memuat data grafik...
-                    </p>
-                    <p className="text-gray-400 text-sm mt-2">
-                      Mohon tunggu sebentar
-                    </p>
-                  </div>
-                ) : data.length === 0 ? (
-                  <div className="h-96 flex flex-col items-center justify-center">
-                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 w-28 h-28 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                      <Package className="w-14 h-14 text-gray-400" />
-                    </div>
-                    <p className="text-gray-700 text-xl font-bold mb-2">
-                      Tidak ada data tersedia
-                    </p>
-                    <p className="text-gray-500 text-sm">
-                      Belum ada transaksi dalam periode ini
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-white/50 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50">
-                    <ResponsiveContainer width="100%" height={450}>
-                      <BarChart
-                        key={animationKey}
-                        data={data}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="#e5e7eb"
-                          opacity={0.5}
-                        />
-                        <XAxis
-                          dataKey="namaBarang"
-                          angle={-45}
-                          textAnchor="end"
-                          height={100}
-                          tick={{
-                            fill: "#374151",
-                            fontSize: 12,
-                            fontWeight: 600,
-                          }}
-                          stroke="#9ca3af"
-                        />
-                        <YAxis
-                          tick={{
-                            fill: "#374151",
-                            fontSize: 12,
-                            fontWeight: 600,
-                          }}
-                          stroke="#9ca3af"
-                        />
-                        <Tooltip
-                          content={<CustomTooltip />}
-                          cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
-                        />
-                        <Legend
-                          wrapperStyle={{ paddingTop: "20px" }}
-                          iconType="circle"
-                          iconSize={12}
-                        />
-                        <Bar
-                          dataKey="totalTerjual"
-                          fill="url(#colorGradient)"
-                          radius={[12, 12, 0, 0]}
-                          name="Total Terjual (pcs)"
-                          animationDuration={1200}
-                          animationEasing="ease-out"
-                        />
-                        <Bar
-                          dataKey="sisaStok"
-                          fill="url(#colorGradientOrange)"
-                          radius={[12, 12, 0, 0]}
-                          name="Sisa Stok (pcs)"
-                          animationDuration={1200}
-                          animationEasing="ease-out"
-                        />
-                        <defs>
-                          <linearGradient
-                            id="colorGradient"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#3b82f6"
-                              stopOpacity={1}
-                            />
-                            <stop
-                              offset="50%"
-                              stopColor="#6366f1"
-                              stopOpacity={0.9}
-                            />
-                            <stop
-                              offset="100%"
-                              stopColor="#8b5cf6"
-                              stopOpacity={0.8}
-                            />
-                          </linearGradient>
-                          <linearGradient
-                            id="colorGradientOrange"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#f97316"
-                              stopOpacity={1}
-                            />
-                            <stop
-                              offset="50%"
-                              stopColor="#fb923c"
-                              stopOpacity={0.9}
-                            />
-                            <stop
-                              offset="100%"
-                              stopColor="#fdba74"
-                              stopOpacity={0.8}
-                            />
-                          </linearGradient>
-
-                          {/* Shadow effects */}
-                          <filter
-                            id="shadow"
-                            x="-50%"
-                            y="-50%"
-                            width="200%"
-                            height="200%"
-                          >
-                            <feDropShadow
-                              dx="0"
-                              dy="4"
-                              stdDeviation="3"
-                              floodColor="#3b82f6"
-                              floodOpacity="0.3"
-                            />
-                          </filter>
-                        </defs>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
               </div>
             </div>
           </>
