@@ -85,12 +85,24 @@ interface ChartData {
   persentase?: number;
 }
 
+interface PenjualanBarang {
+  barangId: number;
+  namaBarang: string;
+  jenisKemasan: string;
+  jumlahPerKemasan: number;
+  totalTerjualPcs: number;
+  totalTerjualKemasan: number;
+}
+
 interface Stats {
   totalProducts: number;
   totalRevenue: number;
   totalUnitsSold: number;
   avgRevenuePerProduct: number;
 }
+
+type ViewMode = "products" | "chart" | "sales";
+type PenjualanFilterMode = "date" | "range";
 
 const DataBarangPage = () => {
   const [barangList, setBarangList] = useState<Barang[]>([]);
@@ -112,7 +124,7 @@ const DataBarangPage = () => {
     hasMore: false,
   });
 
-  const [view, setView] = useState("products");
+  const [view, setView] = useState<ViewMode>("products");
 
   const [rentangHari, setRentangHari] = useState<number>(30);
   const [quickFilter, setQuickFilter] = useState<QuickFilterType>(30);
@@ -126,6 +138,28 @@ const DataBarangPage = () => {
   const [loadingChart, setLoadingChart] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [animationKey, setAnimationKey] = useState(0);
+  const [penjualanBarang, setPenjualanBarang] = useState<PenjualanBarang[]>(
+    []
+  );
+  const [loadingPenjualanBarang, setLoadingPenjualanBarang] = useState(false);
+  const [penjualanFilterMode, setPenjualanFilterMode] =
+    useState<PenjualanFilterMode>("date");
+  const [penjualanDate, setPenjualanDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const [penjualanStartDate, setPenjualanStartDate] = useState<string>("");
+  const [penjualanEndDate, setPenjualanEndDate] = useState<string>("");
+  const [penjualanQuery, setPenjualanQuery] = useState<{
+    mode: PenjualanFilterMode;
+    date: string;
+    startDate: string;
+    endDate: string;
+  }>({
+    mode: "date",
+    date: new Date().toISOString().split("T")[0],
+    startDate: "",
+    endDate: "",
+  });
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -216,6 +250,82 @@ const DataBarangPage = () => {
     const percentage = ((profit / hargaBeli) * 100).toFixed(1);
     return { profit, percentage };
   };
+
+  const formatDecimal = (value: number) => {
+    if (Number.isInteger(value)) {
+      return formatNumber(value);
+    }
+    return new Intl.NumberFormat("id-ID", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  const resetPenjualanFilter = () => {
+    const today = new Date().toISOString().split("T")[0];
+    setPenjualanFilterMode("date");
+    setPenjualanDate(today);
+    setPenjualanStartDate("");
+    setPenjualanEndDate("");
+    setPenjualanQuery({
+      mode: "date",
+      date: today,
+      startDate: "",
+      endDate: "",
+    });
+  };
+
+  const fetchPenjualanBarang = async () => {
+    setLoadingPenjualanBarang(true);
+    try {
+      const params = new URLSearchParams();
+      if (penjualanQuery.mode === "date" && penjualanQuery.date) {
+        params.set("date", penjualanQuery.date);
+      }
+      if (penjualanQuery.mode === "range") {
+        if (penjualanQuery.startDate) {
+          params.set("startDate", penjualanQuery.startDate);
+        }
+        if (penjualanQuery.endDate) {
+          params.set("endDate", penjualanQuery.endDate);
+        }
+      }
+
+      const response = await fetch(
+        `/api/barang/penjualan${params.toString() ? `?${params}` : ""}`
+      );
+      const result = await response.json();
+      if (result.success) {
+        setPenjualanBarang(result.data || []);
+      } else {
+        setPenjualanBarang([]);
+      }
+    } catch (error) {
+      console.error("Error fetching penjualan barang:", error);
+    } finally {
+      setLoadingPenjualanBarang(false);
+    }
+  };
+
+  useEffect(() => {
+    if (view === "sales") {
+      fetchPenjualanBarang();
+    }
+  }, [view, penjualanQuery]);
+
+  useEffect(() => {
+    setPenjualanQuery({
+      mode: penjualanFilterMode,
+      date: penjualanDate,
+      startDate: penjualanStartDate,
+      endDate: penjualanEndDate,
+    });
+  }, [
+    penjualanFilterMode,
+    penjualanDate,
+    penjualanStartDate,
+    penjualanEndDate,
+  ]);
 
   const getProfitColor = (profit: number) => {
     if (profit > 0) return "text-green-600";
@@ -446,57 +556,40 @@ const DataBarangPage = () => {
               </div>
             </div>
             <div className="flex gap-3">
-              <div className="relative">
+              <div className="flex items-center bg-white/10 backdrop-blur-sm p-1 rounded-xl shadow-lg">
                 <button
-                  onClick={() =>
-                    setView(view === "products" ? "chart" : "products")
-                  }
-                  className="relative w-24 h-12 rounded-full transition-all duration-300 ease-in-out focus:outline-none hover:scale-110 active:scale-95 shadow-lg"
-                  style={{
-                    backgroundColor: view === "chart" ? "#4f46e5" : "#6366f1",
-                    boxShadow:
-                      view === "chart"
-                        ? "0 0 20px rgba(79, 70, 229, 0.5)"
-                        : "0 0 20px rgba(99, 102, 241, 0.5)",
-                  }}
+                  onClick={() => setView("products")}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                    view === "products"
+                      ? "bg-white text-blue-700 shadow-md"
+                      : "text-white/90 hover:bg-white/20"
+                  }`}
                 >
-                  {/* Background gradient animation */}
-                  <div className="absolute inset-0 rounded-full opacity-50 bg-gradient-to-r from-indigo-400 to-purple-500 animate-pulse" />
-
-                  {/* Sliding circle */}
-                  <span
-                    className="absolute top-1 w-10 h-10 bg-white rounded-full shadow-xl transform transition-all duration-300 ease-in-out flex items-center justify-center"
-                    style={{
-                      left: view === "chart" ? "calc(100% - 44px)" : "4px",
-                    }}
-                  >
-                    {view === "products" ? (
-                      <ShoppingBag size={18} className="text-indigo-600" />
-                    ) : (
-                      <TrendingUp size={18} className="text-indigo-600" />
-                    )}
-                  </span>
-
-                  {/* Ripple effect saat klik */}
-                  <span
-                    className="absolute inset-0 rounded-full border-4 border-white opacity-0 animate-ping"
-                    style={{ animationDuration: "1s" }}
-                  />
+                  <ShoppingBag className="w-4 h-4" />
+                  Barang
                 </button>
-
-                {/* Indicator dots */}
-                <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1">
-                  <span
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      view === "products" ? "bg-indigo-600 w-6" : "bg-gray-300"
-                    }`}
-                  />
-                  <span
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      view === "chart" ? "bg-indigo-600 w-6" : "bg-gray-300"
-                    }`}
-                  />
-                </div>
+                <button
+                  onClick={() => setView("sales")}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                    view === "sales"
+                      ? "bg-white text-blue-700 shadow-md"
+                      : "text-white/90 hover:bg-white/20"
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Terjual
+                </button>
+                <button
+                  onClick={() => setView("chart")}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                    view === "chart"
+                      ? "bg-white text-blue-700 shadow-md"
+                      : "text-white/90 hover:bg-white/20"
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Terlaris
+                </button>
               </div>
               <button
                 onClick={fetchBarang}
@@ -842,7 +935,7 @@ const DataBarangPage = () => {
               </div>
             </div>
           </>
-        ) : (
+        ) : view === "chart" ? (
           <>
             <div className="mb-6 bg-white rounded-xl p-4 shadow-md border border-gray-100">
               <div className="flex items-center gap-4">
@@ -1101,6 +1194,219 @@ const DataBarangPage = () => {
                 )}
               </div>
             </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-6 bg-white rounded-xl p-4 shadow-md border border-gray-100">
+              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setPenjualanFilterMode("date")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      penjualanFilterMode === "date"
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    Tanggal Tertentu
+                  </button>
+                  <button
+                    onClick={() => setPenjualanFilterMode("range")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      penjualanFilterMode === "range"
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    Rentang Tanggal
+                  </button>
+                </div>
+
+                <div className="flex-1 flex flex-col sm:flex-row gap-3">
+                  {penjualanFilterMode === "date" ? (
+                    <div className="flex items-center gap-3">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <input
+                        type="date"
+                        value={penjualanDate}
+                        onChange={(e) => setPenjualanDate(e.target.value)}
+                        className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <input
+                          type="date"
+                          value={penjualanStartDate}
+                          onChange={(e) =>
+                            setPenjualanStartDate(e.target.value)
+                          }
+                          className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <input
+                          type="date"
+                          value={penjualanEndDate}
+                          onChange={(e) => setPenjualanEndDate(e.target.value)}
+                          className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  onClick={resetPenjualanFilter}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <span>
+                  {penjualanQuery.mode === "date" && penjualanQuery.date
+                    ? `Tanggal: ${penjualanQuery.date}`
+                    : penjualanQuery.mode === "range" &&
+                      (penjualanQuery.startDate || penjualanQuery.endDate)
+                    ? `Rentang: ${penjualanQuery.startDate || "-"} s/d ${
+                        penjualanQuery.endDate || "-"
+                      }`
+                    : "Semua tanggal"}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+              {loadingPenjualanBarang ? (
+                <div className="flex justify-center items-center py-24">
+                  <div className="text-center">
+                    <div className="relative">
+                      <div className="w-20 h-20 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+                      <BarChart3 className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                    </div>
+                    <p className="text-gray-500 mt-6 text-lg font-medium">
+                      Memuat data terjual...
+                    </p>
+                  </div>
+                </div>
+              ) : penjualanBarang.length === 0 ? (
+                <div className="p-16 text-center">
+                  <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <ShoppingBag className="w-12 h-12 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 text-lg font-medium">
+                    Tidak ada data penjualan pada periode ini
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-blue-600 to-indigo-700">
+                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                          No
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                          Nama Barang
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Terjual (Kemasan)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Terjual (PCS)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Kemasan
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {penjualanBarang.map((row, index) => (
+                        <tr
+                          key={row.barangId}
+                          className="hover:bg-blue-50 transition-colors"
+                        >
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            {index + 1}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="bg-blue-100 p-2 rounded-lg">
+                                <Package className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <div className="text-sm font-semibold text-gray-900">
+                                {row.namaBarang}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-bold text-indigo-700">
+                              {formatDecimal(row.totalTerjualKemasan)}{" "}
+                              {row.jenisKemasan}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-semibold text-gray-700">
+                              {formatNumber(row.totalTerjualPcs)} pcs
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm text-gray-700">
+                              {row.jumlahPerKemasan} pcs / {row.jenisKemasan}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {penjualanBarang.length > 0 && (
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase">
+                    Total Barang
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-2">
+                    {penjualanBarang.length}
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase">
+                    Total Terjual (Kemasan)
+                  </p>
+                  <p className="text-2xl font-bold text-indigo-600 mt-2">
+                    {formatDecimal(
+                      penjualanBarang.reduce(
+                        (sum, item) => sum + item.totalTerjualKemasan,
+                        0
+                      )
+                    )}
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase">
+                    Total Terjual (PCS)
+                  </p>
+                  <p className="text-2xl font-bold text-blue-600 mt-2">
+                    {formatNumber(
+                      penjualanBarang.reduce(
+                        (sum, item) => sum + item.totalTerjualPcs,
+                        0
+                      )
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
           </>
         )}
 
