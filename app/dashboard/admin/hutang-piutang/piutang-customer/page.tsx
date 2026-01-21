@@ -77,6 +77,7 @@ interface PenjualanHeader {
   items: PenjualanItem[];
   createdAt: string;
   updatedAt: string;
+  isDeleted?: boolean;
 }
 
 interface Pagination {
@@ -356,6 +357,8 @@ const RiwayatPenjualanPage = () => {
           );
         }
 
+        filtered = filtered.filter((p: PenjualanHeader) => !p.isDeleted);
+
         // Pastikan hanya transaksi tanpa perjalanan sales
         filtered = filtered.filter(
           (p: PenjualanHeader) => p.perjalananSalesId === null
@@ -394,6 +397,7 @@ const RiwayatPenjualanPage = () => {
           );
         }
 
+        filtered = filtered.filter((p) => !p.isDeleted);
         filtered = filtered.filter((p) => p.perjalananSalesId === null);
 
         const hutangList = filtered.filter(
