@@ -69,7 +69,7 @@ const DataCustomerPage = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
+    null,
   );
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
@@ -79,7 +79,7 @@ const DataCustomerPage = () => {
     "all" | "high" | "medium" | "low" | "hutang" | "tanpaHutang"
   >("all");
   const [sortBy, setSortBy] = useState<"name" | "piutang" | "limit" | "date">(
-    "name"
+    "name",
   );
   const [pagination, setPagination] = useState<PaginationInfo>({
     currentPage: 1,
@@ -88,6 +88,11 @@ const DataCustomerPage = () => {
     limit: 12,
     hasMore: false,
   });
+  const [summaryTotals, setSummaryTotals] = useState({
+    totalPiutang: 0,
+    totalLimitPiutang: 0,
+  });
+  const [loadingSummary, setLoadingSummary] = useState<boolean>(true);
   const [editingCustomer, setEditingCustomer] = useState<{
     id: number;
     data: CustomerFormData;
@@ -118,6 +123,10 @@ const DataCustomerPage = () => {
     fetchCustomer(1, true);
   }, [debouncedSearchTerm]);
 
+  useEffect(() => {
+    fetchSummaryTotals();
+  }, []);
+
   const fetchCustomer = async (page: number = 1, reset: boolean = false) => {
     if (reset) {
       setLoading(true);
@@ -130,7 +139,7 @@ const DataCustomerPage = () => {
 
       if (debouncedSearchTerm.trim()) {
         url = `/api/customer/search/${encodeURIComponent(
-          debouncedSearchTerm
+          debouncedSearchTerm,
         )}?page=${page}&limit=12`;
       } else {
         url = `/api/customer?page=${page}&limit=12`;
@@ -158,6 +167,24 @@ const DataCustomerPage = () => {
     }
   };
 
+  const fetchSummaryTotals = async () => {
+    setLoadingSummary(true);
+    try {
+      const res = await fetch("/api/customer/summary");
+      const data = await res.json();
+      if (data.success) {
+        setSummaryTotals({
+          totalPiutang: data.data.totalPiutang || 0,
+          totalLimitPiutang: data.data.totalLimitPiutang || 0,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching customer summary:", error);
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -170,7 +197,7 @@ const DataCustomerPage = () => {
           fetchCustomer(pagination.currentPage + 1, false);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     const currentTarget = observerTarget.current;
@@ -213,7 +240,7 @@ const DataCustomerPage = () => {
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
 
@@ -231,7 +258,7 @@ const DataCustomerPage = () => {
   };
 
   const handleEditInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     if (editingCustomer) {
@@ -291,6 +318,7 @@ const DataCustomerPage = () => {
         setCustomerList([]);
         setPagination((prev) => ({ ...prev, currentPage: 1 }));
         fetchCustomer(1, true);
+        fetchSummaryTotals();
       } else {
         toast.error(data.error || "Gagal menambahkan customer");
       }
@@ -346,8 +374,9 @@ const DataCustomerPage = () => {
         setShowEditModal(false);
         setEditingCustomer(null);
         setCustomerList((prev) =>
-          prev.map((c) => (c.id === data.data.id ? data.data : c))
+          prev.map((c) => (c.id === data.data.id ? data.data : c)),
         );
+        fetchSummaryTotals();
       } else {
         toast.error(data.error || "Gagal mengupdate customer");
       }
@@ -378,6 +407,7 @@ const DataCustomerPage = () => {
           ...prev,
           totalCount: prev.totalCount - 1,
         }));
+        fetchSummaryTotals();
       } else {
         toast.error(data.error || "Gagal menghapus customer");
       }
@@ -393,6 +423,7 @@ const DataCustomerPage = () => {
     setCustomerList([]);
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
     fetchCustomer(1, true);
+    fetchSummaryTotals();
   };
 
   const formatPhoneNumber = (phone: string): string => {
@@ -426,7 +457,7 @@ const DataCustomerPage = () => {
 
   const getPiutangStatus = (
     piutang: number,
-    limit: number
+    limit: number,
   ): { icon: React.ReactNode; color: string; label: string } => {
     const percentage = getPiutangPercentage(piutang, limit);
     if (percentage >= 90)
@@ -448,20 +479,9 @@ const DataCustomerPage = () => {
     };
   };
 
-  const getTotalPiutang = (): number => {
-    return customerList.reduce((sum, customer) => sum + customer.piutang, 0);
-  };
-
-  const getTotalLimitPiutang = (): number => {
-    return customerList.reduce(
-      (sum, customer) => sum + customer.limit_piutang,
-      0
-    );
-  };
-
   const getHighRiskCustomers = (): number => {
     return customerList.filter(
-      (c) => getPiutangPercentage(c.piutang, c.limit_piutang) >= 90
+      (c) => getPiutangPercentage(c.piutang, c.limit_piutang) >= 90,
     ).length;
   };
 
@@ -471,7 +491,7 @@ const DataCustomerPage = () => {
     if (filterStatus === "tanpaHutang") return customer.piutang <= 0;
     const percentage = getPiutangPercentage(
       customer.piutang,
-      customer.limit_piutang
+      customer.limit_piutang,
     );
     if (filterStatus === "high") return percentage >= 90;
     if (filterStatus === "medium") return percentage >= 70 && percentage < 90;
@@ -579,11 +599,15 @@ const DataCustomerPage = () => {
                 </p>
                 <p
                   className="text-2xl font-bold text-red-600 mt-2 cursor-help"
-                  title={formatRupiah(getTotalPiutang())}
+                  title={formatRupiah(summaryTotals.totalPiutang)}
                 >
-                  {formatRupiahSimple(getTotalPiutang())}
+                  {loadingSummary
+                    ? "Memuat..."
+                    : formatRupiahSimple(summaryTotals.totalPiutang)}
                 </p>
-                <p className="text-xs text-red-400 mt-2">Piutang aktif</p>
+                <p className="text-xs text-red-400 mt-2">
+                  {formatRupiah(summaryTotals.totalPiutang)}
+                </p>
               </div>
               <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
                 <Wallet className="w-8 h-8 text-white" />
@@ -599,9 +623,11 @@ const DataCustomerPage = () => {
                 </p>
                 <p
                   className="text-2xl font-bold text-green-600 mt-2 cursor-help"
-                  title={formatRupiah(getTotalLimitPiutang())}
+                  title={formatRupiah(summaryTotals.totalLimitPiutang)}
                 >
-                  {formatRupiahSimple(getTotalLimitPiutang())}
+                  {loadingSummary
+                    ? "Memuat..."
+                    : formatRupiahSimple(summaryTotals.totalLimitPiutang)}
                 </p>
                 <p className="text-xs text-green-400 mt-2">
                   Total limit tersedia
@@ -702,7 +728,7 @@ const DataCustomerPage = () => {
               {filteredCustomers.map((customer) => {
                 const status = getPiutangStatus(
                   customer.piutang,
-                  customer.limit_piutang
+                  customer.limit_piutang,
                 );
                 return (
                   <div
@@ -722,8 +748,8 @@ const DataCustomerPage = () => {
                               status.color === "text-red-600"
                                 ? "bg-red-100 text-red-700"
                                 : status.color === "text-yellow-600"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-green-100 text-green-700"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-green-100 text-green-700"
                             }`}
                           >
                             <span className="w-3 h-3">{status.icon}</span>
@@ -800,7 +826,7 @@ const DataCustomerPage = () => {
                             <span className={status.color}>
                               {getPiutangPercentage(
                                 customer.piutang,
-                                customer.limit_piutang
+                                customer.limit_piutang,
                               ).toFixed(1)}
                               %
                             </span>
@@ -809,12 +835,12 @@ const DataCustomerPage = () => {
                             <div
                               className={`h-2 rounded-full transition-all duration-500 ${getPiutangColor(
                                 customer.piutang,
-                                customer.limit_piutang
+                                customer.limit_piutang,
                               )} relative overflow-hidden`}
                               style={{
                                 width: `${getPiutangPercentage(
                                   customer.piutang,
-                                  customer.limit_piutang
+                                  customer.limit_piutang,
                                 )}%`,
                               }}
                             >
@@ -1086,13 +1112,13 @@ const DataCustomerPage = () => {
                         className={`text-lg font-bold ${
                           getPiutangStatus(
                             selectedCustomer.piutang,
-                            selectedCustomer.limit_piutang
+                            selectedCustomer.limit_piutang,
                           ).color
                         }`}
                       >
                         {getPiutangPercentage(
                           selectedCustomer.piutang,
-                          selectedCustomer.limit_piutang
+                          selectedCustomer.limit_piutang,
                         ).toFixed(1)}
                         %
                       </span>
@@ -1101,12 +1127,12 @@ const DataCustomerPage = () => {
                       <div
                         className={`h-4 rounded-full transition-all duration-500 ${getPiutangColor(
                           selectedCustomer.piutang,
-                          selectedCustomer.limit_piutang
+                          selectedCustomer.limit_piutang,
                         )} relative overflow-hidden`}
                         style={{
                           width: `${getPiutangPercentage(
                             selectedCustomer.piutang,
-                            selectedCustomer.limit_piutang
+                            selectedCustomer.limit_piutang,
                           )}%`,
                         }}
                       >
@@ -1118,7 +1144,7 @@ const DataCustomerPage = () => {
                       <span className="text-lg font-bold text-blue-600">
                         {formatRupiah(
                           selectedCustomer.limit_piutang -
-                            selectedCustomer.piutang
+                            selectedCustomer.piutang,
                         )}
                       </span>
                     </div>
@@ -1292,7 +1318,7 @@ const DataCustomerPage = () => {
                           value={
                             formData.limit_piutang
                               ? parseInt(formData.limit_piutang).toLocaleString(
-                                  "id-ID"
+                                  "id-ID",
                                 )
                               : ""
                           }
@@ -1318,7 +1344,7 @@ const DataCustomerPage = () => {
                           value={
                             formData.piutang
                               ? parseInt(formData.piutang).toLocaleString(
-                                  "id-ID"
+                                  "id-ID",
                                 )
                               : ""
                           }
@@ -1492,7 +1518,7 @@ const DataCustomerPage = () => {
                           value={
                             editingCustomer.data.limit_piutang
                               ? parseInt(
-                                  editingCustomer.data.limit_piutang
+                                  editingCustomer.data.limit_piutang,
                                 ).toLocaleString("id-ID")
                               : ""
                           }
@@ -1518,7 +1544,7 @@ const DataCustomerPage = () => {
                           value={
                             editingCustomer.data.piutang
                               ? parseInt(
-                                  editingCustomer.data.piutang
+                                  editingCustomer.data.piutang,
                                 ).toLocaleString("id-ID")
                               : ""
                           }
