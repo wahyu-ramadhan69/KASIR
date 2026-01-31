@@ -190,7 +190,7 @@ const HutangPembelianPage = () => {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (loadMoreRef.current) observerRef.current.observe(loadMoreRef.current);
@@ -275,7 +275,7 @@ const HutangPembelianPage = () => {
 
         const totalHutang = hutangList.reduce(
           (sum, p) => sum + (p.totalHarga - p.jumlahDibayar),
-          0
+          0,
         );
 
         setStats({
@@ -336,7 +336,7 @@ const HutangPembelianPage = () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ jumlahBayar: parseInt(jumlahBayar) }),
-        }
+        },
       );
       const data = await res.json();
       if (data.success) {
@@ -367,7 +367,7 @@ const HutangPembelianPage = () => {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tanggalJatuhTempo: tanggalJatuhTempoBaru }),
-        }
+        },
       );
       const data = await res.json();
       if (data.success) {
@@ -481,7 +481,9 @@ const HutangPembelianPage = () => {
                 <p className="text-lg font-bold text-red-600">
                   {formatRupiahSimple(stats.totalHutang)}
                 </p>
-                <p className="text-[11px] text-gray-400">Belum lunas</p>
+                <p className="text-[11px] text-gray-500">
+                  {formatRupiah(stats.totalHutang)}
+                </p>
               </div>
               <div className="bg-gradient-to-br from-rose-500 to-rose-600 p-2.5 rounded-lg shadow-md">
                 <AlertCircle className="w-5 h-5 text-white" />
@@ -756,7 +758,9 @@ const HutangPembelianPage = () => {
                                     </button>
                                     {isAdmin && (
                                       <button
-                                        onClick={() => handleOpenUbahJatuhTempo(pb)}
+                                        onClick={() =>
+                                          handleOpenUbahJatuhTempo(pb)
+                                        }
                                         className="p-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all"
                                         title="Ubah Jatuh Tempo"
                                       >
@@ -813,7 +817,7 @@ const HutangPembelianPage = () => {
                     <p className="text-sm text-gray-500">Tanggal</p>
                     <p className="font-semibold">
                       {new Date(selectedPembelian.createdAt).toLocaleString(
-                        "id-ID"
+                        "id-ID",
                       )}
                     </p>
                   </div>
@@ -861,7 +865,7 @@ const HutangPembelianPage = () => {
                           </p>
                           {(() => {
                             const status = getJatuhTempoStatus(
-                              selectedPembelian.tanggalJatuhTempo
+                              selectedPembelian.tanggalJatuhTempo,
                             );
                             return (
                               <span
@@ -906,14 +910,14 @@ const HutangPembelianPage = () => {
                         <td className="px-3 py-2 text-right text-red-500">
                           {item.diskonPerItem > 0
                             ? `-${formatRupiah(
-                                item.diskonPerItem * item.jumlahDus
+                                item.diskonPerItem * item.jumlahDus,
                               )}`
                             : "-"}
                         </td>
                         <td className="px-3 py-2 text-right font-medium">
                           {formatRupiah(
                             item.hargaPokok * item.jumlahDus -
-                              item.diskonPerItem * item.jumlahDus
+                              item.diskonPerItem * item.jumlahDus,
                           )}
                         </td>
                       </tr>
@@ -1052,7 +1056,7 @@ const HutangPembelianPage = () => {
                         </span>
                         {(() => {
                           const status = getJatuhTempoStatus(
-                            pelunasanPembelian.tanggalJatuhTempo
+                            pelunasanPembelian.tanggalJatuhTempo,
                           );
                           return (
                             <span
@@ -1126,7 +1130,7 @@ const HutangPembelianPage = () => {
                           Kembalian:{" "}
                           {formatRupiah(
                             parseInt(jumlahBayar) -
-                              getSisaHutang(pelunasanPembelian)
+                              getSisaHutang(pelunasanPembelian),
                           )}
                         </p>
                       )}
@@ -1141,7 +1145,7 @@ const HutangPembelianPage = () => {
                         Sisa Hutang:{" "}
                         {formatRupiah(
                           getSisaHutang(pelunasanPembelian) -
-                            parseInt(jumlahBayar)
+                            parseInt(jumlahBayar),
                         )}
                       </p>
                     </>
@@ -1228,7 +1232,7 @@ const HutangPembelianPage = () => {
                       </span>
                       {(() => {
                         const status = getJatuhTempoStatus(
-                          jatuhTempoPembelian.tanggalJatuhTempo
+                          jatuhTempoPembelian.tanggalJatuhTempo,
                         );
                         return (
                           <span

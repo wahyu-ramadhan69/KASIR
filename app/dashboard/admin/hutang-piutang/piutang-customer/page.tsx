@@ -135,7 +135,7 @@ const getJatuhTempoStatus = (tanggalJatuhTempo: string) => {
 };
 
 const formatMetodePembayaranLabel = (
-  metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  metode: "CASH" | "TRANSFER" | "CASH_TRANSFER",
 ) => {
   return metode === "CASH_TRANSFER" ? "CASH + TRANSFER" : metode;
 };
@@ -258,7 +258,7 @@ const RiwayatPenjualanPage = () => {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (loadMoreRef.current) {
@@ -353,7 +353,7 @@ const RiwayatPenjualanPage = () => {
           filtered = data.data.filter(
             (p: PenjualanHeader) =>
               p.statusTransaksi === "SELESAI" ||
-              p.statusTransaksi === "DIBATALKAN"
+              p.statusTransaksi === "DIBATALKAN",
           );
         }
 
@@ -361,7 +361,7 @@ const RiwayatPenjualanPage = () => {
 
         // Pastikan hanya transaksi tanpa perjalanan sales
         filtered = filtered.filter(
-          (p: PenjualanHeader) => p.perjalananSalesId === null
+          (p: PenjualanHeader) => p.perjalananSalesId === null,
         );
 
         if (reset) {
@@ -393,7 +393,7 @@ const RiwayatPenjualanPage = () => {
           filtered = filtered.filter(
             (p) =>
               p.statusTransaksi === "SELESAI" ||
-              p.statusTransaksi === "DIBATALKAN"
+              p.statusTransaksi === "DIBATALKAN",
           );
         }
 
@@ -401,17 +401,17 @@ const RiwayatPenjualanPage = () => {
         filtered = filtered.filter((p) => p.perjalananSalesId === null);
 
         const hutangList = filtered.filter(
-          (p) => p.statusPembayaran === "HUTANG"
+          (p) => p.statusPembayaran === "HUTANG",
         );
 
         const totalHutang = hutangList.reduce(
           (sum, p) => sum + (p.totalHarga - p.jumlahDibayar),
-          0
+          0,
         );
 
         const totalPendapatan = filtered.reduce(
           (sum, p) => sum + p.jumlahDibayar,
-          0
+          0,
         );
 
         // Hitung hutang yang akan jatuh tempo dalam 7 hari
@@ -425,7 +425,7 @@ const RiwayatPenjualanPage = () => {
         }).length;
 
         const totalLunas = filtered.filter(
-          (p) => p.statusPembayaran === "LUNAS"
+          (p) => p.statusPembayaran === "LUNAS",
         ).length;
 
         setStats({
@@ -500,7 +500,7 @@ const RiwayatPenjualanPage = () => {
   };
 
   const handleMetodePelunasanChange = (
-    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER",
   ) => {
     if (metode === "CASH_TRANSFER") {
       if (jumlahBayar) {
@@ -511,8 +511,7 @@ const RiwayatPenjualanPage = () => {
       }
     } else if (metodeBayar === "CASH_TRANSFER") {
       const total =
-        parseRupiahToNumber(jumlahCash) +
-        parseRupiahToNumber(jumlahTransfer);
+        parseRupiahToNumber(jumlahCash) + parseRupiahToNumber(jumlahTransfer);
       setJumlahBayar(total ? total.toLocaleString("id-ID") : "");
     }
 
@@ -537,7 +536,7 @@ const RiwayatPenjualanPage = () => {
             totalCash: breakdown.cash,
             totalTransfer: breakdown.transfer,
           }),
-        }
+        },
       );
       const data = await res.json();
 
@@ -586,7 +585,7 @@ const RiwayatPenjualanPage = () => {
           body: JSON.stringify({
             tanggalJatuhTempo: tanggalJatuhTempoBaru,
           }),
-        }
+        },
       );
       const data = await res.json();
 
@@ -726,7 +725,9 @@ const RiwayatPenjualanPage = () => {
                 <p className="text-lg font-bold text-red-600">
                   {formatRupiahSimple(stats.totalHutang)}
                 </p>
-                <p className="text-[11px] text-gray-400">Belum lunas</p>
+                <p className="text-[11px] text-gray-500">
+                  {formatRupiah(stats.totalHutang)}
+                </p>
               </div>
               <div className="bg-gradient-to-br from-rose-500 to-rose-600 p-2.5 rounded-lg shadow-md">
                 <AlertCircle className="w-5 h-5 text-white" />
@@ -918,7 +919,7 @@ const RiwayatPenjualanPage = () => {
                             </p>
                             <span
                               className={`text-xs px-1.5 py-0.5 rounded ${getMetodeBadgeClass(
-                                pj.metodePembayaran
+                                pj.metodePembayaran,
                               )}`}
                             >
                               {formatMetodePembayaranLabel(pj.metodePembayaran)}
@@ -1104,7 +1105,7 @@ const RiwayatPenjualanPage = () => {
                       <p className="text-sm text-gray-500">Tanggal</p>
                       <p className="font-semibold">
                         {new Date(
-                          selectedPenjualan.tanggalTransaksi
+                          selectedPenjualan.tanggalTransaksi,
                         ).toLocaleString("id-ID")}
                       </p>
                     </div>
@@ -1135,7 +1136,7 @@ const RiwayatPenjualanPage = () => {
                             {" "}
                             /{" "}
                             {formatRupiah(
-                              selectedPenjualan.customer.limit_piutang
+                              selectedPenjualan.customer.limit_piutang,
                             )}
                           </span>
                         </div>
@@ -1168,11 +1169,11 @@ const RiwayatPenjualanPage = () => {
                         )}
                         <span
                           className={`px-2 py-1 rounded text-xs font-medium ${getMetodeBadgeClass(
-                            selectedPenjualan.metodePembayaran
+                            selectedPenjualan.metodePembayaran,
                           )}`}
                         >
                           {formatMetodePembayaranLabel(
-                            selectedPenjualan.metodePembayaran
+                            selectedPenjualan.metodePembayaran,
                           )}
                         </span>
                       </div>
@@ -1190,7 +1191,7 @@ const RiwayatPenjualanPage = () => {
                             </p>
                             {(() => {
                               const status = getJatuhTempoStatus(
-                                selectedPenjualan.tanggalJatuhTempo
+                                selectedPenjualan.tanggalJatuhTempo,
                               );
                               return (
                                 <span
@@ -1227,18 +1228,18 @@ const RiwayatPenjualanPage = () => {
                       {selectedPenjualan.items?.map((item) => {
                         const jumlahPerKemasan = Math.max(
                           1,
-                          item.barang?.jumlahPerKemasan || 1
+                          item.barang?.jumlahPerKemasan || 1,
                         );
                         const totalItem = Math.max(
                           0,
-                          Number(item.totalItem || 0)
+                          Number(item.totalItem || 0),
                         );
                         const jumlahDus = Math.floor(
-                          totalItem / jumlahPerKemasan
+                          totalItem / jumlahPerKemasan,
                         );
                         const jumlahPcs = totalItem % jumlahPerKemasan;
                         const hargaPcs = Math.round(
-                          (item.hargaJual / jumlahPerKemasan) * jumlahPcs
+                          (item.hargaJual / jumlahPerKemasan) * jumlahPcs,
                         );
                         const subtotal =
                           item.hargaJual * jumlahDus +
@@ -1280,7 +1281,7 @@ const RiwayatPenjualanPage = () => {
                             <td className="px-3 py-2 text-right text-red-500">
                               {item.diskonPerItem > 0
                                 ? `-${formatRupiah(
-                                    item.diskonPerItem * jumlahDus
+                                    item.diskonPerItem * jumlahDus,
                                   )}`
                                 : "-"}
                             </td>
@@ -1405,7 +1406,7 @@ const RiwayatPenjualanPage = () => {
                         <span className="text-red-600 font-medium">
                           {formatRupiah(pelunasanPenjualan.customer.piutang)} /{" "}
                           {formatRupiah(
-                            pelunasanPenjualan.customer.limit_piutang
+                            pelunasanPenjualan.customer.limit_piutang,
                           )}
                         </span>
                       </div>
@@ -1436,7 +1437,7 @@ const RiwayatPenjualanPage = () => {
                           </span>
                           {(() => {
                             const status = getJatuhTempoStatus(
-                              pelunasanPenjualan.tanggalJatuhTempo
+                              pelunasanPenjualan.tanggalJatuhTempo,
                             );
                             return (
                               <span
@@ -1472,7 +1473,7 @@ const RiwayatPenjualanPage = () => {
                             option.value as
                               | "CASH"
                               | "TRANSFER"
-                              | "CASH_TRANSFER"
+                              | "CASH_TRANSFER",
                           )
                         }
                         className={`px-3 py-2 rounded-lg border text-sm font-semibold transition-all ${
@@ -1540,8 +1541,8 @@ const RiwayatPenjualanPage = () => {
                       onClick={() =>
                         setJumlahBayar(
                           getSisaHutang(pelunasanPenjualan).toLocaleString(
-                            "id-ID"
-                          )
+                            "id-ID",
+                          ),
                         )
                       }
                       className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded text-sm hover:bg-emerald-200"
@@ -1550,10 +1551,10 @@ const RiwayatPenjualanPage = () => {
                     </button>
                     {[50000, 100000, 200000, 500000].map((amount) => (
                       <button
-                      key={amount}
-                      onClick={() =>
-                        setJumlahBayar(amount.toLocaleString("id-ID"))
-                      }
+                        key={amount}
+                        onClick={() =>
+                          setJumlahBayar(amount.toLocaleString("id-ID"))
+                        }
                         className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
                       >
                         {formatRupiah(amount)}
@@ -1566,8 +1567,7 @@ const RiwayatPenjualanPage = () => {
                 {getPelunasanAmount() > 0 && (
                   <div
                     className={`rounded-lg p-4 mb-4 ${
-                      getPelunasanAmount() >=
-                      getSisaHutang(pelunasanPenjualan)
+                      getPelunasanAmount() >= getSisaHutang(pelunasanPenjualan)
                         ? "bg-green-50 border border-green-200"
                         : "bg-yellow-50 border border-yellow-200"
                     }`}
@@ -1585,7 +1585,7 @@ const RiwayatPenjualanPage = () => {
                             Kembalian:{" "}
                             {formatRupiah(
                               getPelunasanAmount() -
-                                getSisaHutang(pelunasanPenjualan)
+                                getSisaHutang(pelunasanPenjualan),
                             )}
                           </p>
                         )}
@@ -1600,7 +1600,7 @@ const RiwayatPenjualanPage = () => {
                           Sisa Piutang:{" "}
                           {formatRupiah(
                             getSisaHutang(pelunasanPenjualan) -
-                              getPelunasanAmount()
+                              getPelunasanAmount(),
                           )}
                         </p>
                       </>
@@ -1618,9 +1618,7 @@ const RiwayatPenjualanPage = () => {
                   </button>
                   <button
                     onClick={handlePelunasan}
-                    disabled={
-                      isSubmitting || getPelunasanAmount() <= 0
-                    }
+                    disabled={isSubmitting || getPelunasanAmount() <= 0}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {isSubmitting ? (
@@ -1691,7 +1689,7 @@ const RiwayatPenjualanPage = () => {
                           </span>
                           {(() => {
                             const status = getJatuhTempoStatus(
-                              jatuhTempoPenjualan.tanggalJatuhTempo
+                              jatuhTempoPenjualan.tanggalJatuhTempo,
                             );
                             return (
                               <span
@@ -1735,7 +1733,7 @@ const RiwayatPenjualanPage = () => {
                       </span>
                       {(() => {
                         const status = getJatuhTempoStatus(
-                          tanggalJatuhTempoBaru
+                          tanggalJatuhTempoBaru,
                         );
                         return (
                           <span

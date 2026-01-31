@@ -187,7 +187,7 @@ const RiwayatPenjualanPage = () => {
     useState<PenjualanHeader | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [deleteTarget, setDeleteTarget] = useState<PenjualanHeader | null>(
-    null
+    null,
   );
 
   // Statistik
@@ -235,7 +235,7 @@ const RiwayatPenjualanPage = () => {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (loadMoreRef.current) {
@@ -317,7 +317,7 @@ const RiwayatPenjualanPage = () => {
         params.append("endDate", endDate);
       }
       const selesaiRes = await fetch(
-        `/api/penjualan-sales?${params.toString()}`
+        `/api/penjualan-sales?${params.toString()}`,
       );
       const selesaiData = await selesaiRes.json();
 
@@ -490,7 +490,7 @@ const RiwayatPenjualanPage = () => {
         </div>
 
         {/* Statistik */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           <div className="group bg-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div>
@@ -517,7 +517,9 @@ const RiwayatPenjualanPage = () => {
                 <p className="text-lg font-bold text-indigo-700">
                   {formatRupiahSimple(stats.totalPendapatan)}
                 </p>
-                <p className="text-[11px] text-gray-400">Semua penjualan</p>
+                <p className="text-[11px] text-gray-500">
+                  {formatRupiah(stats.totalPendapatan)}
+                </p>
               </div>
               <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-2.5 rounded-lg shadow-md">
                 <Banknote className="w-5 h-5 text-white" />
@@ -534,7 +536,9 @@ const RiwayatPenjualanPage = () => {
                 <p className="text-lg font-bold text-red-600">
                   {formatRupiahSimple(stats.totalHutang)}
                 </p>
-                <p className="text-[11px] text-gray-400">Belum lunas</p>
+                <p className="text-[11px] text-gray-500">
+                  {formatRupiah(stats.totalHutang)}
+                </p>
               </div>
               <div className="bg-gradient-to-br from-rose-500 to-rose-600 p-2.5 rounded-lg shadow-md">
                 <AlertCircle className="w-5 h-5 text-white" />
@@ -891,7 +895,7 @@ const RiwayatPenjualanPage = () => {
                       <p className="text-sm text-gray-500">Tanggal</p>
                       <p className="font-semibold">
                         {new Date(
-                          selectedPenjualan.tanggalTransaksi
+                          selectedPenjualan.tanggalTransaksi,
                         ).toLocaleString("id-ID")}
                       </p>
                     </div>
@@ -922,7 +926,7 @@ const RiwayatPenjualanPage = () => {
                             {" "}
                             /{" "}
                             {formatRupiah(
-                              selectedPenjualan.customer.limit_piutang
+                              selectedPenjualan.customer.limit_piutang,
                             )}
                           </span>
                         </div>
@@ -977,7 +981,7 @@ const RiwayatPenjualanPage = () => {
                             </p>
                             {(() => {
                               const status = getJatuhTempoStatus(
-                                selectedPenjualan.tanggalJatuhTempo
+                                selectedPenjualan.tanggalJatuhTempo,
                               );
                               return (
                                 <span
@@ -1019,14 +1023,14 @@ const RiwayatPenjualanPage = () => {
                           item.totalItem ??
                           item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
                         const jumlahDus = Math.floor(
-                          totalItem / jumlahPerKemasan
+                          totalItem / jumlahPerKemasan,
                         );
                         const jumlahPcs = totalItem % jumlahPerKemasan;
 
                         const hargaPcs =
                           jumlahPcs > 0
                             ? Math.round(
-                                (item.hargaJual / jumlahPerKemasan) * jumlahPcs
+                                (item.hargaJual / jumlahPerKemasan) * jumlahPcs,
                               )
                             : 0;
                         const subtotal =
@@ -1062,7 +1066,7 @@ const RiwayatPenjualanPage = () => {
                             <td className="px-3 py-2 text-right text-red-500">
                               {item.diskonPerItem > 0
                                 ? `-${formatRupiah(
-                                    item.diskonPerItem * jumlahDus
+                                    item.diskonPerItem * jumlahDus,
                                   )}`
                                 : "-"}
                             </td>
@@ -1118,7 +1122,7 @@ const RiwayatPenjualanPage = () => {
                     onClick={() => {
                       window.open(
                         `/api/penjualan/${selectedPenjualan.id}/print-receipt`,
-                        "_blank"
+                        "_blank",
                       );
                     }}
                     className="w-full bg-gradient-to-r from-green-600 via-emerald-600 to-green-700 hover:from-green-700 hover:via-emerald-700 hover:to-green-800 text-white py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"

@@ -141,7 +141,7 @@ const getJatuhTempoStatus = (tanggalJatuhTempo: string) => {
 };
 
 const formatMetodePembayaranLabel = (
-  metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  metode: "CASH" | "TRANSFER" | "CASH_TRANSFER",
 ) => {
   return metode === "CASH_TRANSFER" ? "CASH + TRANSFER" : metode;
 };
@@ -266,7 +266,7 @@ const RiwayatPembayaranHutangPage = () => {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (loadMoreRef.current) {
@@ -328,13 +328,13 @@ const RiwayatPembayaranHutangPage = () => {
           filtered = data.data.filter(
             (p: PenjualanHeader) =>
               p.statusTransaksi === "SELESAI" ||
-              p.statusTransaksi === "DIBATALKAN"
+              p.statusTransaksi === "DIBATALKAN",
           );
         }
 
         // Pastikan hanya transaksi tanpa perjalanan sales
         filtered = filtered.filter(
-          (p: PenjualanHeader) => p.perjalananSalesId === null
+          (p: PenjualanHeader) => p.perjalananSalesId === null,
         );
 
         if (reset) {
@@ -365,7 +365,7 @@ const RiwayatPembayaranHutangPage = () => {
       }
 
       const res = await fetch(
-        `/api/penjualan/riwayat-hutang?${params.toString()}`
+        `/api/penjualan/riwayat-hutang?${params.toString()}`,
       );
       const data = await res.json();
 
@@ -440,7 +440,7 @@ const RiwayatPembayaranHutangPage = () => {
   };
 
   const handleMetodePelunasanChange = (
-    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER",
   ) => {
     if (metode === "CASH_TRANSFER") {
       if (jumlahBayar) {
@@ -476,7 +476,7 @@ const RiwayatPembayaranHutangPage = () => {
             totalCash: breakdown.cash,
             totalTransfer: breakdown.transfer,
           }),
-        }
+        },
       );
       const data = await res.json();
 
@@ -525,7 +525,7 @@ const RiwayatPembayaranHutangPage = () => {
           body: JSON.stringify({
             tanggalJatuhTempo: tanggalJatuhTempoBaru,
           }),
-        }
+        },
       );
       const data = await res.json();
 
@@ -665,7 +665,9 @@ const RiwayatPembayaranHutangPage = () => {
                 <p className="text-lg font-bold text-emerald-600">
                   {formatRupiahSimple(stats.totalPembayaran)}
                 </p>
-                <p className="text-[11px] text-gray-400">Semua pembayaran</p>
+                <p className="text-[11px] text-gray-500">
+                  {formatRupiah(stats.totalPembayaran)}
+                </p>
               </div>
               <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-2.5 rounded-lg shadow-md">
                 <Banknote className="w-5 h-5 text-white" />
@@ -855,7 +857,7 @@ const RiwayatPembayaranHutangPage = () => {
                             </p>
                             <span
                               className={`text-xs px-1.5 py-0.5 rounded ${getMetodeBadgeClass(
-                                pj.metodePembayaran
+                                pj.metodePembayaran,
                               )}`}
                             >
                               {formatMetodePembayaranLabel(pj.metodePembayaran)}
@@ -1017,7 +1019,7 @@ const RiwayatPembayaranHutangPage = () => {
                       <p className="text-sm text-gray-500">Tanggal Bayar</p>
                       <p className="font-semibold">
                         {new Date(
-                          selectedPenjualan.tanggalBayar
+                          selectedPenjualan.tanggalBayar,
                         ).toLocaleString("id-ID")}
                       </p>
                     </div>
@@ -1054,7 +1056,7 @@ const RiwayatPembayaranHutangPage = () => {
                             {" "}
                             /{" "}
                             {formatRupiah(
-                              selectedPenjualan.customer.limit_piutang
+                              selectedPenjualan.customer.limit_piutang,
                             )}
                           </span>
                         </div>
@@ -1087,11 +1089,11 @@ const RiwayatPembayaranHutangPage = () => {
                         )}
                         <span
                           className={`px-2 py-1 rounded text-xs font-medium ${getMetodeBadgeClass(
-                            selectedPenjualan.metodePembayaran
+                            selectedPenjualan.metodePembayaran,
                           )}`}
                         >
                           {formatMetodePembayaranLabel(
-                            selectedPenjualan.metodePembayaran
+                            selectedPenjualan.metodePembayaran,
                           )}
                         </span>
                       </div>
@@ -1109,7 +1111,7 @@ const RiwayatPembayaranHutangPage = () => {
                             </p>
                             {(() => {
                               const status = getJatuhTempoStatus(
-                                selectedPenjualan.tanggalJatuhTempo
+                                selectedPenjualan.tanggalJatuhTempo,
                               );
                               return (
                                 <span
@@ -1146,18 +1148,18 @@ const RiwayatPembayaranHutangPage = () => {
                       {selectedPenjualan.items?.map((item) => {
                         const jumlahPerKemasan = Math.max(
                           1,
-                          item.barang?.jumlahPerKemasan || 1
+                          item.barang?.jumlahPerKemasan || 1,
                         );
                         const totalItem = Math.max(
                           0,
-                          Number(item.totalItem || 0)
+                          Number(item.totalItem || 0),
                         );
                         const jumlahDus = Math.floor(
-                          totalItem / jumlahPerKemasan
+                          totalItem / jumlahPerKemasan,
                         );
                         const jumlahPcs = totalItem % jumlahPerKemasan;
                         const hargaPcs = Math.round(
-                          (item.hargaJual / jumlahPerKemasan) * jumlahPcs
+                          (item.hargaJual / jumlahPerKemasan) * jumlahPcs,
                         );
                         const subtotal =
                           item.hargaJual * jumlahDus +
@@ -1199,7 +1201,7 @@ const RiwayatPembayaranHutangPage = () => {
                             <td className="px-3 py-2 text-right text-red-500">
                               {item.diskonPerItem > 0
                                 ? `-${formatRupiah(
-                                    item.diskonPerItem * jumlahDus
+                                    item.diskonPerItem * jumlahDus,
                                   )}`
                                 : "-"}
                             </td>
@@ -1324,7 +1326,7 @@ const RiwayatPembayaranHutangPage = () => {
                         <span className="text-red-600 font-medium">
                           {formatRupiah(pelunasanPenjualan.customer.piutang)} /{" "}
                           {formatRupiah(
-                            pelunasanPenjualan.customer.limit_piutang
+                            pelunasanPenjualan.customer.limit_piutang,
                           )}
                         </span>
                       </div>
@@ -1355,7 +1357,7 @@ const RiwayatPembayaranHutangPage = () => {
                           </span>
                           {(() => {
                             const status = getJatuhTempoStatus(
-                              pelunasanPenjualan.tanggalJatuhTempo
+                              pelunasanPenjualan.tanggalJatuhTempo,
                             );
                             return (
                               <span
@@ -1391,7 +1393,7 @@ const RiwayatPembayaranHutangPage = () => {
                             option.value as
                               | "CASH"
                               | "TRANSFER"
-                              | "CASH_TRANSFER"
+                              | "CASH_TRANSFER",
                           )
                         }
                         className={`px-3 py-2 rounded-lg border text-sm font-semibold transition-all ${
@@ -1459,8 +1461,8 @@ const RiwayatPembayaranHutangPage = () => {
                       onClick={() =>
                         setJumlahBayar(
                           getSisaHutang(pelunasanPenjualan).toLocaleString(
-                            "id-ID"
-                          )
+                            "id-ID",
+                          ),
                         )
                       }
                       className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded text-sm hover:bg-emerald-200"
@@ -1503,7 +1505,7 @@ const RiwayatPembayaranHutangPage = () => {
                             Kembalian:{" "}
                             {formatRupiah(
                               getPelunasanAmount() -
-                                getSisaHutang(pelunasanPenjualan)
+                                getSisaHutang(pelunasanPenjualan),
                             )}
                           </p>
                         )}
@@ -1518,7 +1520,7 @@ const RiwayatPembayaranHutangPage = () => {
                           Sisa Piutang:{" "}
                           {formatRupiah(
                             getSisaHutang(pelunasanPenjualan) -
-                              getPelunasanAmount()
+                              getPelunasanAmount(),
                           )}
                         </p>
                       </>
@@ -1607,7 +1609,7 @@ const RiwayatPembayaranHutangPage = () => {
                           </span>
                           {(() => {
                             const status = getJatuhTempoStatus(
-                              jatuhTempoPenjualan.tanggalJatuhTempo
+                              jatuhTempoPenjualan.tanggalJatuhTempo,
                             );
                             return (
                               <span
@@ -1651,7 +1653,7 @@ const RiwayatPembayaranHutangPage = () => {
                       </span>
                       {(() => {
                         const status = getJatuhTempoStatus(
-                          tanggalJatuhTempoBaru
+                          tanggalJatuhTempoBaru,
                         );
                         return (
                           <span

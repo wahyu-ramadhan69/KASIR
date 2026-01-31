@@ -78,12 +78,14 @@ const HutangKaryawanPage = () => {
 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedKaryawan, setSelectedKaryawan] = useState<Karyawan | null>(
-    null
+    null,
   );
   const [pinjamanHistory, setPinjamanHistory] = useState<PinjamanItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [pinjamanGlobal, setPinjamanGlobal] = useState<PinjamanItem[]>([]);
-  const [pembayaranGlobal, setPembayaranGlobal] = useState<PembayaranItem[]>([]);
+  const [pembayaranGlobal, setPembayaranGlobal] = useState<PembayaranItem[]>(
+    [],
+  );
   const [loadingGlobal, setLoadingGlobal] = useState(false);
 
   const [showTambahPinjamanModal, setShowTambahPinjamanModal] = useState(false);
@@ -97,7 +99,7 @@ const HutangKaryawanPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [editingPinjaman, setEditingPinjaman] = useState<PinjamanItem | null>(
-    null
+    null,
   );
   const [editingPembayaran, setEditingPembayaran] =
     useState<PembayaranItem | null>(null);
@@ -148,7 +150,7 @@ const HutangKaryawanPage = () => {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (loadMoreRef.current) observerRef.current.observe(loadMoreRef.current);
@@ -195,10 +197,7 @@ const HutangKaryawanPage = () => {
       const data = await res.json();
       if (data.success) {
         const list: Karyawan[] = data.data || [];
-        const totalPinjaman = list.reduce(
-          (sum, k) => sum + k.totalPinjaman,
-          0
-        );
+        const totalPinjaman = list.reduce((sum, k) => sum + k.totalPinjaman, 0);
         const totalKaryawan = list.length;
         const rataRataHutang =
           totalKaryawan > 0 ? Math.round(totalPinjaman / totalKaryawan) : 0;
@@ -226,7 +225,12 @@ const HutangKaryawanPage = () => {
   };
 
   const loadMore = () => {
-    if (viewMode === "hutang" && pagination && pagination.hasMore && !loadingMore) {
+    if (
+      viewMode === "hutang" &&
+      pagination &&
+      pagination.hasMore &&
+      !loadingMore
+    ) {
       fetchKaryawan(pagination.page + 1, false);
     }
   };
@@ -251,9 +255,7 @@ const HutangKaryawanPage = () => {
 
   const handleOpenPembayaran = (karyawan?: Karyawan) => {
     const nextKaryawan =
-      karyawan ||
-      karyawanList.find((item) => item.totalPinjaman > 0) ||
-      null;
+      karyawan || karyawanList.find((item) => item.totalPinjaman > 0) || null;
     if (!nextKaryawan) {
       toast.error("Tidak ada karyawan dengan hutang");
       return;
@@ -286,7 +288,7 @@ const HutangKaryawanPage = () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ jumlahBayar: parseInt(jumlahBayar) }),
-        }
+        },
       );
       const data = await res.json();
       if (data.success) {
@@ -353,7 +355,7 @@ const HutangKaryawanPage = () => {
           body: JSON.stringify({
             jumlahBayar: parseInt(editJumlahBayar),
           }),
-        }
+        },
       );
       const data = await res.json();
       if (data.success) {
@@ -380,16 +382,13 @@ const HutangKaryawanPage = () => {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch(
-        `/api/karyawan/${selectedKaryawan.id}/pinjaman`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jumlahPinjaman: parseInt(jumlahPinjaman),
-          }),
-        }
-      );
+      const res = await fetch(`/api/karyawan/${selectedKaryawan.id}/pinjaman`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jumlahPinjaman: parseInt(jumlahPinjaman),
+        }),
+      });
       const data = await res.json();
       if (data.success) {
         toast.success(data.message || "Pinjaman berhasil ditambahkan");
@@ -601,7 +600,9 @@ const HutangKaryawanPage = () => {
                 <p className="text-lg font-bold text-red-600">
                   {formatRupiahSimple(stats.totalPinjaman)}
                 </p>
-                <p className="text-[11px] text-gray-400">Belum lunas</p>
+                <p className="text-[11px] text-gray-600">
+                  {formatRupiah(stats.totalPinjaman)}
+                </p>
               </div>
               <div className="bg-gradient-to-br from-rose-500 to-rose-600 p-2.5 rounded-lg shadow-md">
                 <AlertCircle className="w-5 h-5 text-white" />
@@ -989,9 +990,7 @@ const HutangKaryawanPage = () => {
                   {selectedKaryawan.alamat && (
                     <div className="col-span-2">
                       <p className="text-sm text-gray-500">Alamat</p>
-                      <p className="font-semibold">
-                        {selectedKaryawan.alamat}
-                      </p>
+                      <p className="font-semibold">{selectedKaryawan.alamat}</p>
                     </div>
                   )}
                 </div>
@@ -1095,7 +1094,7 @@ const HutangKaryawanPage = () => {
                   value={selectedKaryawan.id}
                   onChange={(e) => {
                     const next = karyawanOptions.find(
-                      (item) => item.id === Number(e.target.value)
+                      (item) => item.id === Number(e.target.value),
                     );
                     if (next) setSelectedKaryawan(next);
                   }}
@@ -1163,7 +1162,9 @@ const HutangKaryawanPage = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-white">Pembayaran Hutang</h2>
+              <h2 className="text-lg font-bold text-white">
+                Pembayaran Hutang
+              </h2>
               <button
                 onClick={() => setShowPembayaranModal(false)}
                 className="text-white hover:bg-white/20 p-2 rounded-lg transition-all"
@@ -1179,7 +1180,7 @@ const HutangKaryawanPage = () => {
                   value={selectedKaryawan.id}
                   onChange={(e) => {
                     const next = karyawanList.find(
-                      (item) => item.id === Number(e.target.value)
+                      (item) => item.id === Number(e.target.value),
                     );
                     if (next) {
                       setSelectedKaryawan(next);
@@ -1411,7 +1412,6 @@ const HutangKaryawanPage = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
