@@ -582,6 +582,25 @@ const HutangKaryawanPage = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          {viewMode === "hutang" && (
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">
+                  Daftar Hutang Karyawan
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Kelola data hutang karyawan
+                </p>
+              </div>
+              <button
+                onClick={() => handleOpenTambahPinjaman()}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all text-sm font-semibold flex items-center gap-2"
+              >
+                <Wallet className="w-4 h-4" />
+                Tambah Piutang
+              </button>
+            </div>
+          )}
           {viewMode === "hutang" && loading && karyawanList.length === 0 ? (
             <div className="flex justify-center items-center py-24">
               <div className="text-center">
