@@ -301,12 +301,14 @@ enum StatusTransaksi {
 enum Role {
   ADMIN
   KASIR
+  KEPALA_GUDANG
 }
 
 enum JenisKaryawan {
   KASIR
   SALES
   KARYAWAN
+  KEPALA_GUDANG
 }
 
 enum StatusPerjalanan {     

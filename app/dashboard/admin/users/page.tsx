@@ -22,7 +22,7 @@ interface User {
   id: number;
   username: string;
   email: string;
-  role: "ADMIN" | "KASIR";
+  role: "ADMIN" | "KASIR" | "KEPALA_GUDANG";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -31,7 +31,7 @@ interface User {
 interface UserFormData {
   username: string;
   email: string;
-  role: "ADMIN" | "KASIR";
+  role: "ADMIN" | "KASIR" | "KEPALA_GUDANG";
   isActive: boolean;
   password?: string;
 }
@@ -129,7 +129,7 @@ const DataUserPage = () => {
 
       if (data.success) {
         toast.success(
-          `User berhasil ${!currentStatus ? "diaktifkan" : "dinonaktifkan"}!`
+          `User berhasil ${!currentStatus ? "diaktifkan" : "dinonaktifkan"}!`,
         );
         fetchUsers();
       } else {
@@ -142,7 +142,7 @@ const DataUserPage = () => {
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value, type } = e.target;
     if (editingUser) {
@@ -293,6 +293,9 @@ const DataUserPage = () => {
   const activeUsersCount = usersList.filter((u) => u.isActive).length;
   const adminCount = usersList.filter((u) => u.role === "ADMIN").length;
   const kasirCount = usersList.filter((u) => u.role === "KASIR").length;
+  const kepalaGudangCount = usersList.filter(
+    (u) => u.role === "KEPALA_GUDANG",
+  ).length;
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -449,6 +452,7 @@ const DataUserPage = () => {
                 <option value="all">Semua Role</option>
                 <option value="ADMIN">Admin</option>
                 <option value="KASIR">Kasir</option>
+                <option value="KEPALA_GUDANG">Kepala Gudang</option>
               </select>
 
               <select
@@ -547,7 +551,7 @@ const DataUserPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${getRoleColor(
-                            user.role
+                            user.role,
                           )}`}
                         >
                           {getRoleIcon(user.role)}
@@ -699,6 +703,7 @@ const DataUserPage = () => {
                     >
                       <option value="KASIR">Kasir</option>
                       <option value="ADMIN">Admin</option>
+                      <option value="KEPALA_GUDANG">Kepala Gudang</option>
                     </select>
                   </div>
                 </div>
@@ -818,6 +823,7 @@ const DataUserPage = () => {
                     >
                       <option value="KASIR">Kasir</option>
                       <option value="ADMIN">Admin</option>
+                      <option value="KEPALA_GUDANG">Kepala Gudang</option>
                     </select>
                   </div>
 
