@@ -31,6 +31,9 @@ import {
   Undo2,
   ChevronLeft,
   ChevronRight,
+  BarChart3,
+  SquareArrowOutUpRight,
+  SquareArrowOutDownRight,
 } from "lucide-react";
 
 // Menu untuk Admin
@@ -256,6 +259,25 @@ const kasirNavLinks = [
   },
 ];
 
+// Menu untuk Kepala Gudang
+const kepalaGudangNavLinks = [
+  {
+    label: "Barang",
+    href: "/dashboard/kepala_gudang/barang",
+    icon: <Package className="w-5 h-5" />,
+  },
+  {
+    label: "Barang Keluar",
+    href: "/dashboard/kepala_gudang/barang_keluar",
+    icon: <SquareArrowOutUpRight className="w-5 h-5" />,
+  },
+  {
+    label: "Barang Masuk",
+    href: "/dashboard/kepala_gudang/barang_masuk",
+    icon: <SquareArrowOutDownRight className="w-5 h-5" />,
+  },
+];
+
 const kasirMasterDataLinks = [
   {
     label: "Master Data",
@@ -417,12 +439,25 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Dapatkan menu berdasarkan role
-  const userRole = role.toLowerCase() as "admin" | "kasir";
-  const navLinks = userRole === "admin" ? adminNavLinks : kasirNavLinks;
+  const userRole = role.toLowerCase() as "admin" | "kasir" | "kepala_gudang";
+  const navLinks =
+    userRole === "admin"
+      ? adminNavLinks
+      : userRole === "kasir"
+        ? kasirNavLinks
+        : kepalaGudangNavLinks;
   const masterDataLinks =
-    userRole === "admin" ? adminMasterDataLinks : kasirMasterDataLinks;
+    userRole === "admin"
+      ? adminMasterDataLinks
+      : userRole === "kasir"
+        ? kasirMasterDataLinks
+        : [];
   const transactionLinks =
-    userRole === "admin" ? adminTransactionLinks : kasirTransactionLinks;
+    userRole === "admin"
+      ? adminTransactionLinks
+      : userRole === "kasir"
+        ? kasirTransactionLinks
+        : [];
 
   // Auto-expand menu jika ada submenu yang aktif
   useEffect(() => {
@@ -494,7 +529,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
       setOpenMenus((prev) =>
         prev.includes(label)
           ? prev.filter((item) => item !== label)
-          : [...prev, label]
+          : [...prev, label],
       );
     }
   };
@@ -662,7 +697,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
                 isCollapsed ? "justify-center w-full" : "flex-1"
               }`}
               href={
-                userRole === "admin" ? "/dashboard/admin" : "/dashboard/kasir"
+                userRole === "admin"
+                  ? "/dashboard/admin"
+                  : userRole === "kasir"
+                    ? "/dashboard/kasir"
+                    : "/dashboard/kepala_gudang/barang"
               }
             >
               <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow flex-shrink-0">
@@ -671,7 +710,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
               {!isCollapsed && (
                 <div className="overflow-hidden">
                   <h6 className="block font-sans text-sm font-bold text-white tracking-wide whitespace-nowrap uppercase">
-                    {userRole}
+                    {userRole.replace("_", " ")}
                   </h6>
                   <p className="text-xs text-gray-400 whitespace-nowrap">
                     {username || "Dashboard"}

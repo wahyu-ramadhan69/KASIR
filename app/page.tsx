@@ -21,6 +21,8 @@ export default function LoginPage() {
         return "/dashboard/admin";
       case "kasir":
         return "/dashboard/kasir";
+      case "kepala_gudang":
+        return "/dashboard/kepala_gudang";
       default:
         return "/dashboard";
     }
