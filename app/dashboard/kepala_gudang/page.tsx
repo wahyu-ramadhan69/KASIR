@@ -1,49 +1,23 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Package,
-  TrendingUp,
-  TrendingDown,
   RefreshCw,
-  Plus,
-  Edit,
-  Trash2,
   X,
-  Store,
-  DollarSign,
   Box,
   AlertCircle,
-  CheckCircle,
   Eye,
   Filter,
-  Loader2,
   Calendar,
   Activity,
   BarChart3,
-  ShoppingBag,
+  SquareArrowOutUpRight,
+  SquareArrowOutDownRight,
 } from "lucide-react";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import toast, { Toaster } from "react-hot-toast";
-
-interface Supplier {
-  id: number;
-  namaSupplier: string;
-  alamat: string;
-  noHp: string;
-  limitHutang: number;
-  limitPembelian: number;
-}
+import { Toaster } from "react-hot-toast";
+import Link from "next/link";
 
 interface Barang {
   id: number;
@@ -53,139 +27,22 @@ interface Barang {
   stok: number;
   jenisKemasan: string;
   jumlahPerKemasan: number;
-  supplierId: number;
   berat: number;
   limitPenjualan: number;
   createdAt: string;
   updatedAt: string;
-  supplier: Supplier;
 }
-
-interface BarangFormData {
-  namaBarang: string;
-  hargaBeli: string;
-  hargaJual: string;
-  jenisKemasan: string;
-  jumlahPerKemasan: string;
-  supplierId: string;
-  berat: string;
-  limitPenjualan: string;
-}
-
-interface PaginationInfo {
-  currentPage: number;
-  totalPages: number;
-  totalCount: number;
-  limit: number;
-  hasMore: boolean;
-}
-
-interface ChartData {
-  namaBarang: string;
-  totalTerjual: number;
-  totalPenjualan: number;
-  sisaStok: number;
-  persentase?: number;
-}
-
-interface PenjualanBarang {
-  barangId: number;
-  namaBarang: string;
-  jenisKemasan: string;
-  jumlahPerKemasan: number;
-  totalTerjualPcs: number;
-  totalTerjualKemasan: number;
-}
-
-interface Stats {
-  totalProducts: number;
-  totalRevenue: number;
-  totalUnitsSold: number;
-  avgRevenuePerProduct: number;
-}
-
-type ViewMode = "products" | "chart" | "sales";
-type PenjualanFilterMode = "date" | "range";
 
 const DataBarangPage = () => {
   const [barangList, setBarangList] = useState<Barang[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>("");
-  const [filterSupplier, setFilterSupplier] = useState<string>("all");
   const [filterStok, setFilterStok] = useState<
     "all" | "low" | "medium" | "high"
   >("all");
-  const [showAddModal, setShowAddModal] = useState<boolean>(false);
-  const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [selectedBarang, setSelectedBarang] = useState<Barang | null>(null);
-  const [editingBarang, setEditingBarang] = useState<{
-    id: number;
-    data: BarangFormData;
-  } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
-  const [supplierSearch, setSupplierSearch] = useState<string>("");
-  const [showSupplierDropdown, setShowSupplierDropdown] =
-    useState<boolean>(false);
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
-  const [selectedSupplierName, setSelectedSupplierName] = useState<string>("");
-  const [editSupplierSearch, setEditSupplierSearch] = useState<string>("");
-  const [showEditSupplierDropdown, setShowEditSupplierDropdown] =
-    useState<boolean>(false);
-  const [addFormHargaBeli, setAddFormHargaBeli] = useState<string>("");
-  const [addFormHargaJual, setAddFormHargaJual] = useState<string>("");
-  const [showAddLimitPenjualan, setShowAddLimitPenjualan] =
-    useState<boolean>(false);
-  const [addFormLimitPenjualan, setAddFormLimitPenjualan] =
-    useState<string>("0");
-  const [addFormBerat, setAddFormBerat] = useState<string>("");
-  const [showEditLimitPenjualan, setShowEditLimitPenjualan] =
-    useState<boolean>(false);
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    currentPage: 1,
-    totalPages: 1,
-    totalCount: 0,
-    limit: 12,
-    hasMore: false,
-  });
-
-  const [view, setView] = useState<ViewMode>("products");
-
-  const [data, setData] = useState<ChartData[]>([]);
-  const [stats, setStats] = useState<Stats>({
-    totalProducts: 0,
-    totalRevenue: 0,
-    totalUnitsSold: 0,
-    avgRevenuePerProduct: 0,
-  });
-  const [loadingChart, setLoadingChart] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
-  const [animationKey, setAnimationKey] = useState(0);
-  const [penjualanBarang, setPenjualanBarang] = useState<PenjualanBarang[]>([]);
-  const [loadingPenjualanBarang, setLoadingPenjualanBarang] = useState(false);
-  const [penjualanFilterMode, setPenjualanFilterMode] =
-    useState<PenjualanFilterMode>("date");
-  const [penjualanDate, setPenjualanDate] = useState<string>(
-    new Date().toISOString().split("T")[0],
-  );
-  const [penjualanStartDate, setPenjualanStartDate] = useState<string>("");
-  const [penjualanEndDate, setPenjualanEndDate] = useState<string>("");
-  const [penjualanQuery, setPenjualanQuery] = useState<{
-    mode: PenjualanFilterMode;
-    date: string;
-    startDate: string;
-    endDate: string;
-  }>({
-    mode: "date",
-    date: new Date().toISOString().split("T")[0],
-    startDate: "",
-    endDate: "",
-  });
-
-  const observerTarget = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -197,52 +54,13 @@ const DataBarangPage = () => {
 
   useEffect(() => {
     fetchBarang();
-    fetchSuppliers();
   }, []);
-
-  const formatInputRupiah = (value: string): string => {
-    const numbers = value.replace(/\D/g, "");
-    if (numbers === "") return "";
-    const formatted = new Intl.NumberFormat("id-ID").format(parseInt(numbers));
-    return `Rp ${formatted}`;
-  };
-
-  const parseRupiahToNumber = (value: string): number => {
-    const numbers = value.replace(/\D/g, "");
-    return numbers === "" ? 0 : parseInt(numbers);
-  };
-
-  const normalizeDecimalInput = (value: string): string => {
-    const cleaned = value.replace(/[^0-9,\.]/g, "");
-    const normalized = cleaned.replace(/\./g, ",");
-    const [whole, ...rest] = normalized.split(",");
-    return rest.length > 0 ? `${whole},${rest.join("")}` : whole;
-  };
-
-  const parseKgToGrams = (value: string): number => {
-    const normalized = normalizeDecimalInput(value);
-    const numberValue = Number(normalized.replace(",", "."));
-    if (!Number.isFinite(numberValue)) return 0;
-    return Math.round(numberValue * 1000);
-  };
 
   const formatGramsToKg = (grams: number): string => {
     if (!Number.isFinite(grams)) return "";
     const kg = grams / 1000;
     const formatted = kg.toFixed(3).replace(/\.?0+$/, "");
     return formatted.replace(".", ",");
-  };
-
-  const fetchSuppliers = async () => {
-    try {
-      const res = await fetch("/api/supplier");
-      const data = await res.json();
-      if (data.success) {
-        setSuppliersList(data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching suppliers:", error);
-    }
   };
 
   const fetchBarang = async () => {
@@ -261,266 +79,12 @@ const DataBarangPage = () => {
     }
   };
 
-  const handleEdit = (barang: Barang) => {
-    const limitValue = barang.limitPenjualan || 0;
-    setEditingBarang({
-      id: barang.id,
-      data: {
-        namaBarang: barang.namaBarang,
-        hargaBeli: formatInputRupiah(barang.hargaBeli.toString()),
-        hargaJual: formatInputRupiah(barang.hargaJual.toString()),
-        jenisKemasan: barang.jenisKemasan,
-        jumlahPerKemasan: barang.jumlahPerKemasan.toString(),
-        supplierId: barang.supplierId.toString(),
-        berat: formatGramsToKg(barang.berat || 0),
-        limitPenjualan: limitValue.toString(),
-      },
-    });
-    setEditSupplierSearch(barang.supplier?.namaSupplier || "");
-    // Show checkbox if limit > 0
-    setShowEditLimitPenjualan(limitValue > 0);
-    setShowEditModal(true);
-  };
-
-  const handleDelete = async (id: number, namaBarang: string) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus barang "${namaBarang}"?`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/barang/${id}`, {
-        method: "DELETE",
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success("Barang berhasil dihapus!");
-        fetchBarang();
-      } else {
-        toast.error(data.error || "Gagal menghapus barang");
-      }
-    } catch (error) {
-      console.error("Error deleting barang:", error);
-      toast.error("Terjadi kesalahan saat menghapus barang");
-    }
-  };
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    const { name, value } = e.target;
-    if (editingBarang) {
-      if (name === "hargaBeli" || name === "hargaJual") {
-        const formattedValue = formatInputRupiah(value);
-        setEditingBarang({
-          ...editingBarang,
-          data: {
-            ...editingBarang.data,
-            [name]: formattedValue,
-          },
-        });
-      } else if (name === "berat") {
-        const formattedValue = normalizeDecimalInput(value);
-        setEditingBarang({
-          ...editingBarang,
-          data: {
-            ...editingBarang.data,
-            berat: formattedValue,
-          },
-        });
-      } else {
-        setEditingBarang({
-          ...editingBarang,
-          data: {
-            ...editingBarang.data,
-            [name]: value,
-          },
-        });
-      }
-    }
-  };
-
-  const handleSubmitAdd = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    if (!selectedSupplierId) {
-      toast.error("Silakan pilih supplier terlebih dahulu");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const formData = new FormData(e.currentTarget);
-
-    try {
-      const res = await fetch("/api/barang", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          namaBarang: formData.get("namaBarang"),
-          hargaBeli: parseRupiahToNumber(addFormHargaBeli),
-          hargaJual: parseRupiahToNumber(addFormHargaJual),
-          jenisKemasan: formData.get("jenisKemasan"),
-          jumlahPerKemasan: parseInt(
-            formData.get("jumlahPerKemasan") as string,
-          ),
-          supplierId: parseInt(selectedSupplierId),
-          berat: parseKgToGrams(addFormBerat),
-          limitPenjualan: showAddLimitPenjualan
-            ? parseInt(addFormLimitPenjualan)
-            : 0,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success("Barang berhasil ditambahkan!");
-        setShowAddModal(false);
-        setSupplierSearch("");
-        setSelectedSupplierId("");
-        setSelectedSupplierName("");
-        setAddFormHargaBeli("");
-        setAddFormHargaJual("");
-        setAddFormBerat("");
-        setShowAddLimitPenjualan(false);
-        setAddFormLimitPenjualan("0");
-        fetchBarang();
-      } else {
-        toast.error(data.error || "Gagal menambahkan barang");
-      }
-    } catch (error) {
-      console.error("Error adding barang:", error);
-      toast.error("Terjadi kesalahan saat menambahkan barang");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmitEdit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingBarang) return;
-
-    setIsSubmitting(true);
-
-    try {
-      const res = await fetch(`/api/barang/${editingBarang.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          namaBarang: editingBarang.data.namaBarang,
-          hargaBeli: parseRupiahToNumber(editingBarang.data.hargaBeli),
-          hargaJual: parseRupiahToNumber(editingBarang.data.hargaJual),
-          jenisKemasan: editingBarang.data.jenisKemasan,
-          jumlahPerKemasan: parseInt(editingBarang.data.jumlahPerKemasan),
-          supplierId: parseInt(editingBarang.data.supplierId),
-          berat: parseKgToGrams(editingBarang.data.berat),
-          limitPenjualan: showEditLimitPenjualan
-            ? parseInt(editingBarang.data.limitPenjualan)
-            : 0,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success("Barang berhasil diupdate!");
-        setShowEditModal(false);
-        setEditingBarang(null);
-        setShowEditLimitPenjualan(false);
-        fetchBarang();
-      } else {
-        toast.error(data.error || "Gagal mengupdate barang");
-      }
-    } catch (error) {
-      console.error("Error updating barang:", error);
-      toast.error("Terjadi kesalahan saat mengupdate barang");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSupplierSearch = (value: string) => {
-    setSupplierSearch(value);
-    if (value.length >= 3) {
-      setShowSupplierDropdown(true);
-    } else {
-      setShowSupplierDropdown(false);
-      setSelectedSupplierId("");
-      setSelectedSupplierName("");
-    }
-  };
-
-  const handleSelectSupplier = (supplier: Supplier) => {
-    setSelectedSupplierId(supplier.id.toString());
-    setSelectedSupplierName(supplier.namaSupplier);
-    setSupplierSearch(supplier.namaSupplier);
-    setShowSupplierDropdown(false);
-  };
-
-  const handleEditSupplierSearch = (value: string) => {
-    setEditSupplierSearch(value);
-    if (value.length >= 3) {
-      setShowEditSupplierDropdown(true);
-    } else {
-      setShowEditSupplierDropdown(false);
-    }
-  };
-
-  const handleSelectEditSupplier = (supplier: Supplier) => {
-    if (editingBarang) {
-      setEditingBarang({
-        ...editingBarang,
-        data: {
-          ...editingBarang.data,
-          supplierId: supplier.id.toString(),
-        },
-      });
-    }
-    setEditSupplierSearch(supplier.namaSupplier);
-    setShowEditSupplierDropdown(false);
-  };
-
-  const filteredEditSuppliersList = suppliersList.filter((supplier) =>
-    supplier.namaSupplier
-      .toLowerCase()
-      .includes(editSupplierSearch.toLowerCase()),
-  );
-
-  const filteredSuppliersList = suppliersList.filter((supplier) =>
-    supplier.namaSupplier.toLowerCase().includes(supplierSearch.toLowerCase()),
-  );
-
   const formatRupiah = (number: number): string => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
     }).format(number);
-  };
-
-  const formatRupiahSimple = (amount: number): string => {
-    const absAmount = Math.abs(amount);
-    if (absAmount >= 1_000_000_000) {
-      return `Rp ${(amount / 1_000_000_000).toFixed(1)}M`;
-    } else if (absAmount >= 1_000_000) {
-      return `Rp ${(amount / 1_000_000).toFixed(1)}Jt`;
-    } else if (absAmount >= 1_000) {
-      return `Rp ${(amount / 1_000).toFixed(0)}Rb`;
-    } else {
-      return `Rp ${amount}`;
-    }
-  };
-
-  const calculateProfit = (hargaBeli: number, hargaJual: number) => {
-    const profit = hargaJual - hargaBeli;
-    const percentage = ((profit / hargaBeli) * 100).toFixed(1);
-    return { profit, percentage };
   };
 
   const getProfitColor = (profit: number) => {
@@ -565,16 +129,9 @@ const DataBarangPage = () => {
   };
 
   const filteredBarang = barangList.filter((item) => {
-    const matchSearch =
-      item.namaBarang
-        .toLowerCase()
-        .includes(debouncedSearchTerm.toLowerCase()) ||
-      item.supplier?.namaSupplier
-        ?.toLowerCase()
-        .includes(debouncedSearchTerm.toLowerCase());
-    const matchSupplier =
-      filterSupplier === "all" ||
-      item.supplier?.id.toString() === filterSupplier;
+    const matchSearch = item.namaBarang
+      .toLowerCase()
+      .includes(debouncedSearchTerm.toLowerCase());
 
     let matchStok = true;
     if (filterStok === "low")
@@ -584,226 +141,8 @@ const DataBarangPage = () => {
     if (filterStok === "high")
       matchStok = item.stok / item.jumlahPerKemasan >= 100;
 
-    return matchSearch && matchSupplier && matchStok;
+    return matchSearch && matchStok;
   });
-
-  const uniqueSuppliers = Array.from(
-    new Map(
-      barangList.map((item) => [item.supplier?.id, item.supplier]),
-    ).values(),
-  ).filter((supplier): supplier is Supplier => supplier !== undefined);
-
-  const getTotalNilaiBarang = () => {
-    return barangList.reduce(
-      (sum, item) => sum + item.hargaBeli * (item.stok / item.jumlahPerKemasan),
-      0,
-    );
-  };
-
-  const getTotalProfit = () => {
-    return barangList.reduce((sum, item) => {
-      const profit = (item.hargaJual - item.hargaBeli) * item.stok;
-      return sum + profit;
-    }, 0);
-  };
-
-  const fetchData = async () => {
-    setLoadingChart(true);
-    try {
-      const params = new URLSearchParams();
-      if (penjualanQuery.mode === "date" && penjualanQuery.date) {
-        params.set("date", penjualanQuery.date);
-      }
-      if (penjualanQuery.mode === "range") {
-        if (penjualanQuery.startDate) {
-          params.set("startDate", penjualanQuery.startDate);
-        }
-        if (penjualanQuery.endDate) {
-          params.set("endDate", penjualanQuery.endDate);
-        }
-      }
-
-      const response = await fetch(
-        `/api/barang/grafik${params.toString() ? `?${params}` : ""}`,
-      );
-      const result = await response.json();
-
-      const totalRev = result.reduce(
-        (sum: number, item: ChartData) => sum + item.totalPenjualan,
-        0,
-      );
-      const totalUnits = result.reduce(
-        (sum: number, item: ChartData) => sum + item.totalTerjual,
-        0,
-      );
-
-      const dataWithPercentage = result.map((item: ChartData) => ({
-        ...item,
-        persentase: totalUnits > 0 ? (item.totalTerjual / totalUnits) * 100 : 0,
-      }));
-
-      setData(dataWithPercentage);
-      setStats({
-        totalProducts: result.length,
-        totalRevenue: totalRev,
-        totalUnitsSold: totalUnits,
-        avgRevenuePerProduct: totalRev / result.length || 0,
-      });
-      setAnimationKey((prev) => prev + 1);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoadingChart(false);
-    }
-  };
-
-  useEffect(() => {
-    if (view === "chart") {
-      fetchData();
-    }
-  }, [view, penjualanQuery]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatCurrencySimple = (amount: number): string => {
-    const absAmount = Math.abs(amount);
-    if (absAmount >= 1e9) {
-      return `Rp ${(amount / 1e9).toFixed(1)}M`;
-    } else if (absAmount >= 1e6) {
-      return `Rp ${(amount / 1e6).toFixed(1)}Jt`;
-    } else if (absAmount >= 1e3) {
-      return `Rp ${(amount / 1e3).toFixed(0)}Rb`;
-    } else {
-      return `Rp ${amount}`;
-    }
-  };
-
-  const formatNumber = (value: number) => {
-    return new Intl.NumberFormat("id-ID").format(value);
-  };
-
-  const formatDecimal = (value: number) => {
-    if (Number.isInteger(value)) {
-      return formatNumber(value);
-    }
-    return new Intl.NumberFormat("id-ID", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
-
-  const resetPenjualanFilter = () => {
-    const today = new Date().toISOString().split("T")[0];
-    setPenjualanFilterMode("date");
-    setPenjualanDate(today);
-    setPenjualanStartDate("");
-    setPenjualanEndDate("");
-    setPenjualanQuery({
-      mode: "date",
-      date: today,
-      startDate: "",
-      endDate: "",
-    });
-  };
-
-  const fetchPenjualanBarang = async () => {
-    setLoadingPenjualanBarang(true);
-    try {
-      const params = new URLSearchParams();
-      if (penjualanQuery.mode === "date" && penjualanQuery.date) {
-        params.set("date", penjualanQuery.date);
-      }
-      if (penjualanQuery.mode === "range") {
-        if (penjualanQuery.startDate) {
-          params.set("startDate", penjualanQuery.startDate);
-        }
-        if (penjualanQuery.endDate) {
-          params.set("endDate", penjualanQuery.endDate);
-        }
-      }
-
-      const response = await fetch(
-        `/api/barang/penjualan${params.toString() ? `?${params}` : ""}`,
-      );
-      const result = await response.json();
-      if (result.success) {
-        setPenjualanBarang(result.data || []);
-      } else {
-        setPenjualanBarang([]);
-      }
-    } catch (error) {
-      console.error("Error fetching penjualan barang:", error);
-    } finally {
-      setLoadingPenjualanBarang(false);
-    }
-  };
-
-  useEffect(() => {
-    if (view === "sales") {
-      fetchPenjualanBarang();
-    }
-  }, [view, penjualanQuery]);
-
-  useEffect(() => {
-    setPenjualanQuery({
-      mode: penjualanFilterMode,
-      date: penjualanDate,
-      startDate: penjualanStartDate,
-      endDate: penjualanEndDate,
-    });
-  }, [
-    penjualanFilterMode,
-    penjualanDate,
-    penjualanStartDate,
-    penjualanEndDate,
-  ]);
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-4 rounded-xl shadow-2xl border-2 border-blue-200">
-          <p className="font-bold text-gray-800 mb-2 text-base">
-            {payload[0].payload.namaBarang}
-          </p>
-          <div className="space-y-1">
-            <p className="text-sm text-gray-600">
-              Total Terjual:{" "}
-              <span className="font-semibold text-purple-600">
-                {formatNumber(payload[0].payload.totalTerjual)} pcs
-              </span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Sisa Stok:{" "}
-              <span className="font-semibold text-orange-600">
-                {formatNumber(payload[0].payload.sisaStok)} pcs
-              </span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Total Penjualan:{" "}
-              <span className="font-semibold text-green-600">
-                {formatCurrency(payload[0].payload.totalPenjualan)}
-              </span>
-            </p>
-            {payload[0].payload.persentase && (
-              <p className="text-sm text-gray-600">
-                Kontribusi:{" "}
-                <span className="font-semibold text-blue-600">
-                  {payload[0].payload.persentase.toFixed(1)}%
-                </span>
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -838,49 +177,20 @@ const DataBarangPage = () => {
               </div>
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="group bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
+              <Link
+                href="/dashboard/kepala_gudang/barang_keluar"
+                className="px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 bg-white/10 text-white hover:bg-white/20 shadow-lg"
               >
-                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                Tambah Barang
-              </button>
-
-              <div className="flex items-center bg-white/10 backdrop-blur-sm p-1 rounded-xl shadow-lg">
-                <button
-                  onClick={() => setView("products")}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-                    view === "products"
-                      ? "bg-white text-blue-700 shadow-md"
-                      : "text-white/90 hover:bg-white/20"
-                  }`}
-                >
-                  <ShoppingBag className="w-4 h-4" />
-                  Barang
-                </button>
-                <button
-                  onClick={() => setView("sales")}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-                    view === "sales"
-                      ? "bg-white text-blue-700 shadow-md"
-                      : "text-white/90 hover:bg-white/20"
-                  }`}
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  Penjualan
-                </button>
-                <button
-                  onClick={() => setView("chart")}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-                    view === "chart"
-                      ? "bg-white text-blue-700 shadow-md"
-                      : "text-white/90 hover:bg-white/20"
-                  }`}
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Terlaris
-                </button>
-              </div>
+                <SquareArrowOutUpRight className="w-4 h-4" />
+                Barang Keluar
+              </Link>
+              <Link
+                href="/dashboard/kepala_gudang/barang_masuk"
+                className="px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 bg-white/10 text-white hover:bg-white/20 shadow-lg"
+              >
+                <SquareArrowOutDownRight className="w-4 h-4" />
+                Barang Masuk
+              </Link>
               <button
                 onClick={fetchBarang}
                 disabled={loading}
@@ -896,7 +206,7 @@ const DataBarangPage = () => {
         </div>
 
         {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
           <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
@@ -931,7 +241,7 @@ const DataBarangPage = () => {
             </div>
           </div>
 
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+          {/* <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
@@ -951,840 +261,232 @@ const DataBarangPage = () => {
                 <DollarSign className="w-8 h-8 text-white" />
               </div>
             </div>
-          </div>
-
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Supplier
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {uniqueSuppliers.length}
-                </p>
-                <p className="text-xs text-gray-400 mt-2">Supplier aktif</p>
-              </div>
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Store className="w-8 h-8 text-white" />
-              </div>
-            </div>
-          </div>
+          </div> */}
         </div>
-        {view === "products" ? (
-          <>
-            {/* Search and Filter Section */}
-            <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
-              <div className="flex flex-col lg:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    placeholder="Cari nama barang atau supplier..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                  />
-                  {searchTerm && (
-                    <button
-                      onClick={() => setSearchTerm("")}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex gap-3">
-                  <select
-                    value={filterSupplier}
-                    onChange={(e) => setFilterSupplier(e.target.value)}
-                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
-                  >
-                    <option value="all">Semua Supplier</option>
-                    {uniqueSuppliers.map((supplier) => (
-                      <option key={supplier.id} value={supplier.id.toString()}>
-                        {supplier.namaSupplier}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={filterStok}
-                    onChange={(e) => setFilterStok(e.target.value as any)}
-                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
-                  >
-                    <option value="all">Semua Stok</option>
-                    <option value="low">Stok Rendah</option>
-                    <option value="medium">Stok Sedang</option>
-                    <option value="high">Stok Aman</option>
-                  </select>
-
-                  <button className="px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2">
-                    <Filter className="w-5 h-5 text-gray-600" />
-                    <span className="hidden lg:inline text-gray-700 font-medium">
-                      Filter
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {debouncedSearchTerm && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
-                  <Search className="w-4 h-4 text-blue-600" />
-                  <span>
-                    Menampilkan hasil pencarian untuk:{" "}
-                    <span className="font-semibold text-blue-700">
-                      "{debouncedSearchTerm}"
-                    </span>
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Barang Table */}
-            {loading ? (
-              <div className="flex justify-center items-center py-32">
-                <div className="text-center">
-                  <div className="relative">
-                    <div className="w-24 h-24 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-                    <Package className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-                  </div>
-                  <p className="text-gray-500 mt-6 text-lg font-medium">
-                    Memuat data barang...
-                  </p>
-                </div>
-              </div>
-            ) : filteredBarang.length === 0 ? (
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-16 text-center">
-                <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Package className="w-12 h-12 text-gray-400" />
-                </div>
-                <p className="text-gray-500 text-lg font-medium">
-                  {debouncedSearchTerm
-                    ? `Tidak ada barang ditemukan untuk "${debouncedSearchTerm}"`
-                    : "Tidak ada data barang"}
-                </p>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gradient-to-r from-blue-600 to-indigo-700">
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
-                          No
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
-                          Nama Barang
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
-                          Supplier
-                        </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
-                          Harga Beli
-                        </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
-                          Harga Jual
-                        </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
-                          Profit
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Stok
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Berat (KG)
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Kemasan
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider sticky right-0 bg-gradient-to-r from-blue-600 to-indigo-700">
-                          Aksi
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredBarang.map((item, index) => {
-                        const { profit, percentage } = calculateProfit(
-                          item.hargaBeli,
-                          item.hargaJual,
-                        );
-                        const stokStatus = getStokStatus(
-                          item.stok,
-                          item.jumlahPerKemasan,
-                        );
-
-                        return (
-                          <tr
-                            key={item.id}
-                            className="hover:bg-blue-50 transition-colors group"
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {index + 1}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
-                                  <Package className="w-4 h-4 text-blue-600" />
-                                </div>
-                                <div>
-                                  <div className="text-sm font-bold text-gray-900">
-                                    {item.namaBarang}
-                                  </div>
-                                  <div className="text-xs flex items-center gap-1">
-                                    {item.limitPenjualan > 0 ? (
-                                      <>
-                                        <AlertCircle className="w-3 h-3 text-orange-500" />
-                                        <span className="text-orange-600 font-semibold">
-                                          Limit: {item.limitPenjualan} item
-                                          perhari
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <span className="text-green-600 font-medium">
-                                        ♾️ Unlimited
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <Store className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm text-gray-700 font-medium">
-                                  {item.supplier?.namaSupplier || "-"}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <div className="text-sm font-semibold text-gray-900">
-                                {formatRupiahSimple(item.hargaBeli)}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {formatRupiah(item.hargaBeli)}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <div className="text-sm font-semibold text-blue-600">
-                                {formatRupiahSimple(item.hargaJual)}
-                              </div>
-                              <div className="text-xs text-blue-500">
-                                {formatRupiah(item.hargaJual)}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <div
-                                className={`text-sm font-bold ${getProfitColor(
-                                  profit,
-                                )}`}
-                              >
-                                {formatRupiahSimple(profit)}
-                              </div>
-                              <div
-                                className={`text-xs ${getProfitColor(
-                                  profit,
-                                )} opacity-75`}
-                              >
-                                {getPercentagePrefix(profit)}
-                                {percentage}%
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <span
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${stokStatus.color}`}
-                              >
-                                <span
-                                  className={`w-2 h-2 rounded-full ${stokStatus.badgeColor} mr-2`}
-                                ></span>
-                                {item.stok / item.jumlahPerKemasan}{" "}
-                                {item.jenisKemasan}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <span className="text-sm font-semibold text-gray-700">
-                                {formatGramsToKg(item.berat)} KG
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="text-sm font-bold text-purple-700 bg-purple-100 px-3 py-1 rounded-lg">
-                                  {item.jumlahPerKemasan} pcs
-                                </span>
-                                <span className="text-xs font-semibold text-gray-600">
-                                  per {item.jenisKemasan}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-blue-50 transition-colors">
-                              <div className="flex items-center justify-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    setSelectedBarang(item);
-                                    setShowDetailModal(true);
-                                  }}
-                                  className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
-                                  title="Lihat Detail"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleEdit(item)}
-                                  className="p-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-600 rounded-lg transition-all"
-                                  title="Edit"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleDelete(item.id, item.namaBarang)
-                                  }
-                                  className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
-                                  title="Hapus"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Footer Info */}
-            <div className="mt-8 text-center">
-              <div className="inline-flex items-center gap-3 px-6 py-3 bg-white rounded-full shadow-md border border-gray-100">
-                <Activity className="w-5 h-5 text-blue-600" />
-                <span className="text-sm text-gray-600">
-                  Menampilkan{" "}
-                  <span className="font-bold text-gray-900">
-                    {filteredBarang.length}
-                  </span>{" "}
-                  dari{" "}
-                  <span className="font-bold text-gray-900">
-                    {barangList.length}
-                  </span>{" "}
-                  barang
-                  {debouncedSearchTerm && (
-                    <span className="text-blue-600 font-semibold">
-                      {" "}
-                      (hasil pencarian)
-                    </span>
-                  )}
-                </span>
-              </div>
-            </div>
-          </>
-        ) : view === "chart" ? (
-          <>
-            <div className="mb-6 bg-white rounded-xl p-4 shadow-md border border-gray-100">
-              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-                <div className="flex items-center gap-3">
+        <>
+          {/* Search and Filter Section */}
+          <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Cari nama barang..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                />
+                {searchTerm && (
                   <button
-                    onClick={() => setPenjualanFilterMode("date")}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      penjualanFilterMode === "date"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   >
-                    Tanggal Tertentu
+                    <X className="w-5 h-5" />
                   </button>
-                  <button
-                    onClick={() => setPenjualanFilterMode("range")}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      penjualanFilterMode === "range"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    Rentang Tanggal
-                  </button>
-                </div>
-
-                <div className="flex-1 flex flex-col sm:flex-row gap-3">
-                  {penjualanFilterMode === "date" ? (
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <input
-                        type="date"
-                        value={penjualanDate}
-                        onChange={(e) => setPenjualanDate(e.target.value)}
-                        className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-3">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <input
-                          type="date"
-                          value={penjualanStartDate}
-                          onChange={(e) =>
-                            setPenjualanStartDate(e.target.value)
-                          }
-                          className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                        />
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <input
-                          type="date"
-                          value={penjualanEndDate}
-                          onChange={(e) => setPenjualanEndDate(e.target.value)}
-                          className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  onClick={resetPenjualanFilter}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
-                >
-                  Reset
-                </button>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
-                <Calendar className="w-4 h-4 text-blue-600" />
-                <span>
-                  {penjualanQuery.mode === "date" && penjualanQuery.date
-                    ? `Tanggal: ${penjualanQuery.date}`
-                    : penjualanQuery.mode === "range" &&
-                        (penjualanQuery.startDate || penjualanQuery.endDate)
-                      ? `Rentang: ${penjualanQuery.startDate || "-"} s/d ${
-                          penjualanQuery.endDate || "-"
-                        }`
-                      : "Semua tanggal"}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 shadow-xl border border-gray-200 mb-8 relative overflow-hidden">
-              {/* Decorative background elements */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -z-0"></div>
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -z-0"></div>
-
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                        <BarChart3 className="w-6 h-6 text-white" />
-                      </div>
-                      10 Barang Terlaris
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-1 ml-13">
-                      Analisis performa produk terbaik
-                    </p>
-                  </div>
-                  {data.length > 0 && (
-                    <div className="flex gap-4">
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 px-4 py-2 rounded-xl border border-blue-200">
-                        <p className="text-xs text-blue-600 font-semibold">
-                          Total Produk
-                        </p>
-                        <p className="text-2xl font-bold text-blue-700">
-                          {data.length}
-                        </p>
-                      </div>
-                      <div className="bg-gradient-to-br from-orange-50 to-orange-100 px-4 py-2 rounded-xl border border-orange-200">
-                        <p className="text-xs text-orange-600 font-semibold">
-                          Total Terjual
-                        </p>
-                        <p className="text-2xl font-bold text-orange-700">
-                          {data.reduce(
-                            (sum, item) => sum + item.totalTerjual,
-                            0,
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {loadingChart ? (
-                  <div className="h-96 flex flex-col items-center justify-center">
-                    <div className="relative">
-                      <div className="w-28 h-28 border-8 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-                      <div
-                        className="w-28 h-28 border-8 border-indigo-100 border-b-indigo-600 rounded-full animate-spin absolute top-0 left-0"
-                        style={{
-                          animationDirection: "reverse",
-                          animationDuration: "1.5s",
-                        }}
-                      ></div>
-                      <BarChart3 className="w-12 h-12 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-                    </div>
-                    <p className="text-gray-600 mt-8 text-lg font-semibold animate-pulse">
-                      Memuat data grafik...
-                    </p>
-                    <p className="text-gray-400 text-sm mt-2">
-                      Mohon tunggu sebentar
-                    </p>
-                  </div>
-                ) : data.length === 0 ? (
-                  <div className="h-96 flex flex-col items-center justify-center">
-                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 w-28 h-28 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                      <Package className="w-14 h-14 text-gray-400" />
-                    </div>
-                    <p className="text-gray-700 text-xl font-bold mb-2">
-                      Tidak ada data tersedia
-                    </p>
-                    <p className="text-gray-500 text-sm">
-                      Belum ada transaksi dalam periode ini
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-white/50 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50">
-                    <ResponsiveContainer width="100%" height={450}>
-                      <BarChart
-                        key={animationKey}
-                        data={data}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="#e5e7eb"
-                          opacity={0.5}
-                        />
-                        <XAxis
-                          dataKey="namaBarang"
-                          angle={-45}
-                          textAnchor="end"
-                          height={100}
-                          tick={{
-                            fill: "#374151",
-                            fontSize: 12,
-                            fontWeight: 600,
-                          }}
-                          stroke="#9ca3af"
-                        />
-                        <YAxis
-                          tick={{
-                            fill: "#374151",
-                            fontSize: 12,
-                            fontWeight: 600,
-                          }}
-                          stroke="#9ca3af"
-                        />
-                        <Tooltip
-                          content={<CustomTooltip />}
-                          cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
-                        />
-                        <Legend
-                          wrapperStyle={{ paddingTop: "20px" }}
-                          iconType="circle"
-                          iconSize={12}
-                        />
-                        <Bar
-                          dataKey="totalTerjual"
-                          fill="url(#colorGradient)"
-                          radius={[12, 12, 0, 0]}
-                          name="Total Terjual (pcs)"
-                          animationDuration={1200}
-                          animationEasing="ease-out"
-                        />
-                        <Bar
-                          dataKey="sisaStok"
-                          fill="url(#colorGradientOrange)"
-                          radius={[12, 12, 0, 0]}
-                          name="Sisa Stok (pcs)"
-                          animationDuration={1200}
-                          animationEasing="ease-out"
-                        />
-                        <defs>
-                          <linearGradient
-                            id="colorGradient"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#3b82f6"
-                              stopOpacity={1}
-                            />
-                            <stop
-                              offset="50%"
-                              stopColor="#6366f1"
-                              stopOpacity={0.9}
-                            />
-                            <stop
-                              offset="100%"
-                              stopColor="#8b5cf6"
-                              stopOpacity={0.8}
-                            />
-                          </linearGradient>
-                          <linearGradient
-                            id="colorGradientOrange"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#f97316"
-                              stopOpacity={1}
-                            />
-                            <stop
-                              offset="50%"
-                              stopColor="#fb923c"
-                              stopOpacity={0.9}
-                            />
-                            <stop
-                              offset="100%"
-                              stopColor="#fdba74"
-                              stopOpacity={0.8}
-                            />
-                          </linearGradient>
-
-                          {/* Shadow effects */}
-                          <filter
-                            id="shadow"
-                            x="-50%"
-                            y="-50%"
-                            width="200%"
-                            height="200%"
-                          >
-                            <feDropShadow
-                              dx="0"
-                              dy="4"
-                              stdDeviation="3"
-                              floodColor="#3b82f6"
-                              floodOpacity="0.3"
-                            />
-                          </filter>
-                        </defs>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
                 )}
               </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="mb-6 bg-white rounded-xl p-4 shadow-md border border-gray-100">
-              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setPenjualanFilterMode("date")}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      penjualanFilterMode === "date"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    Tanggal Tertentu
-                  </button>
-                  <button
-                    onClick={() => setPenjualanFilterMode("range")}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      penjualanFilterMode === "range"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    Rentang Tanggal
-                  </button>
-                </div>
 
-                <div className="flex-1 flex flex-col sm:flex-row gap-3">
-                  {penjualanFilterMode === "date" ? (
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <input
-                        type="date"
-                        value={penjualanDate}
-                        onChange={(e) => setPenjualanDate(e.target.value)}
-                        className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-3">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <input
-                          type="date"
-                          value={penjualanStartDate}
-                          onChange={(e) =>
-                            setPenjualanStartDate(e.target.value)
-                          }
-                          className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                        />
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <input
-                          type="date"
-                          value={penjualanEndDate}
-                          onChange={(e) => setPenjualanEndDate(e.target.value)}
-                          className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  onClick={resetPenjualanFilter}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
+              <div className="flex gap-3">
+                <select
+                  value={filterStok}
+                  onChange={(e) => setFilterStok(e.target.value as any)}
+                  className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
                 >
-                  Reset
+                  <option value="all">Semua Stok</option>
+                  <option value="low">Stok Rendah</option>
+                  <option value="medium">Stok Sedang</option>
+                  <option value="high">Stok Aman</option>
+                </select>
+
+                <button className="px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2">
+                  <Filter className="w-5 h-5 text-gray-600" />
+                  <span className="hidden lg:inline text-gray-700 font-medium">
+                    Filter
+                  </span>
                 </button>
               </div>
-
-              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
-                <Calendar className="w-4 h-4 text-blue-600" />
-                <span>
-                  {penjualanQuery.mode === "date" && penjualanQuery.date
-                    ? `Tanggal: ${penjualanQuery.date}`
-                    : penjualanQuery.mode === "range" &&
-                        (penjualanQuery.startDate || penjualanQuery.endDate)
-                      ? `Rentang: ${penjualanQuery.startDate || "-"} s/d ${
-                          penjualanQuery.endDate || "-"
-                        }`
-                      : "Semua tanggal"}
-                </span>
-              </div>
             </div>
 
+            {debouncedSearchTerm && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg">
+                <Search className="w-4 h-4 text-blue-600" />
+                <span>
+                  Menampilkan hasil pencarian untuk:{" "}
+                  <span className="font-semibold text-blue-700">
+                    "{debouncedSearchTerm}"
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Barang Table */}
+          {loading ? (
+            <div className="flex justify-center items-center py-32">
+              <div className="text-center">
+                <div className="relative">
+                  <div className="w-24 h-24 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+                  <Package className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                </div>
+                <p className="text-gray-500 mt-6 text-lg font-medium">
+                  Memuat data barang...
+                </p>
+              </div>
+            </div>
+          ) : filteredBarang.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-16 text-center">
+              <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Package className="w-12 h-12 text-gray-400" />
+              </div>
+              <p className="text-gray-500 text-lg font-medium">
+                {debouncedSearchTerm
+                  ? `Tidak ada barang ditemukan untuk "${debouncedSearchTerm}"`
+                  : "Tidak ada data barang"}
+              </p>
+            </div>
+          ) : (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              {loadingPenjualanBarang ? (
-                <div className="flex justify-center items-center py-24">
-                  <div className="text-center">
-                    <div className="relative">
-                      <div className="w-20 h-20 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-                      <BarChart3 className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-                    </div>
-                    <p className="text-gray-500 mt-6 text-lg font-medium">
-                      Memuat data penjualan barang...
-                    </p>
-                  </div>
-                </div>
-              ) : penjualanBarang.length === 0 ? (
-                <div className="p-16 text-center">
-                  <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <ShoppingBag className="w-12 h-12 text-gray-400" />
-                  </div>
-                  <p className="text-gray-500 text-lg font-medium">
-                    Tidak ada data penjualan pada periode ini
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gradient-to-r from-blue-600 to-indigo-700">
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
-                          No
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
-                          Nama Barang
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Terjual (Kemasan)
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Terjual (PCS)
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Kemasan
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {penjualanBarang.map((row, index) => (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-blue-600 to-indigo-700">
+                      <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        No
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        Nama Barang
+                      </th>
+
+                      <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        Stok
+                      </th>
+                      <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        Berat (KG)
+                      </th>
+                      <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        Kemasan
+                      </th>
+                      <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider sticky right-0 bg-gradient-to-r from-blue-600 to-indigo-700">
+                        Aksi
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredBarang.map((item, index) => {
+                      const stokStatus = getStokStatus(
+                        item.stok,
+                        item.jumlahPerKemasan,
+                      );
+
+                      return (
                         <tr
-                          key={row.barangId}
-                          className="hover:bg-blue-50 transition-colors"
+                          key={item.id}
+                          className="hover:bg-blue-50 transition-colors group"
                         >
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {index + 1}
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
-                              <div className="bg-blue-100 p-2 rounded-lg">
+                              <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
                                 <Package className="w-4 h-4 text-blue-600" />
                               </div>
-                              <div className="text-sm font-semibold text-gray-900">
-                                {row.namaBarang}
+                              <div>
+                                <div className="text-sm font-bold text-gray-900">
+                                  {item.namaBarang}
+                                </div>
+                                <div className="text-xs flex items-center gap-1">
+                                  {item.limitPenjualan > 0 ? (
+                                    <>
+                                      <AlertCircle className="w-3 h-3 text-orange-500" />
+                                      <span className="text-orange-600 font-semibold">
+                                        Limit: {item.limitPenjualan} item
+                                        perhari
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-green-600 font-medium">
+                                      ♾️ Unlimited
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="text-sm font-bold text-indigo-700">
-                              {formatDecimal(row.totalTerjualKemasan)}{" "}
-                              {row.jenisKemasan}
+
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${stokStatus.color}`}
+                            >
+                              <span
+                                className={`w-2 h-2 rounded-full ${stokStatus.badgeColor} mr-2`}
+                              ></span>
+                              {item.stok / item.jumlahPerKemasan}{" "}
+                              {item.jenisKemasan}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
                             <span className="text-sm font-semibold text-gray-700">
-                              {formatNumber(row.totalTerjualPcs)} pcs
+                              {formatGramsToKg(item.berat)} KG
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="text-sm text-gray-700">
-                              {row.jumlahPerKemasan} pcs / {row.jenisKemasan}
-                            </span>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-sm font-bold text-purple-700 bg-purple-100 px-3 py-1 rounded-lg">
+                                {item.jumlahPerKemasan} pcs
+                              </span>
+                              <span className="text-xs font-semibold text-gray-600">
+                                per {item.jenisKemasan}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-blue-50 transition-colors">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setSelectedBarang(item);
+                                  setShowDetailModal(true);
+                                }}
+                                className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
+                                title="Lihat Detail"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {penjualanBarang.length > 0 && (
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">
-                    Total Barang
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900 mt-2">
-                    {penjualanBarang.length}
-                  </p>
-                </div>
-                <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">
-                    Total Terjual (Kemasan)
-                  </p>
-                  <p className="text-2xl font-bold text-indigo-600 mt-2">
-                    {formatDecimal(
-                      penjualanBarang.reduce(
-                        (sum, item) => sum + item.totalTerjualKemasan,
-                        0,
-                      ),
-                    )}
-                  </p>
-                </div>
-                <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">
-                    Total Terjual (PCS)
-                  </p>
-                  <p className="text-2xl font-bold text-blue-600 mt-2">
-                    {formatNumber(
-                      penjualanBarang.reduce(
-                        (sum, item) => sum + item.totalTerjualPcs,
-                        0,
-                      ),
-                    )}
-                  </p>
-                </div>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </>
-        )}
+            </div>
+          )}
+
+          {/* Footer Info */}
+          <div className="mt-8 text-center">
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-white rounded-full shadow-md border border-gray-100">
+              <Activity className="w-5 h-5 text-blue-600" />
+              <span className="text-sm text-gray-600">
+                Menampilkan{" "}
+                <span className="font-bold text-gray-900">
+                  {filteredBarang.length}
+                </span>{" "}
+                dari{" "}
+                <span className="font-bold text-gray-900">
+                  {barangList.length}
+                </span>{" "}
+                barang
+                {debouncedSearchTerm && (
+                  <span className="text-blue-600 font-semibold">
+                    {" "}
+                    (hasil pencarian)
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        </>
 
         {/* Detail Modal */}
         {showDetailModal && selectedBarang && (
@@ -1823,98 +525,6 @@ const DataBarangPage = () => {
                   <p className="text-gray-900 text-2xl font-bold">
                     {selectedBarang.namaBarang}
                   </p>
-                </div>
-
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="bg-white p-2 rounded-lg">
-                      <Store className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider">
-                      Supplier
-                    </p>
-                  </div>
-                  <p className="text-gray-900 text-lg font-semibold pl-11">
-                    {selectedBarang.supplier?.namaSupplier || "-"}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Harga Beli
-                    </p>
-                    <p className="text-gray-900 text-xl font-bold">
-                      {formatRupiah(selectedBarang.hargaBeli)}
-                    </p>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                      Harga Jual
-                    </p>
-                    <p className="text-blue-600 text-xl font-bold">
-                      {formatRupiah(selectedBarang.hargaJual)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 rounded-2xl p-6 border-2 border-blue-200">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-blue-600 p-3 rounded-xl">
-                      <BarChart3 className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800">
-                      Informasi Profit
-                    </h3>
-                  </div>
-
-                  <div className="bg-white rounded-xl p-4 shadow-md">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-semibold text-gray-700">
-                        Profit per Unit
-                      </span>
-                      <div className="text-right">
-                        <span
-                          className={`text-xl font-bold ${getProfitColor(
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual,
-                            ).profit,
-                          )}`}
-                        >
-                          {formatRupiah(
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual,
-                            ).profit,
-                          )}
-                        </span>
-                        <div
-                          className={`text-sm ${getProfitColor(
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual,
-                            ).profit,
-                          )}`}
-                        >
-                          {getPercentagePrefix(
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual,
-                            ).profit,
-                          )}
-                          {
-                            calculateProfit(
-                              selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual,
-                            ).percentage
-                          }
-                          %
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -1982,596 +592,6 @@ const DataBarangPage = () => {
                   Tutup
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add Modal - sama seperti sebelumnya tapi dengan styling yang diperbarui */}
-        {showAddModal && (
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
-            onClick={() => setShowAddModal(false)}
-          >
-            <div
-              className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="sticky top-0 z-10 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-8">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
-                      <Plus className="w-8 h-8 text-white" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-white">
-                      Tambah Barang Baru
-                    </h2>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowAddModal(false);
-                      setSupplierSearch("");
-                      setSelectedSupplierId("");
-                      setSelectedSupplierName("");
-                      setAddFormHargaBeli("");
-                      setAddFormHargaJual("");
-                      setAddFormBerat("");
-                      setShowAddLimitPenjualan(false);
-                      setAddFormLimitPenjualan("0");
-                    }}
-                    className="text-white hover:bg-white/20 p-3 rounded-xl transition-all"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmitAdd} className="p-8">
-                <div className="space-y-5">
-                  <div className="group">
-                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                      <Package className="w-4 h-4 text-blue-600" />
-                      Nama Barang <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="namaBarang"
-                      className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                      placeholder="Masukkan nama barang"
-                      required
-                    />
-                  </div>
-
-                  <div className="group">
-                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                      <Store className="w-4 h-4 text-blue-600" />
-                      Supplier <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={supplierSearch}
-                        onChange={(e) => handleSupplierSearch(e.target.value)}
-                        onFocus={() => {
-                          if (supplierSearch.length >= 3)
-                            setShowSupplierDropdown(true);
-                        }}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Ketik minimal 3 huruf untuk mencari supplier..."
-                        required
-                      />
-                      {showSupplierDropdown && supplierSearch.length >= 3 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
-                          {filteredSuppliersList.length > 0 ? (
-                            filteredSuppliersList.map((supplier) => (
-                              <div
-                                key={supplier.id}
-                                onClick={() => handleSelectSupplier(supplier)}
-                                className="px-5 py-3 hover:bg-blue-50 cursor-pointer transition-colors border-b border-gray-100 last:border-0"
-                              >
-                                <p className="font-semibold text-gray-900">
-                                  {supplier.namaSupplier}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {supplier.alamat}
-                                </p>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="px-5 py-4 text-gray-500 text-sm text-center">
-                              Supplier tidak ditemukan
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {supplierSearch.length > 0 &&
-                        supplierSearch.length < 3 && (
-                          <p className="text-xs text-gray-500 mt-2">
-                            Ketik minimal 3 karakter untuk mencari
-                          </p>
-                        )}
-                      {selectedSupplierName && (
-                        <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-green-50 rounded-lg">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          <p className="text-sm text-green-700 font-semibold">
-                            {selectedSupplierName} dipilih
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <TrendingDown className="w-4 h-4 text-red-600" />
-                        Harga Beli <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="hargaBeli"
-                        value={addFormHargaBeli}
-                        onChange={(e) =>
-                          setAddFormHargaBeli(formatInputRupiah(e.target.value))
-                        }
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Rp 12.000"
-                        required
-                      />
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                        Harga Jual
-                        <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="hargaJual"
-                        value={addFormHargaJual}
-                        onChange={(e) =>
-                          setAddFormHargaJual(formatInputRupiah(e.target.value))
-                        }
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Rp 15.000"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-5">
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Box className="w-4 h-4 text-blue-600" />
-                        Berat (KG) <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="berat"
-                        value={addFormBerat}
-                        onChange={(e) =>
-                          setAddFormBerat(normalizeDecimalInput(e.target.value))
-                        }
-                        inputMode="decimal"
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="1,5"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Package className="w-4 h-4 text-purple-600" />
-                        Jenis Kemasan <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        name="jenisKemasan"
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white group-hover:border-gray-300"
-                        required
-                      >
-                        <option value="">Pilih Jenis Kemasan</option>
-                        <option value="Dus">Dus</option>
-                        <option value="Box">Box</option>
-                        <option value="Karton">Karton</option>
-                        <option value="Pack">Pack</option>
-                        <option value="Lusin">Lusin</option>
-                        <option value="Krat">Krat</option>
-                        <option value="Bal">Bal</option>
-                        <option value="Sak">Sak</option>
-                      </select>
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Box className="w-4 h-4 text-purple-600" />
-                        Jumlah Per Kemasan{" "}
-                        <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        name="jumlahPerKemasan"
-                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="24"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Checkbox untuk Limit Pembelian */}
-                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border-2 border-blue-100">
-                    <input
-                      type="checkbox"
-                      id="showAddLimitPenjualan"
-                      checked={showAddLimitPenjualan}
-                      onChange={(e) =>
-                        setShowAddLimitPenjualan(e.target.checked)
-                      }
-                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                    />
-                    <label
-                      htmlFor="showAddLimitPenjualan"
-                      className="text-sm font-bold text-gray-700 cursor-pointer uppercase tracking-wide"
-                    >
-                      Aktifkan Limit Pembelian
-                    </label>
-                  </div>
-
-                  {/* Limit Pembelian Field - Hidden by default */}
-                  {showAddLimitPenjualan && (
-                    <div className="group animate-in fade-in slide-in-from-top-2 duration-300">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <AlertCircle className="w-4 h-4 text-orange-600" />
-                        Limit Pembelian (dalam unit)
-                      </label>
-                      <input
-                        type="number"
-                        name="limitPenjualan"
-                        value={addFormLimitPenjualan}
-                        onChange={(e) =>
-                          setAddFormLimitPenjualan(e.target.value)
-                        }
-                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Contoh: 100"
-                        min="0"
-                      />
-                      <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
-                        💡 Batasan maksimal unit yang dapat dibeli per
-                        transaksi. Isi 0 atau kosongkan untuk tidak ada batasan.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-8">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddModal(false);
-                      setSupplierSearch("");
-                      setSelectedSupplierId("");
-                      setSelectedSupplierName("");
-                      setAddFormHargaBeli("");
-                      setAddFormHargaJual("");
-                      setAddFormBerat("");
-                      setShowAddLimitPenjualan(false);
-                      setAddFormLimitPenjualan("0");
-                    }}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-4 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-4 rounded-xl transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Menyimpan...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        Simpan Barang
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Modal - similar styling updates */}
-        {showEditModal && editingBarang && (
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
-            onClick={() => setShowEditModal(false)}
-          >
-            <div
-              className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="sticky top-0 z-10 bg-gradient-to-br from-yellow-500 via-yellow-600 to-orange-600 p-8">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
-                      <Edit className="w-8 h-8 text-white" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-white">
-                      Edit Barang
-                    </h2>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowEditModal(false);
-                      setEditSupplierSearch("");
-                      setShowEditSupplierDropdown(false);
-                      setShowEditLimitPenjualan(false);
-                    }}
-                    className="text-white hover:bg-white/20 p-3 rounded-xl transition-all"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmitEdit} className="p-8">
-                <div className="space-y-5">
-                  <div className="group">
-                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                      <Package className="w-4 h-4 text-yellow-600" />
-                      Nama Barang <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="namaBarang"
-                      value={editingBarang.data.namaBarang}
-                      onChange={handleInputChange}
-                      className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                      required
-                    />
-                  </div>
-
-                  <div className="group">
-                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                      <Store className="w-4 h-4 text-yellow-600" />
-                      Supplier <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={editSupplierSearch}
-                        onChange={(e) =>
-                          handleEditSupplierSearch(e.target.value)
-                        }
-                        onFocus={() => {
-                          if (editSupplierSearch.length >= 3)
-                            setShowEditSupplierDropdown(true);
-                        }}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Ketik minimal 3 huruf untuk mencari supplier..."
-                        required
-                      />
-                      {showEditSupplierDropdown &&
-                        editSupplierSearch.length >= 3 && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
-                            {filteredEditSuppliersList.length > 0 ? (
-                              filteredEditSuppliersList.map((supplier) => (
-                                <div
-                                  key={supplier.id}
-                                  onClick={() =>
-                                    handleSelectEditSupplier(supplier)
-                                  }
-                                  className="px-5 py-3 hover:bg-yellow-50 cursor-pointer transition-colors border-b border-gray-100 last:border-0"
-                                >
-                                  <p className="font-semibold text-gray-900">
-                                    {supplier.namaSupplier}
-                                  </p>
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    {supplier.alamat}
-                                  </p>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="px-5 py-4 text-gray-500 text-sm text-center">
-                                Supplier tidak ditemukan
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      {editSupplierSearch.length > 0 &&
-                        editSupplierSearch.length < 3 && (
-                          <p className="text-xs text-gray-500 mt-2">
-                            Ketik minimal 3 karakter untuk mencari
-                          </p>
-                        )}
-                      {editingBarang.data.supplierId &&
-                        editSupplierSearch.length >= 3 && (
-                          <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-green-50 rounded-lg">
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                            <p className="text-sm text-green-700 font-semibold">
-                              Supplier dipilih
-                            </p>
-                          </div>
-                        )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <TrendingDown className="w-4 h-4 text-red-600" />
-                        Harga Beli <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="hargaBeli"
-                        value={editingBarang.data.hargaBeli}
-                        onChange={handleInputChange}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        required
-                      />
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                        Harga Jual <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="hargaJual"
-                        value={editingBarang.data.hargaJual}
-                        onChange={handleInputChange}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-5">
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Box className="w-4 h-4 text-yellow-600" />
-                        Berat (KG) <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="berat"
-                        value={editingBarang.data.berat}
-                        onChange={handleInputChange}
-                        inputMode="decimal"
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Package className="w-4 h-4 text-yellow-600" />
-                        Jenis Kemasan <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        name="jenisKemasan"
-                        value={editingBarang.data.jenisKemasan}
-                        onChange={handleInputChange}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-white group-hover:border-gray-300"
-                        required
-                      >
-                        <option value="">Pilih Jenis Kemasan</option>
-                        <option value="Dus">Dus</option>
-                        <option value="Box">Box</option>
-                        <option value="Karton">Karton</option>
-                        <option value="Pack">Pack</option>
-                        <option value="Lusin">Lusin</option>
-                        <option value="Krat">Krat</option>
-                        <option value="Bal">Bal</option>
-                        <option value="Sak">Sak</option>
-                      </select>
-                    </div>
-
-                    <div className="group">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <Box className="w-4 h-4 text-yellow-600" />
-                        Jumlah Per Kemasan{" "}
-                        <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        name="jumlahPerKemasan"
-                        value={editingBarang.data.jumlahPerKemasan}
-                        onChange={handleInputChange}
-                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Checkbox untuk Limit Pembelian */}
-                  <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-100">
-                    <input
-                      type="checkbox"
-                      id="showEditLimitPenjualan"
-                      checked={showEditLimitPenjualan}
-                      onChange={(e) =>
-                        setShowEditLimitPenjualan(e.target.checked)
-                      }
-                      className="w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500 cursor-pointer"
-                    />
-                    <label
-                      htmlFor="showEditLimitPenjualan"
-                      className="text-sm font-bold text-gray-700 cursor-pointer uppercase tracking-wide"
-                    >
-                      Aktifkan Limit Pembelian
-                    </label>
-                  </div>
-
-                  {/* Limit Pembelian Field - Hidden by default */}
-                  {showEditLimitPenjualan && (
-                    <div className="group animate-in fade-in slide-in-from-top-2 duration-300">
-                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                        <AlertCircle className="w-4 h-4 text-orange-600" />
-                        Limit Pembelian (dalam unit)
-                      </label>
-                      <input
-                        type="number"
-                        name="limitPenjualan"
-                        value={editingBarang.data.limitPenjualan}
-                        onChange={handleInputChange}
-                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                        className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all group-hover:border-gray-300"
-                        placeholder="Contoh: 100"
-                        min="0"
-                      />
-                      <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
-                        💡 Batasan maksimal unit yang dapat dibeli per
-                        transaksi. Isi 0 atau kosongkan untuk tidak ada batasan.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-8">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditModal(false);
-                      setEditSupplierSearch("");
-                      setShowEditSupplierDropdown(false);
-                      setShowEditLimitPenjualan(false);
-                    }}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-4 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-6 py-4 rounded-xl transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Menyimpan...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        Update Barang
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         )}

@@ -263,7 +263,7 @@ const kasirNavLinks = [
 const kepalaGudangNavLinks = [
   {
     label: "Barang",
-    href: "/dashboard/kepala_gudang/barang",
+    href: "/dashboard/kepala_gudang",
     icon: <Package className="w-5 h-5" />,
   },
   {

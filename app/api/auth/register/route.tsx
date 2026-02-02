@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     }
 
     // ✅ Validasi role (opsional, default KASIR)
-    const validRoles = ["ADMIN", "KASIR"];
+    const validRoles = ["ADMIN", "KASIR", "KEPALA_GUDANG"];
     const userRole = role && validRoles.includes(role) ? role : "KASIR";
 
     // 🔍 Cek apakah username sudah digunakan
