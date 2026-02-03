@@ -34,6 +34,7 @@ import {
   BarChart3,
   SquareArrowOutUpRight,
   SquareArrowOutDownRight,
+  ClipboardPen,
 } from "lucide-react";
 
 // Menu untuk Admin
@@ -69,6 +70,11 @@ const adminMasterDataLinks = [
       {
         label: "Karyawan",
         href: "/dashboard/admin/karyawan",
+        icon: <Truck className="w-4 h-4" />,
+      },
+      {
+        label: "Absensi Karyawan",
+        href: "/dashboard/admin/absen",
         icon: <Truck className="w-4 h-4" />,
       },
       {
@@ -298,6 +304,11 @@ const kasirMasterDataLinks = [
         label: "Customer",
         href: "/dashboard/kasir/customer",
         icon: <UserCheck className="w-4 h-4" />,
+      },
+      {
+        label: "Absensi Karyawan",
+        href: "/dashboard/kasir/absen",
+        icon: <ClipboardPen className="w-4 h-4" />,
       },
     ],
   },

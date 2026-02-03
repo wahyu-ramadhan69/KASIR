@@ -72,6 +72,7 @@ model Karyawan {
   perjalananSales           PerjalananSales[]
   pinjamanKaryawan          PinjamanKaryawan[]
   pembayaranHutangKaryawan  PembayaranHutangKaryawan[]
+  absensi Absensi[]
   isActive                  Boolean           @default(true)
 }
 
@@ -281,6 +282,25 @@ model PengembalianBarang {
   @@index([barangId])
 }
 
+model Absensi {
+  id          Int           @id @default(autoincrement())
+  karyawanId  Int
+  tanggal     DateTime
+  jamMasuk    DateTime?
+  jamKeluar   DateTime?
+  status      StatusAbsensi @default(HADIR)
+  catatan     String?
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  karyawan    Karyawan      @relation(fields: [karyawanId], references: [id])
+
+  @@unique([karyawanId, tanggal])
+  @@index([tanggal])
+  @@index([karyawanId])
+}
+
 enum MetodePembayaran {
   CASH
   TRANSFER
@@ -309,6 +329,7 @@ enum JenisKaryawan {
   SALES
   KARYAWAN
   KEPALA_GUDANG
+  OWNER
 }
 
 enum StatusPerjalanan {     
@@ -329,4 +350,12 @@ enum JenisPengeluaran {
   MINGGUAN
   BULANAN
   TAHUNAN
+}
+
+enum StatusAbsensi {
+  HADIR
+  IZIN
+  SAKIT
+  ALPHA
+  LIBUR
 }

@@ -52,8 +52,18 @@ interface KaryawanFormData {
   totalPinjaman: string;
 }
 
+interface EstimasiGajiItem {
+  karyawan: {
+    id: number;
+  };
+  gajiProrate: number;
+}
+
 const DataKaryawanPage = () => {
   const [karyawanList, setKaryawanList] = useState<Karyawan[]>([]);
+  const [estimasiGajiMap, setEstimasiGajiMap] = useState<
+    Record<number, number>
+  >({});
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -81,8 +91,12 @@ const DataKaryawanPage = () => {
     tunjanganMakan: "",
     totalPinjaman: "",
   });
+  const currentMonthLabel = new Intl.DateTimeFormat("id-ID", {
+    month: "long",
+  }).format(new Date());
 
   const observerTarget = useRef<HTMLDivElement>(null);
+  const hasMountedRef = useRef<boolean>(false);
 
   useEffect(() => {
     fetchKaryawan(true);
@@ -119,6 +133,29 @@ const DataKaryawanPage = () => {
         setKaryawanList((prev) => [...prev, ...data.data]);
       }
 
+      if (reset && Array.isArray(data.data)) {
+        const now = new Date();
+        const month = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(
+          2,
+          "0"
+        )}`;
+        try {
+          const salaryRes = await fetch(
+            `/api/karyawan/absensi/gaji?month=${month}`
+          );
+          const salaryData = await salaryRes.json();
+          if (salaryRes.ok && Array.isArray(salaryData.data)) {
+            const map: Record<number, number> = {};
+            for (const item of salaryData.data as EstimasiGajiItem[]) {
+              map[item.karyawan.id] = item.gajiProrate ?? 0;
+            }
+            setEstimasiGajiMap(map);
+          }
+        } catch (salaryError) {
+          console.error("Error fetching estimasi gaji:", salaryError);
+        }
+      }
+
       setNextCursor(data.nextCursor ?? null);
       setHasMore(data.nextCursor !== null);
     } catch (error) {
@@ -136,6 +173,12 @@ const DataKaryawanPage = () => {
   };
 
   useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    if (!searchTerm.trim()) return;
+
     const timer = setTimeout(() => {
       setKaryawanList([]);
       setNextCursor(null);
@@ -437,6 +480,18 @@ const DataKaryawanPage = () => {
     );
   };
 
+  const getEstimasiBreakdown = (karyawan: Karyawan) => {
+    const totalBulanan = karyawan.gajiPokok + karyawan.tunjanganMakan;
+    const totalEstimasi = estimasiGajiMap[karyawan.id] ?? 0;
+    if (totalBulanan <= 0 || totalEstimasi <= 0) {
+      return { pokok: 0, tunjangan: 0, total: totalEstimasi };
+    }
+    const ratio = Math.max(0, Math.min(1, totalEstimasi / totalBulanan));
+    const pokok = Math.round(karyawan.gajiPokok * ratio);
+    const tunjangan = Math.max(0, totalEstimasi - pokok);
+    return { pokok, tunjangan, total: totalEstimasi };
+  };
+
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="w-full px-6 pb-8">
@@ -637,6 +692,9 @@ const DataKaryawanPage = () => {
                           <SortIcon field="gajiPokok" />
                         </button>
                       </th>
+                      <th className="px-6 py-4 text-left font-bold uppercase text-sm tracking-wide">
+                        Estimasi Gaji
+                      </th>
                       <th className="px-6 py-4 text-center font-bold uppercase text-sm tracking-wide">
                         Aksi
                       </th>
@@ -693,6 +751,14 @@ const DataKaryawanPage = () => {
                               + {formatRupiah(karyawan.tunjanganMakan)}
                             </p>
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-blue-600">
+                            {formatRupiah(estimasiGajiMap[karyawan.id] ?? 0)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Bulan: {currentMonthLabel}
+                          </p>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
@@ -880,6 +946,34 @@ const DataKaryawanPage = () => {
                       <p className="text-2xl font-bold text-green-600">
                         {formatRupiah(selectedKaryawan.tunjanganMakan)}
                       </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-3">
+                      Estimasi Gaji Bulan Ini (Prorate)
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white rounded-xl p-4 shadow-md">
+                        <p className="text-xs text-gray-500 font-semibold uppercase mb-2">
+                          Estimasi Gaji Pokok
+                        </p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {formatRupiah(
+                            getEstimasiBreakdown(selectedKaryawan).pokok
+                          )}
+                        </p>
+                      </div>
+                      <div className="bg-white rounded-xl p-4 shadow-md">
+                        <p className="text-xs text-gray-500 font-semibold uppercase mb-2">
+                          Estimasi Tunjangan
+                        </p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {formatRupiah(
+                            getEstimasiBreakdown(selectedKaryawan).tunjangan
+                          )}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
