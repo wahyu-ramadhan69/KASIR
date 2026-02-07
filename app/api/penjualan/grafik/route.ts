@@ -108,6 +108,7 @@ export async function GET(request: Request) {
           },
           penjualan: {
             statusTransaksi: "SELESAI",
+            isDeleted: false,
           },
           jenisPembayaran: "PENJUALAN",
           ...(shouldFilterByUser ? { userId } : {}),
@@ -131,6 +132,7 @@ export async function GET(request: Request) {
           },
           penjualan: {
             statusTransaksi: "SELESAI",
+            isDeleted: false,
           },
           jenisPembayaran: "PIUTANG",
           ...(shouldFilterByUser ? { userId } : {}),
@@ -153,6 +155,7 @@ export async function GET(request: Request) {
           },
           statusTransaksi: "SELESAI",
           statusPembayaran: "HUTANG",
+          isDeleted: false,
           ...(shouldFilterByUser ? { userId } : {}),
         },
         select: {
@@ -177,6 +180,7 @@ export async function GET(request: Request) {
             lte: today,
           },
           statusTransaksi: "SELESAI",
+          isDeleted: false,
           ...(shouldFilterByUser ? { userId } : {}),
         },
         select: {
@@ -197,6 +201,7 @@ export async function GET(request: Request) {
           },
           penjualan: {
             statusTransaksi: "SELESAI",
+            isDeleted: false,
           },
           jenisPembayaran: "PENJUALAN",
           ...(shouldFilterByUser ? { userId } : {}),
@@ -218,6 +223,9 @@ export async function GET(request: Request) {
             lte: today,
           },
           jenisPembayaran: "PIUTANG",
+          penjualan: {
+            isDeleted: false,
+          },
           ...(shouldFilterByUser ? { userId } : {}),
         },
         select: {
@@ -238,6 +246,7 @@ export async function GET(request: Request) {
           },
           statusTransaksi: "SELESAI",
           statusPembayaran: "HUTANG",
+          isDeleted: false,
           ...(shouldFilterByUser ? { userId } : {}),
         },
         select: {
@@ -295,6 +304,7 @@ export async function GET(request: Request) {
             lte: today,
           },
           statusTransaksi: "SELESAI",
+          isDeleted: false,
           ...(shouldFilterByUser ? { userId } : {}),
         },
       },

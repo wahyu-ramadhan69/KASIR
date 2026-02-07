@@ -62,7 +62,7 @@ const AbsenDetailPage = () => {
         return;
       }
       const res = await fetch(
-        `/api/karyawan/absensi/bulanan?month=${selectedMonth}&karyawanId=${karyawanId}`
+        `/api/karyawan/absensi/bulanan?month=${selectedMonth}&karyawanId=${karyawanId}`,
       );
       const data = await res.json();
       if (!res.ok || !Array.isArray(data.data)) {
@@ -238,9 +238,7 @@ const AbsenDetailPage = () => {
                   </p>
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <CreditCard className="w-4 h-4 text-gray-400" />
-                    <span className="font-mono">
-                      {karyawan?.nik ?? "-"}
-                    </span>
+                    <span className="font-mono">{karyawan?.nik ?? "-"}</span>
                     {karyawan?.jenis && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
                         <Briefcase className="w-3 h-3" />
@@ -336,65 +334,64 @@ const AbsenDetailPage = () => {
                         key={date.toISOString()}
                         className="hover:bg-blue-50 transition-colors"
                       >
+                        <td className="px-6 py-4">{formatDayLabel(date)}</td>
                         <td className="px-6 py-4">
-                          {formatDayLabel(date)}
-                        </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md">
-                            {(data?.karyawan.nama ?? karyawan?.nama ?? "K")
-                              .charAt(0)
-                              .toUpperCase()}
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md">
+                              {(data?.karyawan.nama ?? karyawan?.nama ?? "K")
+                                .charAt(0)
+                                .toUpperCase()}
+                            </div>
+                            <span className="font-semibold text-gray-900">
+                              {data?.karyawan.nama ?? karyawan?.nama ?? "-"}
+                            </span>
                           </div>
-                          <span className="font-semibold text-gray-900">
-                            {data?.karyawan.nama ?? karyawan?.nama ?? "-"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-gray-400" />
+                            <span className="font-mono text-sm text-gray-700">
+                              {data?.karyawan.nik ?? karyawan?.nik ?? "-"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
+                              (data?.karyawan.jenis ?? karyawan?.jenis) ===
+                              "KASIR"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}
+                          >
+                            <Briefcase className="w-3 h-3" />
+                            {data?.karyawan.jenis ?? karyawan?.jenis ?? "-"}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-gray-400" />
-                          <span className="font-mono text-sm text-gray-700">
-                            {data?.karyawan.nik ?? karyawan?.nik ?? "-"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-green-700 font-semibold">
+                            <LogIn className="w-4 h-4" />
+                            {data ? formatTime(data.jamMasuk) : "-"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-orange-700 font-semibold">
+                            <LogOut className="w-4 h-4" />
+                            {data ? formatTime(data.jamKeluar) : "-"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-gray-700">
+                            {data
+                              ? formatDuration(data.jamMasuk, data.jamKeluar)
+                              : "-"}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
-                            (data?.karyawan.jenis ?? karyawan?.jenis) === "KASIR"
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`}
-                        >
-                          <Briefcase className="w-3 h-3" />
-                          {data?.karyawan.jenis ?? karyawan?.jenis ?? "-"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-green-700 font-semibold">
-                          <LogIn className="w-4 h-4" />
-                          {data ? formatTime(data.jamMasuk) : "-"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-orange-700 font-semibold">
-                          <LogOut className="w-4 h-4" />
-                          {data ? formatTime(data.jamKeluar) : "-"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-gray-700">
-                          {data
-                            ? formatDuration(data.jamMasuk, data.jamKeluar)
-                            : "-"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-semibold text-gray-700">
-                          {data?.status ?? (isSunday ? "LIBUR" : "-")}
-                        </span>
-                      </td>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-semibold text-gray-700">
+                            {data?.status ?? (isSunday ? "LIBUR" : "-")}
+                          </span>
+                        </td>
                       </tr>
                     );
                   })}

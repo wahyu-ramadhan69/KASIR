@@ -59,6 +59,33 @@ export async function PATCH(_req: NextRequest, { params }: RouteCtx) {
         }
       }
 
+      if (existing.statusPembayaran === "HUTANG" && existing.customerId) {
+        const totalHarga = BigInt(existing.totalHarga || 0);
+        const jumlahDibayar = BigInt(existing.jumlahDibayar || 0);
+        const sisaHutang =
+          totalHarga > jumlahDibayar ? totalHarga - jumlahDibayar : BigInt(0);
+
+        if (sisaHutang > BigInt(0)) {
+          const customer = await tx.customer.findUnique({
+            where: { id: existing.customerId },
+            select: { piutang: true },
+          });
+
+          if (customer) {
+            const currentPiutang = BigInt(customer.piutang || 0);
+            const nextPiutang =
+              currentPiutang > sisaHutang
+                ? currentPiutang - sisaHutang
+                : BigInt(0);
+
+            await tx.customer.update({
+              where: { id: existing.customerId },
+              data: { piutang: nextPiutang },
+            });
+          }
+        }
+      }
+
       await tx.penjualanHeader.update({
         where: { id: penjualanId },
         data: { isDeleted: true },

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import Image from "next/image";
 
 export default function LoginPage() {
+  const toastDuration = 3000;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,9 @@ export default function LoginPage() {
 
       if (res.ok) {
         if (data?.twoFARequired) {
-          toast.success("Masukkan kode OTP dari Authenticator");
+          toast.success("Masukkan kode OTP dari Authenticator", {
+            duration: toastDuration,
+          });
           setIsTwoFA(true);
           setCode("");
         } else {
@@ -52,10 +55,12 @@ export default function LoginPage() {
           setPassword("");
         }
       } else {
-        toast.error(data?.error || "Terjadi kesalahan login");
+        toast.error(data?.error || "Terjadi kesalahan login", {
+          duration: toastDuration,
+        });
       }
     } catch (err) {
-      toast.error("Gagal menghubungi server");
+      toast.error("Gagal menghubungi server", { duration: toastDuration });
     } finally {
       setLoading(false);
     }
@@ -77,10 +82,12 @@ export default function LoginPage() {
       if (res.ok) {
         router.push(getRedirectPath(data?.user?.role));
       } else {
-        toast.error(data?.error || "Kode OTP salah");
+        toast.error(data?.error || "Kode OTP salah", {
+          duration: toastDuration,
+        });
       }
     } catch {
-      toast.error("Gagal menghubungi server");
+      toast.error("Gagal menghubungi server", { duration: toastDuration });
     } finally {
       setVerifying(false);
     }
@@ -88,6 +95,7 @@ export default function LoginPage() {
 
   return (
     <div className="lg:flex bg-white">
+      <Toaster position="top-right" />
       <div className="lg:w-1/2 xl:max-w-screen-sm">
         <div className="py-12 bg-white lg:bg-white flex justify-center lg:justify-start lg:px-12">
           <div className="cursor-pointer flex items-center">

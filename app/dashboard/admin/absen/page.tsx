@@ -83,7 +83,7 @@ const AbsenKaryawanPage = () => {
     }
 
     try {
-      let url = `/api/karyawan?limit=20`;
+      let url = `/api/karyawan?limit=20&excludeJenis=OWNER`;
 
       if (!reset && nextCursor) {
         url += `&cursor=${nextCursor}`;

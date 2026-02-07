@@ -57,7 +57,14 @@ function parseTimeOnDate(
   if (Number.isNaN(parsed.getTime())) {
     return undefined as unknown as Date | null;
   }
-  return parsed;
+  const normalized = new Date(tanggal);
+  normalized.setHours(
+    parsed.getHours(),
+    parsed.getMinutes(),
+    parsed.getSeconds(),
+    parsed.getMilliseconds()
+  );
+  return normalized;
 }
 
 export async function GET(request: NextRequest) {

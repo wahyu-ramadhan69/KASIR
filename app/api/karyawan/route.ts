@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const cursor = searchParams.get("cursor");
     const limit = parseInt(searchParams.get("limit") || "10");
     const search = searchParams.get("search") || "";
+    const excludeJenisParam = searchParams.get("excludeJenis");
 
     const where: any = {
       isActive: true,
@@ -25,6 +26,16 @@ export async function GET(request: NextRequest) {
         { nama: { contains: search, mode: "insensitive" } },
         { nik: { contains: search, mode: "insensitive" } },
       ];
+    }
+
+    if (excludeJenisParam) {
+      const excludeJenis = excludeJenisParam
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (excludeJenis.length > 0) {
+        where.jenis = { notIn: excludeJenis };
+      }
     }
 
     const karyawan = await prisma.karyawan.findMany({

@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Building2,
   CreditCard,
+  Printer,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -59,9 +60,33 @@ interface EstimasiGajiItem {
   gajiProrate: number;
 }
 
+interface PembayaranGajiItem {
+  id: number;
+  karyawanId: number;
+  nominal: number;
+  periode: string;
+  bulan: string;
+  minggu: number | null;
+}
+
 const DataKaryawanPage = () => {
   const [karyawanList, setKaryawanList] = useState<Karyawan[]>([]);
   const [estimasiGajiMap, setEstimasiGajiMap] = useState<
+    Record<number, number>
+  >({});
+  const [estimasiMingguanMap, setEstimasiMingguanMap] = useState<
+    Record<number, number>
+  >({});
+  const [pembayaranBulananMap, setPembayaranBulananMap] = useState<
+    Record<number, PembayaranGajiItem>
+  >({});
+  const [pembayaranMingguanMap, setPembayaranMingguanMap] = useState<
+    Record<number, PembayaranGajiItem>
+  >({});
+  const [pembayaranMingguanAllMap, setPembayaranMingguanAllMap] = useState<
+    Record<number, PembayaranGajiItem[]>
+  >({});
+  const [pembayaranMingguanTotalMap, setPembayaranMingguanTotalMap] = useState<
     Record<number, number>
   >({});
   const [loading, setLoading] = useState<boolean>(true);
@@ -81,6 +106,13 @@ const DataKaryawanPage = () => {
     id: number;
     data: KaryawanFormData;
   } | null>(null);
+  const [showSlipModal, setShowSlipModal] = useState<boolean>(false);
+  const [slipKaryawan, setSlipKaryawan] = useState<Karyawan | null>(null);
+  const [showPayModal, setShowPayModal] = useState<boolean>(false);
+  const [payKaryawan, setPayKaryawan] = useState<Karyawan | null>(null);
+  const [payPeriod, setPayPeriod] = useState<"BULANAN" | "MINGGUAN">("BULANAN");
+  const [payNominal, setPayNominal] = useState<string>("");
+  const [payNote, setPayNote] = useState<string>("");
   const [formData, setFormData] = useState<KaryawanFormData>({
     nama: "",
     nik: "",
@@ -91,9 +123,30 @@ const DataKaryawanPage = () => {
     tunjanganMakan: "",
     totalPinjaman: "",
   });
+  const now = new Date();
+  const currentMonthValue = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthValue);
+  const [selectedWeek, setSelectedWeek] = useState<number>(() => {
+    const day = now.getDate();
+    return Math.min(5, Math.max(1, Math.ceil(day / 7)));
+  });
+  const maxWeek = (() => {
+    const [yearStr, monthStr] = selectedMonth.split("-");
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    if (!year || !month) return 4;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    let count = 0;
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month - 1, day);
+      if (date.getDay() === 6) count += 1; // Saturday
+    }
+    return Math.max(1, count);
+  })();
   const currentMonthLabel = new Intl.DateTimeFormat("id-ID", {
     month: "long",
-  }).format(new Date());
+  }).format(new Date(`${selectedMonth}-01T00:00:00`));
+  const currentWeekLabel = `Minggu ke-${selectedWeek}`;
 
   const observerTarget = useRef<HTMLDivElement>(null);
   const hasMountedRef = useRef<boolean>(false);
@@ -101,6 +154,16 @@ const DataKaryawanPage = () => {
   useEffect(() => {
     fetchKaryawan(true);
   }, []);
+
+  useEffect(() => {
+    if (selectedWeek > maxWeek) {
+      setSelectedWeek(maxWeek);
+      return;
+    }
+    setKaryawanList([]);
+    setNextCursor(null);
+    fetchKaryawan(true);
+  }, [selectedMonth, selectedWeek]);
 
   const fetchKaryawan = async (reset: boolean = false) => {
     if (reset) {
@@ -134,14 +197,9 @@ const DataKaryawanPage = () => {
       }
 
       if (reset && Array.isArray(data.data)) {
-        const now = new Date();
-        const month = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(
-          2,
-          "0"
-        )}`;
         try {
           const salaryRes = await fetch(
-            `/api/karyawan/absensi/gaji?month=${month}`
+            `/api/karyawan/absensi/gaji?month=${selectedMonth}`
           );
           const salaryData = await salaryRes.json();
           if (salaryRes.ok && Array.isArray(salaryData.data)) {
@@ -150,6 +208,68 @@ const DataKaryawanPage = () => {
               map[item.karyawan.id] = item.gajiProrate ?? 0;
             }
             setEstimasiGajiMap(map);
+          }
+
+          const weeklyRes = await fetch(
+            `/api/karyawan/absensi/gaji?period=weekly&month=${selectedMonth}&week=${selectedWeek}`
+          );
+          const weeklyData = await weeklyRes.json();
+          if (weeklyRes.ok && Array.isArray(weeklyData.data)) {
+            const map: Record<number, number> = {};
+            for (const item of weeklyData.data as EstimasiGajiItem[]) {
+              map[item.karyawan.id] = item.gajiProrate ?? 0;
+            }
+            setEstimasiMingguanMap(map);
+          }
+
+          const pembayaranBulananRes = await fetch(
+            `/api/penggajian?period=BULANAN&month=${selectedMonth}`
+          );
+          const pembayaranBulananData = await pembayaranBulananRes.json();
+          if (
+            pembayaranBulananRes.ok &&
+            Array.isArray(pembayaranBulananData.data)
+          ) {
+            const map: Record<number, PembayaranGajiItem> = {};
+            for (const item of pembayaranBulananData.data as PembayaranGajiItem[]) {
+              map[item.karyawanId] = item;
+            }
+            setPembayaranBulananMap(map);
+          }
+
+          const pembayaranMingguanRes = await fetch(
+            `/api/penggajian?period=MINGGUAN&month=${selectedMonth}&week=${selectedWeek}`
+          );
+          const pembayaranMingguanData = await pembayaranMingguanRes.json();
+          if (
+            pembayaranMingguanRes.ok &&
+            Array.isArray(pembayaranMingguanData.data)
+          ) {
+            const map: Record<number, PembayaranGajiItem> = {};
+            for (const item of pembayaranMingguanData.data as PembayaranGajiItem[]) {
+              map[item.karyawanId] = item;
+            }
+            setPembayaranMingguanMap(map);
+          }
+
+          const pembayaranMingguanAllRes = await fetch(
+            `/api/penggajian?period=MINGGUAN&month=${selectedMonth}`
+          );
+          const pembayaranMingguanAllData = await pembayaranMingguanAllRes.json();
+          if (
+            pembayaranMingguanAllRes.ok &&
+            Array.isArray(pembayaranMingguanAllData.data)
+          ) {
+            const map: Record<number, PembayaranGajiItem[]> = {};
+            const totalMap: Record<number, number> = {};
+            for (const item of pembayaranMingguanAllData.data as PembayaranGajiItem[]) {
+              if (!map[item.karyawanId]) map[item.karyawanId] = [];
+              map[item.karyawanId].push(item);
+              totalMap[item.karyawanId] =
+                (totalMap[item.karyawanId] ?? 0) + (item.nominal ?? 0);
+            }
+            setPembayaranMingguanAllMap(map);
+            setPembayaranMingguanTotalMap(totalMap);
           }
         } catch (salaryError) {
           console.error("Error fetching estimasi gaji:", salaryError);
@@ -424,6 +544,69 @@ const DataKaryawanPage = () => {
     fetchKaryawan(true);
   };
 
+  const openPayModal = (karyawan: Karyawan) => {
+    setPayKaryawan(karyawan);
+    setPayPeriod("BULANAN");
+    const defaultNominal = estimasiGajiMap[karyawan.id] ?? 0;
+    setPayNominal(defaultNominal ? defaultNominal.toString() : "");
+    setPayNote("");
+    setShowPayModal(true);
+  };
+
+  const closePayModal = () => {
+    setShowPayModal(false);
+    setPayKaryawan(null);
+  };
+
+  const handlePaySubmit = async () => {
+    if (!payKaryawan) return;
+    const nominalValue = Number(payNominal.replace(/[^0-9]/g, ""));
+    if (!nominalValue || nominalValue <= 0) {
+      toast.error("Nominal pembayaran tidak valid");
+      return;
+    }
+
+    const payload: any = {
+      karyawanId: payKaryawan.id,
+      periode: payPeriod,
+      bulan: selectedMonth,
+      nominal: nominalValue,
+      catatan: payNote || null,
+    };
+    if (payPeriod === "MINGGUAN") {
+      payload.minggu = selectedWeek;
+    }
+
+    try {
+      const res = await fetch("/api/penggajian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Pembayaran gaji berhasil disimpan");
+        closePayModal();
+        fetchKaryawan(true);
+      } else {
+        toast.error(data.error || "Gagal menyimpan pembayaran gaji");
+      }
+    } catch (error) {
+      console.error("Error saving pembayaran gaji:", error);
+      toast.error("Terjadi kesalahan saat menyimpan pembayaran");
+    }
+  };
+
+  const openSlipModal = (karyawan: Karyawan) => {
+    setSlipKaryawan(karyawan);
+    setShowSlipModal(true);
+  };
+
+  const closeSlipModal = () => {
+    setShowSlipModal(false);
+    setSlipKaryawan(null);
+  };
+
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("id-ID", {
@@ -622,6 +805,30 @@ const DataKaryawanPage = () => {
                 </button>
               )}
             </div>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+              <select
+                value={selectedWeek}
+                onChange={(e) => setSelectedWeek(Number(e.target.value))}
+                className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+              >
+                {Array.from({ length: maxWeek }, (_, i) => i + 1).map(
+                  (week) => (
+                    <option key={week} value={week}>
+                      Minggu {week}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -695,6 +902,9 @@ const DataKaryawanPage = () => {
                       <th className="px-6 py-4 text-left font-bold uppercase text-sm tracking-wide">
                         Estimasi Gaji
                       </th>
+                      <th className="px-6 py-4 text-left font-bold uppercase text-sm tracking-wide">
+                        Estimasi Mingguan
+                      </th>
                       <th className="px-6 py-4 text-center font-bold uppercase text-sm tracking-wide">
                         Aksi
                       </th>
@@ -753,11 +963,85 @@ const DataKaryawanPage = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <p className="font-bold text-blue-600">
-                            {formatRupiah(estimasiGajiMap[karyawan.id] ?? 0)}
-                          </p>
+                          {(() => {
+                            const weeks =
+                              pembayaranMingguanAllMap[karyawan.id]
+                                ?.map((item) => item.minggu)
+                                .filter(
+                                  (v): v is number => typeof v === "number"
+                                ) ?? [];
+                            const uniqueWeeks = new Set(weeks);
+                            const allWeeksPaid =
+                              maxWeek > 0 &&
+                              Array.from({ length: maxWeek }, (_, i) => i + 1)
+                                .every((week) => uniqueWeeks.has(week));
+                            const hasMonthly = Boolean(
+                              pembayaranBulananMap[karyawan.id]
+                            );
+                            const weeklyPaidTotal =
+                              pembayaranMingguanTotalMap[karyawan.id] ?? 0;
+                            const estimasiBulanan =
+                              estimasiGajiMap[karyawan.id] ?? 0;
+                            const estimasiDisplay = allWeeksPaid || hasMonthly
+                              ? estimasiBulanan
+                              : Math.max(0, estimasiBulanan - weeklyPaidTotal);
+                            return (
+                              <p className="font-bold text-blue-600">
+                                {formatRupiah(estimasiDisplay)}
+                              </p>
+                            );
+                          })()}
                           <p className="text-xs text-gray-500">
                             Bulan: {currentMonthLabel}
+                          </p>
+                          {(() => {
+                            const weeks =
+                              pembayaranMingguanAllMap[karyawan.id]
+                                ?.map((item) => item.minggu)
+                                .filter(
+                                  (v): v is number => typeof v === "number"
+                                ) ?? [];
+                            const uniqueWeeks = new Set(weeks);
+                            const allWeeksPaid =
+                              maxWeek > 0 &&
+                              Array.from({ length: maxWeek }, (_, i) => i + 1)
+                                .every((week) => uniqueWeeks.has(week));
+                            const hasMonthly = Boolean(
+                              pembayaranBulananMap[karyawan.id]
+                            );
+                            const paid =
+                              hasMonthly ||
+                              allWeeksPaid;
+                            return (
+                              <p
+                                className={`text-xs font-semibold mt-1 ${
+                                  paid ? "text-green-600" : "text-orange-600"
+                                }`}
+                              >
+                                {paid ? "Sudah dibayar" : "Belum dibayar"}
+                              </p>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-indigo-600">
+                            {formatRupiah(estimasiMingguanMap[karyawan.id] ?? 0)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Minggu: {currentWeekLabel}
+                          </p>
+                          <p
+                            className={`text-xs font-semibold mt-1 ${
+                              pembayaranMingguanMap[karyawan.id] ||
+                              pembayaranBulananMap[karyawan.id]
+                                ? "text-green-600"
+                                : "text-orange-600"
+                            }`}
+                          >
+                            {pembayaranMingguanMap[karyawan.id] ||
+                            pembayaranBulananMap[karyawan.id]
+                              ? "Sudah dibayar"
+                              : "Belum dibayar"}
                           </p>
                         </td>
                         <td className="px-6 py-4">
@@ -768,6 +1052,20 @@ const DataKaryawanPage = () => {
                               title="Lihat Detail"
                             >
                               <Eye className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                            </button>
+                            <button
+                              onClick={() => openSlipModal(karyawan)}
+                              className="p-2 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors group/btn"
+                              title="Cetak Slip Gaji"
+                            >
+                              <Printer className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                            </button>
+                            <button
+                              onClick={() => openPayModal(karyawan)}
+                              className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors group/btn"
+                              title="Bayar Gaji"
+                            >
+                              <Wallet className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
                             </button>
                             <button
                               onClick={() => handleEdit(karyawan)}
@@ -1134,6 +1432,8 @@ const DataKaryawanPage = () => {
                         <option value="KASIR">KASIR</option>
                         <option value="SALES">SALES</option>
                         <option value="KARYAWAN">KARYAWAN</option>
+                        <option value="KEPALA_GUDANG">KEPALA GUDANG</option>
+                        <option value="OWNER">OWNER</option>
                       </select>
                     </div>
                   </div>
@@ -1365,6 +1665,8 @@ const DataKaryawanPage = () => {
                         <option value="KASIR">KASIR</option>
                         <option value="SALES">SALES</option>
                         <option value="KARYAWAN">KARYAWAN</option>
+                        <option value="KEPALA_GUDANG">KEPALA GUDANG</option>
+                        <option value="OWNER">OWNER</option>
                       </select>
                     </div>
                   </div>
@@ -1496,6 +1798,217 @@ const DataKaryawanPage = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {showSlipModal && slipKaryawan && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+            onClick={closeSlipModal}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-lg w-full shadow-2xl animate-in zoom-in duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 bg-gradient-to-br from-indigo-600 via-indigo-700 to-blue-700 p-6 rounded-t-2xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                      <Printer className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">
+                        Cetak Slip Gaji
+                      </h2>
+                      <p className="text-blue-100 text-sm">
+                        {slipKaryawan.nama} • {slipKaryawan.nik}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={closeSlipModal}
+                    className="text-white hover:bg-white/20 p-2 rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.open(
+                        `/api/laporan/slip?karyawanId=${slipKaryawan.id}&month=${selectedMonth}`,
+                        "_blank"
+                      )
+                    }
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl transition-all font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                  >
+                    Slip Bulanan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.open(
+                        `/api/laporan/slip?karyawanId=${slipKaryawan.id}&month=${selectedMonth}&week=${selectedWeek}&period=weekly`,
+                        "_blank"
+                      )
+                    }
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl transition-all font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                  >
+                    Slip Mingguan
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeSlipModal}
+                  className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-3 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showPayModal && payKaryawan && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+            onClick={closePayModal}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-lg w-full shadow-2xl animate-in zoom-in duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 bg-gradient-to-br from-green-600 via-green-700 to-emerald-700 p-6 rounded-t-2xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                      <Wallet className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">
+                        Pembayaran Gaji
+                      </h2>
+                      <p className="text-green-100 text-sm">
+                        {payKaryawan.nama} • {payKaryawan.nik}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={closePayModal}
+                    className="text-white hover:bg-white/20 p-2 rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                    Periode
+                  </label>
+                  <select
+                    value={payPeriod}
+                    onChange={(e) => {
+                      const next = e.target.value as "BULANAN" | "MINGGUAN";
+                      setPayPeriod(next);
+                      const nominal =
+                        next === "BULANAN"
+                          ? estimasiGajiMap[payKaryawan.id] ?? 0
+                          : estimasiMingguanMap[payKaryawan.id] ?? 0;
+                      setPayNominal(nominal ? nominal.toString() : "");
+                    }}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-400 focus:border-transparent outline-none transition-all"
+                  >
+                    <option value="BULANAN">Bulanan</option>
+                    <option value="MINGGUAN">Mingguan</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-2">
+                      Bulan
+                    </label>
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      disabled
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-2">
+                      Minggu
+                    </label>
+                    <select
+                      value={selectedWeek}
+                      disabled={payPeriod !== "MINGGUAN"}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-600"
+                    >
+                      <option value={1}>Minggu 1</option>
+                      <option value={2}>Minggu 2</option>
+                      <option value={3}>Minggu 3</option>
+                      <option value={4}>Minggu 4</option>
+                      <option value={5}>Minggu 5</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                    Nominal Dibayar
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      payNominal
+                        ? parseInt(payNominal).toLocaleString("id-ID")
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setPayNominal(parseRupiahInput(e.target.value))
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-400 focus:border-transparent outline-none transition-all"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                    Catatan
+                  </label>
+                  <textarea
+                    value={payNote}
+                    onChange={(e) => setPayNote(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-400 focus:border-transparent outline-none resize-none transition-all"
+                    placeholder="Opsional"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={closePayModal}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-3 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePaySubmit}
+                    className="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl transition-all font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                  >
+                    Simpan Pembayaran
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

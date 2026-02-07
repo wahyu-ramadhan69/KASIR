@@ -83,7 +83,7 @@ const AbsenKaryawanPage = () => {
     }
 
     try {
-      let url = `/api/karyawan?limit=20`;
+      let url = `/api/karyawan?limit=20&excludeJenis=OWNER`;
 
       if (!reset && nextCursor) {
         url += `&cursor=${nextCursor}`;
@@ -100,7 +100,9 @@ const AbsenKaryawanPage = () => {
         throw new Error(data.error || "Invalid karyawan response");
       }
 
-      const incoming: Karyawan[] = data.data;
+      const incoming: Karyawan[] = data.data.filter(
+        (item: Karyawan) => item.jenis !== "OWNER"
+      );
 
       if (reset) {
         setKaryawanList(incoming);

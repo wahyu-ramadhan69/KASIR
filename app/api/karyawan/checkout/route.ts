@@ -19,6 +19,17 @@ function normalizeTanggal(value?: string | Date): Date | null {
   return parsed;
 }
 
+function mergeDateWithTime(date: Date, timeSource: Date): Date {
+  const merged = new Date(date);
+  merged.setHours(
+    timeSource.getHours(),
+    timeSource.getMinutes(),
+    timeSource.getSeconds(),
+    timeSource.getMilliseconds()
+  );
+  return merged;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await isAuthenticated();
@@ -46,6 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date();
+    const jamKeluar = mergeDateWithTime(tanggal, now);
 
     const result = await prisma.$transaction(async (tx) => {
       const karyawan = await tx.karyawan.findUnique({
@@ -74,7 +86,7 @@ export async function POST(request: NextRequest) {
       return tx.absensi.update({
         where: { id: existing.id },
         data: {
-          jamKeluar: now,
+          jamKeluar,
           ...(catatan !== null ? { catatan } : {}),
         },
       });
