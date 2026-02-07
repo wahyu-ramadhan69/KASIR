@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { PeriodeGaji, PrismaClient } from "@prisma/client";
 import { getAuthData, isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
@@ -316,7 +316,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const periodeUpper = String(periode).toUpperCase();
+    const periodeUpper = String(periode).toUpperCase() as PeriodeGaji;
     if (!["BULANAN", "MINGGUAN"].includes(periodeUpper)) {
       return NextResponse.json(
         { success: false, error: "Periode tidak valid" },

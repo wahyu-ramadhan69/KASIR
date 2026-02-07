@@ -160,6 +160,12 @@ export async function GET(request: NextRequest) {
           parsedDate.getMonth() + 1,
           Math.ceil(parsedDate.getDate() / 7),
         );
+        if (!range) {
+          return NextResponse.json(
+            { success: false, error: "Range minggu tidak valid" },
+            { status: 400 },
+          );
+        }
       }
     } else {
       range = parseMonth(monthParam);
@@ -169,6 +175,13 @@ export async function GET(request: NextRequest) {
           { status: 400 },
         );
       }
+    }
+
+    if (!range) {
+      return NextResponse.json(
+        { success: false, error: "Range tidak valid" },
+        { status: 400 },
+      );
     }
 
     const karyawan = await prisma.karyawan.findUnique({
@@ -208,10 +221,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const { start: rangeStart, end: rangeEnd } = range;
     const absensi = await prisma.absensi.findMany({
       where: {
         karyawanId,
-        tanggal: { gte: range.start, lt: range.end },
+        tanggal: { gte: rangeStart, lt: rangeEnd },
       },
       select: {
         tanggal: true,
@@ -227,7 +241,7 @@ export async function GET(request: NextRequest) {
       absensiMap.set(key, item);
     }
 
-    const workingDays = getWorkingDays(range.start, range.end);
+    const workingDays = getWorkingDays(rangeStart, rangeEnd);
     const totalWorkingDays = workingDays.length;
     const totalBulanan =
       pembayaran.gajiPokokBulanan + pembayaran.tunjanganMakanBulanan;
@@ -349,7 +363,9 @@ export async function GET(request: NextRequest) {
     doc.fontSize(14).text("Slip Gaji", { align: "center" });
     doc.moveDown(0.2);
     doc.fontSize(11).text("AW SEMBAKO SAROLANGUN", { align: "center" });
-    doc.text(`BULAN : ${formatMonthLabel(monthParam)}`, { align: "center" });
+    doc.text(`BULAN : ${formatMonthLabel(monthParam ?? "")}`, {
+      align: "center",
+    });
 
     // Fixed layout for header info to avoid misalignment
     const infoTopY = doc.y + 18;
