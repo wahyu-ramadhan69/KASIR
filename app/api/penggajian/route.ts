@@ -305,6 +305,8 @@ export async function POST(request: NextRequest) {
       bulan,
       minggu,
       nominal,
+      bonus,
+      pinjamanDipotong,
       catatan,
       tanggalBayar,
     } = body;
@@ -331,10 +333,11 @@ export async function POST(request: NextRequest) {
       minggu: periodeUpper === "MINGGUAN" ? Number(minggu) : null,
     });
 
+    const bonusValue = Number(bonus) || 0;
+    const pinjamanValue = Number(pinjamanDipotong) || 0;
+    const baseNominal = breakdown.totalDiterima + bonusValue - pinjamanValue;
     const nominalBayar =
-      nominal !== undefined && nominal !== null
-        ? Number(nominal)
-        : breakdown.totalDiterima;
+      nominal !== undefined && nominal !== null ? Number(nominal) : baseNominal;
 
     if (!Number.isFinite(nominalBayar)) {
       return NextResponse.json(
@@ -375,6 +378,8 @@ export async function POST(request: NextRequest) {
           lembur: breakdown.lembur,
           gajiPokokBulanan: breakdown.karyawan.gajiPokok,
           tunjanganMakanBulanan: breakdown.karyawan.tunjanganMakan,
+          pinjamanDipotong: pinjamanValue || null,
+          bonus: bonusValue || null,
           catatan: catatan || null,
           userId,
         },

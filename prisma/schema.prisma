@@ -376,6 +376,8 @@ model PembayaranGaji {
   lembur            Int
   gajiPokokBulanan   Int
   tunjanganMakanBulanan Int
+  pinjamanDipotong  Int?
+  bonus            Int?
   catatan           String?
   user              User         @relation(fields: [userId], references: [id])
   userId            Int

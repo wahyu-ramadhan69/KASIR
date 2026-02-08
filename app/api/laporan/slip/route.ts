@@ -352,10 +352,19 @@ export async function GET(request: NextRequest) {
     const colLeftX = pageLeft;
     const colRightX = pageLeft + colWidth + colGap;
 
-    const totalPotongan = pembayaran.totalPotongan;
+    const bonus = pembayaran.bonus ?? 0;
     const totalGross = pembayaran.totalGross;
-    const totalPendapatan = totalGross + lembur;
+    const totalPendapatan = totalGross + lembur + bonus;
     const totalTransfer = pembayaran.nominal;
+    const inferredPinjaman = Math.max(
+      0,
+      totalPendapatan - pembayaran.totalPotongan - totalTransfer
+    );
+    const potonganPinjaman =
+      pembayaran.pinjamanDipotong && pembayaran.pinjamanDipotong > 0
+        ? pembayaran.pinjamanDipotong
+        : inferredPinjaman;
+    const totalPotongan = pembayaran.totalPotongan + potonganPinjaman;
 
     // Watermark removed per request
 
@@ -410,13 +419,21 @@ export async function GET(request: NextRequest) {
 
     const startY = sectionY + 24;
     const rowHeight = 18;
+    const ratio =
+      totalBulanan > 0 ? totalGross / totalBulanan : 0;
+    const gajiPokokDisplay = Math.round(
+      pembayaran.gajiPokokBulanan * ratio
+    );
+    const tunjanganDisplay = Math.round(
+      pembayaran.tunjanganMakanBulanan * ratio
+    );
     const leftRows: Array<{ label: string; value: number }> = [
-      { label: "Gaji Pokok / Bulan", value: pembayaran.gajiPokokBulanan },
-      {
-        label: "Tunjangan Makan / Bulan",
-        value: pembayaran.tunjanganMakanBulanan,
-      },
+      { label: "Gaji Pokok / Bulan", value: gajiPokokDisplay },
+      { label: "Tunjangan Makan / Bulan", value: tunjanganDisplay },
     ];
+    if (bonus > 0) {
+      leftRows.push({ label: "Bonus", value: Math.round(bonus) });
+    }
     if (lembur > 0) {
       leftRows.push({ label: "Lembur", value: Math.round(lembur) });
     }
@@ -426,6 +443,12 @@ export async function GET(request: NextRequest) {
       { label: "Potongan Telat", value: Math.round(potonganTelat) },
       { label: "Potongan Jam < 9", value: Math.round(potonganKurangJam) },
     ];
+    if (potonganPinjaman > 0) {
+      rightRows.push({
+        label: "Potongan Pinjaman",
+        value: Math.round(potonganPinjaman),
+      });
+    }
 
     const maxRows = Math.max(leftRows.length, rightRows.length);
     for (let i = 0; i < maxRows; i += 1) {
