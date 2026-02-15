@@ -1003,7 +1003,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         checkoutData.namaCustomer = manualCustomerName;
       }
 
-      if (isAdmin && tanggalTransaksi) {
+      if (tanggalTransaksi) {
         checkoutData.tanggalTransaksi = tanggalTransaksi;
       }
 

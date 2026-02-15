@@ -446,6 +446,17 @@ export async function POST(
         });
       }
 
+      const now = new Date();
+      const transaksiDate = tanggalTransaksi ? new Date(tanggalTransaksi) : now;
+      if (tanggalTransaksi) {
+        transaksiDate.setHours(
+          now.getHours(),
+          now.getMinutes(),
+          now.getSeconds(),
+          now.getMilliseconds()
+        );
+      }
+
       // Prepare update data
       const updateData: any = {
         subtotal: BigInt(calculation.ringkasan.subtotal),
@@ -457,9 +468,7 @@ export async function POST(
         metodePembayaran,
         statusPembayaran,
         statusTransaksi: "SELESAI",
-        tanggalTransaksi: tanggalTransaksi
-          ? new Date(tanggalTransaksi)
-          : new Date(),
+        tanggalTransaksi: transaksiDate,
         tanggalJatuhTempo: finalTanggalJatuhTempo,
       };
 
@@ -509,9 +518,7 @@ export async function POST(
             normalizedTotalCash > 0 ? normalizedTotalCash : jumlahDibayar;
         }
 
-        const pembayaranDate = tanggalTransaksi
-          ? new Date(tanggalTransaksi)
-          : new Date();
+        const pembayaranDate = transaksiDate;
         const pembayaranDateStr = pembayaranDate
           .toISOString()
           .slice(0, 10)

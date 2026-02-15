@@ -106,7 +106,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate kode penjualan
-    const today = tanggalTransaksi ? new Date(tanggalTransaksi) : new Date();
+    const now = new Date();
+    const today = tanggalTransaksi ? new Date(tanggalTransaksi) : now;
+    if (tanggalTransaksi) {
+      today.setHours(
+        now.getHours(),
+        now.getMinutes(),
+        now.getSeconds(),
+        now.getMilliseconds()
+      );
+    }
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
 
     const lastPenjualan = await prisma.penjualanHeader.findFirst({

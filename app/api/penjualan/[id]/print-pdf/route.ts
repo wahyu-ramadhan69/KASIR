@@ -172,13 +172,10 @@ export async function GET(
 
     currentY += 12;
     doc.font("RobotoMono-Bold").text("Tanggal:", leftCol, currentY);
+    const tanggalNota = penjualan.tanggalTransaksi ?? penjualan.createdAt;
     doc
       .font("RobotoMono")
-      .text(
-        formatDate(penjualan.createdAt.toISOString()),
-        leftCol + 55,
-        currentY
-      );
+      .text(formatDate(tanggalNota.toISOString()), leftCol + 55, currentY);
 
     currentY += 12;
     doc.font("RobotoMono-Bold").text("Customer:", leftCol, currentY);

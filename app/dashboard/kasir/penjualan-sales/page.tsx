@@ -1305,7 +1305,7 @@ const PenjualanPage = () => {
             diskonNota: currentPenjualan.diskonNota,
             jumlahDibayar: jumlahDibayarFinal,
             metodePembayaran: currentPenjualan.metodePembayaran,
-            tanggalPenjualan: tanggalPenjualan,
+            tanggalTransaksi: tanggalPenjualan,
             tanggalJatuhTempo: tanggalJatuhTempo || undefined,
             keterangan: keterangan || undefined,
             rutePengiriman: rutePengiriman || undefined,

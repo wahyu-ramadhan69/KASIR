@@ -383,9 +383,16 @@ export async function POST(request: NextRequest) {
 
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
-      const transaksiDate = tanggalTransaksi
-        ? new Date(tanggalTransaksi)
-        : new Date();
+      const now = new Date();
+      const transaksiDate = tanggalTransaksi ? new Date(tanggalTransaksi) : now;
+      if (tanggalTransaksi) {
+        transaksiDate.setHours(
+          now.getHours(),
+          now.getMinutes(),
+          now.getSeconds(),
+          now.getMilliseconds()
+        );
+      }
       const dateStr = transaksiDate
         .toISOString()
         .slice(0, 10)

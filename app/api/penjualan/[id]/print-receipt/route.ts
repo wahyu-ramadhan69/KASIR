@@ -318,7 +318,7 @@ export async function GET(
     </div>
     <div class="info-row">
       <span class="info-label">Tanggal:</span>
-      <span>${formatDate(penjualan.createdAt)}</span>
+      <span>${formatDate(penjualan.tanggalTransaksi ?? penjualan.createdAt)}</span>
     </div>
     <div class="info-row">
       <span class="info-label">Customer:</span>
