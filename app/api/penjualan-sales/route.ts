@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("endDate");
     const summary = searchParams.get("summary") === "1";
 
-    const isAdmin = authData.role === "ADMIN";
+    const isPrivileged = authData.role === "ADMIN" || authData.role === "KASIR";
     const baseWhere: any = {
       // Filter hanya penjualan dengan karyawan jenis SALES
       karyawan: {
@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
     const listWhere: any = { ...baseWhere };
     const summaryWhere: any = { ...baseWhere, isDeleted: false };
     const userId = Number(authData.userId);
-    if (!isAdmin && !Number.isNaN(userId)) {
+    if (!isPrivileged && !Number.isNaN(userId)) {
       listWhere.isDeleted = false;
       listWhere.userId = userId;
       summaryWhere.userId = userId;

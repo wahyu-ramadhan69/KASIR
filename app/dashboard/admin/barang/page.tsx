@@ -95,6 +95,10 @@ interface PenjualanBarang {
   jumlahPerKemasan: number;
   totalTerjualPcs: number;
   totalTerjualKemasan: number;
+  totalMasukPcs: number;
+  totalMasukKemasan: number;
+  stokPadaTanggalPcs: number;
+  stokPadaTanggalKemasan: number;
 }
 
 interface Stats {
@@ -718,30 +722,121 @@ const DataBarangPage = () => {
   const fetchPenjualanBarang = async () => {
     setLoadingPenjualanBarang(true);
     try {
-      const params = new URLSearchParams();
-      if (penjualanQuery.mode === "date" && penjualanQuery.date) {
-        params.set("date", penjualanQuery.date);
-      }
-      if (penjualanQuery.mode === "range") {
-        if (penjualanQuery.startDate) {
-          params.set("startDate", penjualanQuery.startDate);
+      const fetchHistoris = async (date: string) => {
+        const response = await fetch(
+          `/api/stok-harian/historis?tanggal=${date}`
+        );
+        const result = await response.json();
+        if (!result.success || !Array.isArray(result.data)) {
+          return [];
         }
-        if (penjualanQuery.endDate) {
-          params.set("endDate", penjualanQuery.endDate);
+        return result.data as any[];
+      };
+
+      const toNumber = (value: any) => {
+        if (typeof value === "bigint") return Number(value);
+        if (typeof value === "string") return Number(value);
+        return Number(value || 0);
+      };
+
+      const mapById = (rows: any[]) => {
+        const map = new Map<number, any>();
+        rows.forEach((row) => map.set(row.barangId, row));
+        return map;
+      };
+
+      const formatDate = (date: Date) => date.toISOString().split("T")[0];
+      const addDays = (dateStr: string, delta: number) => {
+        const d = new Date(dateStr);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + delta);
+        return formatDate(d);
+      };
+
+      let startDateStr = "";
+      let endDateStr = "";
+      if (penjualanQuery.mode === "date" && penjualanQuery.date) {
+        startDateStr = penjualanQuery.date;
+        endDateStr = penjualanQuery.date;
+      } else if (penjualanQuery.mode === "range") {
+        if (penjualanQuery.startDate && penjualanQuery.endDate) {
+          startDateStr = penjualanQuery.startDate;
+          endDateStr = penjualanQuery.endDate;
+        } else if (penjualanQuery.startDate) {
+          startDateStr = penjualanQuery.startDate;
+          endDateStr = penjualanQuery.startDate;
+        } else if (penjualanQuery.endDate) {
+          startDateStr = penjualanQuery.endDate;
+          endDateStr = penjualanQuery.endDate;
         }
       }
 
-      const response = await fetch(
-        `/api/barang/penjualan${params.toString() ? `?${params}` : ""}`
-      );
-      const result = await response.json();
-      if (result.success) {
-        setPenjualanBarang(result.data || []);
-      } else {
+      if (!startDateStr || !endDateStr) {
         setPenjualanBarang([]);
+        return;
       }
+
+      const prevDateStr = addDays(startDateStr, -1);
+      const [prevRows, endRows] = await Promise.all([
+        fetchHistoris(prevDateStr),
+        fetchHistoris(endDateStr),
+      ]);
+
+      const prevMap = mapById(prevRows);
+      const endMap = mapById(endRows);
+
+      const result: PenjualanBarang[] = [];
+      endRows.forEach((row: any) => {
+        const barangId = row.barangId;
+        const prevRow = prevMap.get(barangId);
+        const jumlahPerKemasan = Number(row.jumlahPerKemasan || 1);
+
+        const masukSetelahEnd = toNumber(row.masukSetelahTanggal);
+        const keluarSetelahEnd = toNumber(row.keluarSetelahTanggal);
+        const masukSetelahPrev = prevRow
+          ? toNumber(prevRow.masukSetelahTanggal)
+          : masukSetelahEnd;
+        const keluarSetelahPrev = prevRow
+          ? toNumber(prevRow.keluarSetelahTanggal)
+          : keluarSetelahEnd;
+
+        const totalMasukPcs = Math.max(0, masukSetelahPrev - masukSetelahEnd);
+        const totalTerjualPcs = Math.max(
+          0,
+          keluarSetelahPrev - keluarSetelahEnd
+        );
+
+        result.push({
+          barangId,
+          namaBarang: row.namaBarang || "-",
+          jenisKemasan: row.jenisKemasan || "-",
+          jumlahPerKemasan,
+          totalTerjualPcs,
+          totalTerjualKemasan: jumlahPerKemasan
+            ? totalTerjualPcs / jumlahPerKemasan
+            : 0,
+          totalMasukPcs,
+          totalMasukKemasan: jumlahPerKemasan
+            ? totalMasukPcs / jumlahPerKemasan
+            : 0,
+          stokPadaTanggalPcs: toNumber(row.stokPadaTanggal),
+          stokPadaTanggalKemasan: jumlahPerKemasan
+            ? toNumber(row.stokPadaTanggal) / jumlahPerKemasan
+            : 0,
+        });
+      });
+
+      result.sort((a, b) => {
+        if (b.totalMasukPcs !== a.totalMasukPcs) {
+          return b.totalMasukPcs - a.totalMasukPcs;
+        }
+        return b.totalTerjualPcs - a.totalTerjualPcs;
+      });
+
+      setPenjualanBarang(result);
     } catch (error) {
       console.error("Error fetching penjualan barang:", error);
+      setPenjualanBarang([]);
     } finally {
       setLoadingPenjualanBarang(false);
     }
@@ -1699,6 +1794,18 @@ const DataBarangPage = () => {
                           Terjual (PCS)
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Stok (Kemasan)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Stok (PCS)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Masuk (Kemasan)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Masuk (PCS)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Kemasan
                         </th>
                       </tr>
@@ -1734,6 +1841,28 @@ const DataBarangPage = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-bold text-amber-700">
+                              {formatDecimal(row.stokPadaTanggalKemasan)}{" "}
+                              {row.jenisKemasan}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-semibold text-gray-700">
+                              {formatNumber(row.stokPadaTanggalPcs)} pcs
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-bold text-emerald-700">
+                              {formatDecimal(row.totalMasukKemasan)}{" "}
+                              {row.jenisKemasan}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-semibold text-gray-700">
+                              {formatNumber(row.totalMasukPcs)} pcs
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
                             <span className="text-sm text-gray-700">
                               {row.jumlahPerKemasan} pcs / {row.jenisKemasan}
                             </span>
@@ -1747,7 +1876,7 @@ const DataBarangPage = () => {
             </div>
 
             {penjualanBarang.length > 0 && (
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase">
                     Total Barang
@@ -1777,6 +1906,19 @@ const DataBarangPage = () => {
                     {formatNumber(
                       penjualanBarang.reduce(
                         (sum, item) => sum + item.totalTerjualPcs,
+                        0
+                      )
+                    )}
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase">
+                    Total Masuk (PCS)
+                  </p>
+                  <p className="text-2xl font-bold text-emerald-600 mt-2">
+                    {formatNumber(
+                      penjualanBarang.reduce(
+                        (sum, item) => sum + item.totalMasukPcs,
                         0
                       )
                     )}

@@ -22,8 +22,9 @@ interface User {
   id: number;
   username: string;
   email: string;
-  role: "ADMIN" | "KASIR" | "KEPALA_GUDANG";
+  role: "ADMIN" | "KASIR" | "KEPALA_GUDANG" | "SALES";
   isActive: boolean;
+  karyawanId?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,9 +32,16 @@ interface User {
 interface UserFormData {
   username: string;
   email: string;
-  role: "ADMIN" | "KASIR" | "KEPALA_GUDANG";
+  role: "ADMIN" | "KASIR" | "KEPALA_GUDANG" | "SALES";
   isActive: boolean;
   password?: string;
+  karyawanId?: number | null;
+}
+
+interface SalesKaryawan {
+  id: number;
+  nama: string;
+  nik: string;
 }
 
 const DataUserPage = () => {
@@ -51,9 +59,12 @@ const DataUserPage = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showEditPassword, setShowEditPassword] = useState<boolean>(false);
+  const [salesKaryawan, setSalesKaryawan] = useState<SalesKaryawan[]>([]);
+  const [addRole, setAddRole] = useState<UserFormData["role"]>("KASIR");
 
   useEffect(() => {
     fetchUsers();
+    fetchSalesKaryawan();
   }, []);
 
   const fetchUsers = async () => {
@@ -75,6 +86,20 @@ const DataUserPage = () => {
     }
   };
 
+  const fetchSalesKaryawan = async () => {
+    try {
+      const res = await fetch(
+        "/api/karyawan?limit=1000&excludeJenis=KASIR,KEPALA_GUDANG,KARYAWAN,OWNER",
+      );
+      const data = await res.json();
+      if (Array.isArray(data.data)) {
+        setSalesKaryawan(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching karyawan sales:", error);
+    }
+  };
+
   const handleEdit = (user: User) => {
     setEditingUser({
       id: user.id,
@@ -84,6 +109,7 @@ const DataUserPage = () => {
         role: user.role,
         isActive: user.isActive,
         password: "",
+        karyawanId: user.karyawanId ?? null,
       },
     });
     setShowEditModal(true);
@@ -146,15 +172,27 @@ const DataUserPage = () => {
   ) => {
     const { name, value, type } = e.target;
     if (editingUser) {
+      const nextValue =
+        type === "checkbox"
+          ? (e.target as HTMLInputElement).checked
+          : name === "karyawanId"
+            ? value === ""
+              ? null
+              : Number(value)
+            : value;
+
+      const nextData: UserFormData = {
+        ...editingUser.data,
+        [name]: nextValue as any,
+      };
+
+      if (name === "role" && value !== "SALES") {
+        nextData.karyawanId = null;
+      }
+
       setEditingUser({
         ...editingUser,
-        data: {
-          ...editingUser.data,
-          [name]:
-            type === "checkbox"
-              ? (e.target as HTMLInputElement).checked
-              : value,
-        },
+        data: nextData,
       });
     }
   };
@@ -165,9 +203,19 @@ const DataUserPage = () => {
 
     const formData = new FormData(e.currentTarget);
     const password = formData.get("password") as string;
+    const role = (formData.get("role") as string) || "KASIR";
+    const karyawanIdRaw = formData.get("karyawanId") as string | null;
+    const karyawanId =
+      karyawanIdRaw && karyawanIdRaw !== "" ? Number(karyawanIdRaw) : null;
 
     if (password.length < 4) {
       toast.error("Password minimal 4 karakter");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (role === "SALES" && !karyawanId) {
+      toast.error("Karyawan wajib dipilih untuk role Sales");
       setIsSubmitting(false);
       return;
     }
@@ -182,7 +230,8 @@ const DataUserPage = () => {
           username: formData.get("username"),
           email: formData.get("email"),
           password: password,
-          role: formData.get("role"),
+          role,
+          ...(role === "SALES" ? { karyawanId } : {}),
         }),
       });
 
@@ -227,6 +276,18 @@ const DataUserPage = () => {
       updateData.password = editingUser.data.password;
     }
 
+    if (editingUser.data.role === "SALES" && !editingUser.data.karyawanId) {
+      toast.error("Karyawan wajib dipilih untuk role Sales");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (editingUser.data.role === "SALES") {
+      updateData.karyawanId = editingUser.data.karyawanId;
+    } else {
+      updateData.karyawanId = null;
+    }
+
     try {
       const res = await fetch(`/api/users/${editingUser.id}`, {
         method: "PUT",
@@ -265,17 +326,17 @@ const DataUserPage = () => {
   };
 
   const getRoleColor = (role: string) => {
-    return role === "ADMIN"
-      ? "bg-purple-100 text-purple-800"
-      : "bg-blue-100 text-blue-800";
+    if (role === "ADMIN") return "bg-purple-100 text-purple-800";
+    if (role === "KASIR") return "bg-blue-100 text-blue-800";
+    if (role === "KEPALA_GUDANG") return "bg-amber-100 text-amber-800";
+    return "bg-emerald-100 text-emerald-800";
   };
 
   const getRoleIcon = (role: string) => {
-    return role === "ADMIN" ? (
-      <Shield className="w-4 h-4" />
-    ) : (
-      <ShoppingCart className="w-4 h-4" />
-    );
+    if (role === "ADMIN") return <Shield className="w-4 h-4" />;
+    if (role === "KASIR") return <ShoppingCart className="w-4 h-4" />;
+    if (role === "KEPALA_GUDANG") return <CheckCircle className="w-4 h-4" />;
+    return <UserPlus className="w-4 h-4" />;
   };
 
   const filteredUsers = usersList.filter((user) => {
@@ -293,6 +354,7 @@ const DataUserPage = () => {
   const activeUsersCount = usersList.filter((u) => u.isActive).length;
   const adminCount = usersList.filter((u) => u.role === "ADMIN").length;
   const kasirCount = usersList.filter((u) => u.role === "KASIR").length;
+  const salesCount = usersList.filter((u) => u.role === "SALES").length;
   const kepalaGudangCount = usersList.filter(
     (u) => u.role === "KEPALA_GUDANG",
   ).length;
@@ -331,7 +393,10 @@ const DataUserPage = () => {
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => {
+                  setAddRole("KASIR");
+                  setShowAddModal(true);
+                }}
                 className="group bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
               >
                 <PlusIcon className="w-5 h-5 group-hover:rotate-90 transition-transform" />
@@ -419,6 +484,40 @@ const DataUserPage = () => {
               </div>
             </div>
           </div>
+
+          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                  Sales
+                </p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">
+                  {salesCount}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Role sales</p>
+              </div>
+              <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <UserPlus className="w-8 h-8 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                  Kepala Gudang
+                </p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">
+                  {kepalaGudangCount}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Role gudang</p>
+              </div>
+              <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+                <CheckCircle className="w-8 h-8 text-white" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Search and Filter */}
@@ -452,6 +551,7 @@ const DataUserPage = () => {
                 <option value="all">Semua Role</option>
                 <option value="ADMIN">Admin</option>
                 <option value="KASIR">Kasir</option>
+                <option value="SALES">Sales</option>
                 <option value="KEPALA_GUDANG">Kepala Gudang</option>
               </select>
 
@@ -696,16 +796,43 @@ const DataUserPage = () => {
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Role <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      name="role"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                      required
-                    >
-                      <option value="KASIR">Kasir</option>
-                      <option value="ADMIN">Admin</option>
-                      <option value="KEPALA_GUDANG">Kepala Gudang</option>
-                    </select>
+                      <select
+                        name="role"
+                        onChange={(e) =>
+                          setAddRole(e.target.value as UserFormData["role"])
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                        required
+                      >
+                        <option value="KASIR">Kasir</option>
+                        <option value="ADMIN">Admin</option>
+                        <option value="SALES">Sales</option>
+                        <option value="KEPALA_GUDANG">Kepala Gudang</option>
+                      </select>
                   </div>
+
+                  {addRole === "SALES" && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Karyawan Sales <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="karyawanId"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                        required
+                        defaultValue=""
+                      >
+                        <option value="" disabled>
+                          Pilih karyawan sales
+                        </option>
+                        {salesKaryawan.map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {k.nama} ({k.nik})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 mt-6">
@@ -823,9 +950,34 @@ const DataUserPage = () => {
                     >
                       <option value="KASIR">Kasir</option>
                       <option value="ADMIN">Admin</option>
+                      <option value="SALES">Sales</option>
                       <option value="KEPALA_GUDANG">Kepala Gudang</option>
                     </select>
                   </div>
+
+                  {editingUser.data.role === "SALES" && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Karyawan Sales <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="karyawanId"
+                        value={editingUser.data.karyawanId ?? ""}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
+                        required
+                      >
+                        <option value="" disabled>
+                          Pilih karyawan sales
+                        </option>
+                        {salesKaryawan.map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {k.nama} ({k.nik})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="flex items-center gap-2 cursor-pointer">

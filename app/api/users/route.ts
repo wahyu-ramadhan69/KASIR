@@ -37,6 +37,7 @@ export async function GET() {
         email: true,
         role: true,
         isActive: true,
+        karyawanId: true,
         createdAt: true,
         updatedAt: true,
       },

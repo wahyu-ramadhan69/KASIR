@@ -42,7 +42,7 @@ export async function PUT(
 
     const userId = parseInt(id);
     const body = await request.json();
-    const { username, email, role, isActive, password } = body;
+    const { username, email, role, isActive, password, karyawanId } = body;
 
     // Cek apakah user exist
     const existingUser = await prisma.user.findUnique({
@@ -97,6 +97,37 @@ export async function PUT(
       updateData.password = await bcrypt.hash(password, 10);
     }
 
+    const finalRole = role || existingUser.role;
+    if (finalRole === "SALES") {
+      if (!karyawanId) {
+        return NextResponse.json(
+          { error: "Karyawan wajib dipilih untuk role SALES" },
+          { status: 400 }
+        );
+      }
+      const karyawan = await prisma.karyawan.findUnique({
+        where: { id: Number(karyawanId) },
+      });
+      if (!karyawan || karyawan.jenis !== "SALES") {
+        return NextResponse.json(
+          { error: "Karyawan SALES tidak ditemukan" },
+          { status: 404 }
+        );
+      }
+      const existingUserWithKaryawan = await prisma.user.findUnique({
+        where: { karyawanId: Number(karyawanId) },
+      });
+      if (existingUserWithKaryawan && existingUserWithKaryawan.id !== userId) {
+        return NextResponse.json(
+          { error: "Karyawan sudah terhubung dengan user lain" },
+          { status: 409 }
+        );
+      }
+      updateData.karyawanId = Number(karyawanId);
+    } else {
+      updateData.karyawanId = null;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,
@@ -106,6 +137,7 @@ export async function PUT(
         email: true,
         role: true,
         isActive: true,
+        karyawanId: true,
         createdAt: true,
         updatedAt: true,
       },

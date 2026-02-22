@@ -5,7 +5,15 @@ const Navbar = async () => {
   const authData = await getAuthData();
   const role = authData?.role?.toUpperCase();
   const settingsPath =
-    role === "ADMIN" ? "/dashboard/admin/settings" : "/dashboard/kasir/settings";
+    role === "ADMIN"
+      ? "/dashboard/admin/settings"
+      : role === "KASIR"
+        ? "/dashboard/kasir/settings"
+        : role === "SALES"
+          ? "/dashboard/sales/settings"
+          : role === "KEPALA_GUDANG"
+            ? "/dashboard/kepala_gudang/settings"
+            : "/dashboard";
 
   return <NavbarClient settingsPath={settingsPath} />;
 };

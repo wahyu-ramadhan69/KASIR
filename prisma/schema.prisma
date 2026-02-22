@@ -14,12 +14,16 @@ model User {
   password    String
   role        Role
   isActive    Boolean       @default(true)
-  twoFAEnabled Boolean  @default(false)
+  twoFAEnabled Boolean      @default(false)
   twoFASecret  String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  karyawanId  Int?          @unique
+  karyawan    Karyawan?      @relation(fields: [karyawanId], references: [id])
   pengeluaran Pengeluaran[]
   pembayaranGaji PembayaranGaji[]
+  penjualanDibuat PenjualanHeader[] @relation("PenjualanDibuat")
+  penjualanDisetujui PenjualanHeader[] @relation("PenjualanDisetujui")
 }
 
 model Barang {
@@ -39,6 +43,7 @@ model Barang {
   penjualanItems        PenjualanItem[]
   manifestBarang        ManifestBarang[]
   pengembalianBarang    PengembalianBarang[]
+  stokHarian            StokHarian[]
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   isActive              Boolean         @default(true)
@@ -73,9 +78,10 @@ model Karyawan {
   perjalananSales           PerjalananSales[]
   pinjamanKaryawan          PinjamanKaryawan[]
   pembayaranHutangKaryawan  PembayaranHutangKaryawan[]
-  absensi Absensi[]
-  pembayaranGaji PembayaranGaji[]
+  absensi                   Absensi[]
+  pembayaranGaji            PembayaranGaji[]
   isActive                  Boolean           @default(true)
+  user                      User?             // ← wajib ada, pakai ? karena one-to-one optional
 }
 
 model PinjamanKaryawan {
@@ -169,6 +175,15 @@ model PenjualanHeader {
   tanggalJatuhTempo     DateTime?
   isDeleted             Boolean         @default(false)
   userId                Int?
+
+  statusApproval  StatusApproval @default(PENDING)
+  approvedAt      DateTime?
+  approvedById    Int?
+  approvedBy      User?   @relation("PenjualanDisetujui", fields: [approvedById], references: [id])
+
+  createdById     Int?
+  createdBy       User?   @relation("PenjualanDibuat", fields: [createdById], references: [id])
+  
   items                 PenjualanItem[]
   perjalananSales       PerjalananSales? @relation(fields: [perjalananSalesId], references: [id])
   pembayaran            PembayaranPenjualan[]
@@ -324,6 +339,7 @@ enum Role {
   ADMIN
   KASIR
   KEPALA_GUDANG
+  SALES
 }
 
 enum JenisKaryawan {
@@ -396,4 +412,27 @@ enum StatusAbsensi {
   SAKIT
   ALPHA
   LIBUR
+}
+
+enum StatusApproval {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model StokHarian {
+  id        Int      @id @default(autoincrement())
+  barangId  Int
+  barang    Barang   @relation(fields: [barangId], references: [id])
+  tanggal   DateTime @db.Date  // hanya tanggal, tanpa jam
+  stok      BigInt
+  
+  // opsional tapi berguna untuk audit
+  totalMasuk  BigInt @default(0)
+  totalKeluar BigInt @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([barangId, tanggal]) // satu record per barang per hari
+  @@index([tanggal])
 }

@@ -7,7 +7,8 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    const { username, email, password, role } = await request.json();
+    const { username, email, password, role, karyawanId } =
+      await request.json();
 
     // ✅ Validasi input
     if (!username || !email || !password) {
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     // ✅ Validasi role (opsional, default KASIR)
-    const validRoles = ["ADMIN", "KASIR", "KEPALA_GUDANG"];
+    const validRoles = ["ADMIN", "KASIR", "KEPALA_GUDANG", "SALES"];
     const userRole = role && validRoles.includes(role) ? role : "KASIR";
 
     // 🔍 Cek apakah username sudah digunakan
@@ -65,6 +66,35 @@ export async function POST(request: Request) {
     // 🔐 Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    let karyawanIdValue: number | null = null;
+    if (userRole === "SALES") {
+      if (!karyawanId) {
+        return NextResponse.json(
+          { error: "Karyawan wajib dipilih untuk role SALES" },
+          { status: 400 }
+        );
+      }
+      const karyawan = await prisma.karyawan.findUnique({
+        where: { id: Number(karyawanId) },
+      });
+      if (!karyawan || karyawan.jenis !== "SALES") {
+        return NextResponse.json(
+          { error: "Karyawan SALES tidak ditemukan" },
+          { status: 404 }
+        );
+      }
+      const existingUserWithKaryawan = await prisma.user.findUnique({
+        where: { karyawanId: Number(karyawanId) },
+      });
+      if (existingUserWithKaryawan) {
+        return NextResponse.json(
+          { error: "Karyawan sudah terhubung dengan user lain" },
+          { status: 409 }
+        );
+      }
+      karyawanIdValue = Number(karyawanId);
+    }
+
     // ✅ Buat user baru
     const newUser = await prisma.user.create({
       data: {
@@ -72,12 +102,14 @@ export async function POST(request: Request) {
         email,
         password: hashedPassword,
         role: userRole,
+        ...(karyawanIdValue ? { karyawanId: karyawanIdValue } : {}),
       },
       select: {
         id: true,
         username: true,
         email: true,
         role: true,
+        karyawanId: true,
         createdAt: true,
       },
     });

@@ -35,10 +35,27 @@ import {
   SquareArrowOutUpRight,
   SquareArrowOutDownRight,
   ClipboardPen,
+  FileCheckCorner,
 } from "lucide-react";
 
-// Menu untuk Admin
-const adminNavLinks = [
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface SubMenuItem {
+  label: string;
+  href: string;
+  icon: React.ReactElement;
+}
+
+interface NavLinkWithSub {
+  label: string;
+  href: string;
+  icon: React.ReactElement;
+  subMenu?: SubMenuItem[];
+}
+
+// ─── Admin Menus ──────────────────────────────────────────────────────────────
+
+const adminNavLinks: NavLinkWithSub[] = [
   {
     label: "Dashboard",
     href: "/dashboard/admin",
@@ -46,7 +63,7 @@ const adminNavLinks = [
   },
 ];
 
-const adminMasterDataLinks = [
+const adminMasterDataLinks: NavLinkWithSub[] = [
   {
     label: "Master Data",
     href: "/dashboard/admin/barang",
@@ -86,7 +103,7 @@ const adminMasterDataLinks = [
   },
 ];
 
-const adminTransactionLinks = [
+const adminTransactionLinks: NavLinkWithSub[] = [
   {
     label: "Pembelian",
     href: "/dashboard/admin/pembelian",
@@ -137,35 +154,20 @@ const adminTransactionLinks = [
     icon: <Truck className="w-5 h-5" />,
     subMenu: [
       {
+        label: "Pengajuan Sales",
+        href: "/dashboard/admin/penjualan-sales/approval",
+        icon: <FileCheckCorner className="w-4 h-4" />,
+      },
+      {
         label: "Transaksi Sales",
         href: "/dashboard/admin/penjualan-sales",
         icon: <PackageOpen className="w-4 h-4" />,
       },
-      // {
-      //   label: "Luar Kota",
-      //   href: "/dashboard/admin/penjualan-sales/luar-kota",
-      //   icon: <Truck className="w-4 h-4" />,
-      // },
-      // {
-      //   label: "Kanvas Sales",
-      //   href: "/dashboard/admin/penjualan-sales/kanvas",
-      //   icon: <Truck className="w-4 h-4" />,
-      // },
       {
         label: "Riwayat Transaksi Sales",
         href: "/dashboard/admin/penjualan-sales/riwayat",
         icon: <History className="w-4 h-4" />,
       },
-      // {
-      //   label: "Riwayat Kanvas",
-      //   href: "/dashboard/admin/penjualan-sales/luar-kota/riwayat",
-      //   icon: <History className="w-4 h-4" />,
-      // },
-      // {
-      //   label: "Pengembalian Kanvas",
-      //   href: "/dashboard/admin/penjualan-sales/riwayat/pengembalian",
-      //   icon: <History className="w-4 h-4" />,
-      // },
     ],
   },
   {
@@ -256,8 +258,9 @@ const adminTransactionLinks = [
   },
 ];
 
-// Menu untuk Kasir
-const kasirNavLinks = [
+// ─── Kasir Menus ──────────────────────────────────────────────────────────────
+
+const kasirNavLinks: NavLinkWithSub[] = [
   {
     label: "Dashboard",
     href: "/dashboard/kasir",
@@ -265,26 +268,7 @@ const kasirNavLinks = [
   },
 ];
 
-// Menu untuk Kepala Gudang
-const kepalaGudangNavLinks = [
-  {
-    label: "Barang",
-    href: "/dashboard/kepala_gudang",
-    icon: <Package className="w-5 h-5" />,
-  },
-  {
-    label: "Barang Keluar",
-    href: "/dashboard/kepala_gudang/barang_keluar",
-    icon: <SquareArrowOutUpRight className="w-5 h-5" />,
-  },
-  {
-    label: "Barang Masuk",
-    href: "/dashboard/kepala_gudang/barang_masuk",
-    icon: <SquareArrowOutDownRight className="w-5 h-5" />,
-  },
-];
-
-const kasirMasterDataLinks = [
+const kasirMasterDataLinks: NavLinkWithSub[] = [
   {
     label: "Master Data",
     href: "/dashboard/kasir/barang",
@@ -295,11 +279,6 @@ const kasirMasterDataLinks = [
         href: "/dashboard/kasir/barang",
         icon: <Package className="w-4 h-4" />,
       },
-      // {
-      //   label: "Supplier",
-      //   href: "/dashboard/kasir/supplier",
-      //   icon: <Users className="w-4 h-4" />,
-      // },
       {
         label: "Customer",
         href: "/dashboard/kasir/customer",
@@ -314,7 +293,7 @@ const kasirMasterDataLinks = [
   },
 ];
 
-const kasirTransactionLinks = [
+const kasirTransactionLinks: NavLinkWithSub[] = [
   {
     label: "Transaksi Kasir",
     href: "/dashboard/kasir/penjualan",
@@ -348,35 +327,20 @@ const kasirTransactionLinks = [
     icon: <Truck className="w-5 h-5" />,
     subMenu: [
       {
+        label: "Pengajuan Sales",
+        href: "/dashboard/kasir/penjualan-sales/approval",
+        icon: <FileCheckCorner className="w-4 h-4" />,
+      },
+      {
         label: "Transaksi Sales",
         href: "/dashboard/kasir/penjualan-sales",
         icon: <PackageOpen className="w-4 h-4" />,
       },
-      // {
-      //   label: "Luar Kota",
-      //   href: "/dashboard/kasir/penjualan-sales/luar-kota",
-      //   icon: <Truck className="w-4 h-4" />,
-      // },
-      // {
-      //   label: "Kanvas Sales",
-      //   href: "/dashboard/kasir/penjualan-sales/kanvas",
-      //   icon: <Truck className="w-4 h-4" />,
-      // },
       {
         label: "Riwayat Transaksi Sales",
         href: "/dashboard/kasir/penjualan-sales/riwayat",
         icon: <History className="w-4 h-4" />,
       },
-      // {
-      //   label: "Riwayat Kanvas",
-      //   href: "/dashboard/kasir/penjualan-sales/luar-kota/riwayat",
-      //   icon: <History className="w-4 h-4" />,
-      // },
-      // {
-      //   label: "Pengembalian Kanvas",
-      //   href: "/dashboard/kasir/penjualan-sales/riwayat/pengembalian",
-      //   icon: <History className="w-4 h-4" />,
-      // },
     ],
   },
   {
@@ -437,10 +401,65 @@ const kasirTransactionLinks = [
   },
 ];
 
+// ─── Sales Menus ──────────────────────────────────────────────────────────────
+
+const salesNavLinks: NavLinkWithSub[] = [
+  {
+    label: "Dashboard",
+    href: "/dashboard/sales",
+    icon: <LayoutDashboard className="w-5 h-5" />,
+  },
+];
+
+const salesMasterDataLinks: NavLinkWithSub[] = [
+  {
+    label: "Customer",
+    href: "/dashboard/sales/customer",
+    icon: <UserCheck className="w-5 h-5" />,
+  },
+];
+
+const salesTransactionLinks: NavLinkWithSub[] = [
+  {
+    label: "Order",
+    href: "/dashboard/sales/order",
+    icon: <ShoppingBag className="w-5 h-5" />,
+  },
+  {
+    label: "Riwayat Order",
+    href: "/dashboard/sales/riwayat/order",
+    icon: <History className="w-5 h-5" />,
+  },
+];
+
+// ─── Kepala Gudang Menus ──────────────────────────────────────────────────────
+
+const kepalaGudangNavLinks: NavLinkWithSub[] = [
+  {
+    label: "Barang",
+    href: "/dashboard/kepala_gudang",
+    icon: <Package className="w-5 h-5" />,
+  },
+  {
+    label: "Barang Keluar",
+    href: "/dashboard/kepala_gudang/barang_keluar",
+    icon: <SquareArrowOutUpRight className="w-5 h-5" />,
+  },
+  {
+    label: "Barang Masuk",
+    href: "/dashboard/kepala_gudang/barang_masuk",
+    icon: <SquareArrowOutDownRight className="w-5 h-5" />,
+  },
+];
+
+// ─── Component Props ──────────────────────────────────────────────────────────
+
 interface SidebarProps {
   role: string;
   username?: string;
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
   const router = useRouter();
@@ -449,41 +468,44 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Dapatkan menu berdasarkan role
-  const userRole = role.toLowerCase() as "admin" | "kasir" | "kepala_gudang";
+  const userRole = role.toLowerCase() as
+    | "admin"
+    | "kasir"
+    | "kepala_gudang"
+    | "sales";
+
   const navLinks =
     userRole === "admin"
       ? adminNavLinks
       : userRole === "kasir"
         ? kasirNavLinks
-        : kepalaGudangNavLinks;
-  const masterDataLinks =
+        : userRole === "sales"
+          ? salesNavLinks
+          : kepalaGudangNavLinks;
+
+  const masterDataLinks: NavLinkWithSub[] =
     userRole === "admin"
       ? adminMasterDataLinks
       : userRole === "kasir"
         ? kasirMasterDataLinks
-        : [];
-  const transactionLinks =
+        : userRole === "sales"
+          ? salesMasterDataLinks
+          : [];
+
+  const transactionLinks: NavLinkWithSub[] =
     userRole === "admin"
       ? adminTransactionLinks
       : userRole === "kasir"
         ? kasirTransactionLinks
-        : [];
+        : userRole === "sales"
+          ? salesTransactionLinks
+          : [];
 
   // Auto-expand menu jika ada submenu yang aktif
   useEffect(() => {
     if (!isCollapsed) {
-      masterDataLinks.forEach((link) => {
-        if (
-          link.subMenu &&
-          isSubMenuActive(link.subMenu) &&
-          !openMenus.includes(link.label)
-        ) {
-          setOpenMenus((prev) => [...prev, link.label]);
-        }
-      });
-
-      transactionLinks.forEach((link) => {
+      const allLinks = [...masterDataLinks, ...transactionLinks];
+      allLinks.forEach((link) => {
         if (
           link.subMenu &&
           isSubMenuActive(link.subMenu) &&
@@ -493,7 +515,8 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
         }
       });
     }
-  }, [pathname, isCollapsed, masterDataLinks, transactionLinks, openMenus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, isCollapsed]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -502,21 +525,14 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
 
   // Close all menus when sidebar is collapsed
   useEffect(() => {
-    if (isCollapsed) {
-      setOpenMenus([]);
-    }
+    if (isCollapsed) setOpenMenus([]);
   }, [isCollapsed]);
 
   // Update body class for layout adjustment
   useEffect(() => {
     if (typeof window !== "undefined") {
-      if (isCollapsed) {
-        document.body.classList.add("sidebar-collapsed");
-      } else {
-        document.body.classList.remove("sidebar-collapsed");
-      }
+      document.body.classList.toggle("sidebar-collapsed", isCollapsed);
     }
-
     return () => {
       if (typeof window !== "undefined") {
         document.body.classList.remove("sidebar-collapsed");
@@ -548,13 +564,13 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
   const isMenuOpen = (label: string) =>
     openMenus.includes(label) && !isCollapsed;
 
-  const isSubMenuActive = (subMenu: { href: string }[]) =>
+  const isSubMenuActive = (subMenu: SubMenuItem[]) =>
     subMenu.some((item) => pathname === item.href);
 
-  const renderMenuItem = (link: any, isSubMenu: boolean = false) => {
-    const hasSubMenu = link.subMenu && link.subMenu.length > 0;
+  const renderMenuItem = (link: NavLinkWithSub) => {
+    const hasSubMenu = !!link.subMenu && link.subMenu.length > 0;
     const isActive = hasSubMenu
-      ? isSubMenuActive(link.subMenu)
+      ? isSubMenuActive(link.subMenu!)
       : pathname === link.href;
 
     if (hasSubMenu) {
@@ -570,9 +586,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
             type="button"
           >
             <span
-              className={`flex-shrink-0 ${
-                isActive ? "text-white" : "text-gray-400 group-hover:text-white"
-              }`}
+              className={`flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`}
             >
               {link.icon}
             </span>
@@ -580,9 +594,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
               <>
                 <span className="flex-1 text-left">{link.label}</span>
                 <span
-                  className={`transform transition-transform duration-200 ${
-                    isMenuOpen(link.label) ? "rotate-180" : ""
-                  }`}
+                  className={`transform transition-transform duration-200 ${isMenuOpen(link.label) ? "rotate-180" : ""}`}
                 >
                   <ChevronDown className="w-4 h-4" />
                 </span>
@@ -590,7 +602,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
             )}
           </button>
 
-          {/* Tooltip for collapsed state */}
+          {/* Tooltip collapsed */}
           {isCollapsed && (
             <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
               {link.label}
@@ -606,7 +618,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
                   : "max-h-0 opacity-0"
               }`}
             >
-              {link.subMenu.map((subItem: any) => (
+              {link.subMenu!.map((subItem) => (
                 <li key={subItem.href}>
                   <Link href={subItem.href} scroll={false}>
                     <button
@@ -618,11 +630,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
                       type="button"
                     >
                       <span
-                        className={`${
-                          pathname === subItem.href
-                            ? "text-blue-400"
-                            : "text-gray-500 group-hover:text-gray-300"
-                        }`}
+                        className={`${pathname === subItem.href ? "text-blue-400" : "text-gray-500 group-hover:text-gray-300"}`}
                       >
                         {subItem.icon}
                       </span>
@@ -649,9 +657,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
             type="button"
           >
             <span
-              className={`flex-shrink-0 ${
-                isActive ? "text-white" : "text-gray-400 group-hover:text-white"
-              }`}
+              className={`flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`}
             >
               {link.icon}
             </span>
@@ -682,7 +688,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
         )}
       </button>
 
-      {/* Overlay for mobile */}
+      {/* Overlay mobile */}
       {isMobileOpen && (
         <div
           className="xl:hidden fixed inset-0 bg-black/50 z-40"
@@ -699,20 +705,18 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
         {/* Header */}
         <div className="relative border-b border-white/10 bg-gradient-to-r from-blue-600/10 to-purple-600/10">
           <div
-            className={`flex items-center py-6 px-6 ${
-              isCollapsed ? "flex-col gap-4" : "justify-between"
-            }`}
+            className={`flex items-center py-6 px-6 ${isCollapsed ? "flex-col gap-4" : "justify-between"}`}
           >
             <Link
-              className={`flex items-center gap-3 group ${
-                isCollapsed ? "justify-center w-full" : "flex-1"
-              }`}
+              className={`flex items-center gap-3 group ${isCollapsed ? "justify-center w-full" : "flex-1"}`}
               href={
                 userRole === "admin"
                   ? "/dashboard/admin"
                   : userRole === "kasir"
                     ? "/dashboard/kasir"
-                    : "/dashboard/kepala_gudang/barang"
+                    : userRole === "sales"
+                      ? "/dashboard/sales"
+                      : "/dashboard/kepala_gudang/barang"
               }
             >
               <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow flex-shrink-0">
@@ -730,7 +734,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
               )}
             </Link>
 
-            {/* Toggle Button - Desktop Only */}
+            {/* Toggle Button Desktop */}
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className={`hidden xl:flex p-2 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 items-center justify-center group border border-white/10 ${
@@ -750,9 +754,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
 
         {/* Navigation */}
         <div
-          className={`py-4 h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar ${
-            isCollapsed ? "px-2" : "px-4"
-          }`}
+          className={`py-4 h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar ${isCollapsed ? "px-2" : "px-4"}`}
         >
           {/* Menu Utama */}
           <div className="mb-6">
