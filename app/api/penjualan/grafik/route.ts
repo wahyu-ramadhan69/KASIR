@@ -1,4 +1,4 @@
-// app/api/penjualan/summary/route.ts
+// app/api/penjualan/grafik/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getAuthData } from "@/app/AuthGuard";
@@ -21,24 +21,11 @@ function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
   return jumlahDus * jumlahPerKemasan + jumlahPcs;
 }
 
-// Deep serialize to handle all BigInt in nested objects
 function deepSerialize(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-
-  if (typeof obj === "bigint") {
-    return Number(obj);
-  }
-
-  if (obj instanceof Date) {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(deepSerialize);
-  }
-
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") return Number(obj);
+  if (obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(deepSerialize);
   if (typeof obj === "object") {
     const serialized: any = {};
     for (const key in obj) {
@@ -48,7 +35,6 @@ function deepSerialize(obj: any): any {
     }
     return serialized;
   }
-
   return obj;
 }
 
@@ -57,35 +43,50 @@ export async function GET(request: Request) {
   if (!authData) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
   try {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "daily";
     const range = parseInt(searchParams.get("range") || "30");
     const dateParam = searchParams.get("date");
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
+    const useCustomRange = !!(startDateParam && endDateParam);
+
     const roleUpper = authData.role?.toUpperCase();
     const isAdmin = roleUpper === "ADMIN";
     const isKasir = roleUpper === "KASIR";
     const userId = Number(authData.userId);
     const shouldFilterByUser = !isAdmin && !Number.isNaN(userId);
 
-    const today = dateParam
-      ? new Date(`${dateParam}T00:00:00`)
-      : new Date();
-    today.setHours(23, 59, 59, 999);
+    // ✅ Kalkulasi startDate & today berdasarkan mode
+    let today: Date;
+    let startDate: Date;
 
-    const startDate = new Date(today);
+    if (useCustomRange) {
+      // Mode custom range: gunakan startDate & endDate dari params
+      startDate = new Date(`${startDateParam}T00:00:00`);
+      startDate.setHours(0, 0, 0, 0);
+      today = new Date(`${endDateParam}T00:00:00`);
+      today.setHours(23, 59, 59, 999);
+    } else {
+      // Mode normal: pakai period + range + date
+      today = dateParam ? new Date(`${dateParam}T00:00:00`) : new Date();
+      today.setHours(23, 59, 59, 999);
+      startDate = new Date(today);
 
-    if (period === "daily") {
-      startDate.setDate(startDate.getDate() - (range - 1));
-      startDate.setHours(0, 0, 0, 0);
-    } else if (period === "monthly") {
-      startDate.setMonth(startDate.getMonth() - (range - 1));
-      startDate.setDate(1);
-      startDate.setHours(0, 0, 0, 0);
-    } else if (period === "yearly") {
-      startDate.setFullYear(startDate.getFullYear() - (range - 1));
-      startDate.setMonth(0, 1);
-      startDate.setHours(0, 0, 0, 0);
+      if (period === "daily") {
+        startDate.setDate(startDate.getDate() - (range - 1));
+        startDate.setHours(0, 0, 0, 0);
+      } else if (period === "monthly") {
+        startDate.setMonth(startDate.getMonth() - (range - 1));
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+      } else if (period === "yearly") {
+        startDate.setFullYear(startDate.getFullYear() - (range - 1));
+        startDate.setMonth(0, 1);
+        startDate.setHours(0, 0, 0, 0);
+      }
     }
 
     type PenjualanEntry = {
@@ -99,24 +100,14 @@ export async function GET(request: Request) {
     let pembayaranPenjualanEntries: PenjualanEntry[] = [];
 
     if (isKasir) {
-      // Fetch data penjualan berdasarkan pembayaran (khusus kasir)
       const pembayaranPenjualan = await prisma.pembayaranPenjualan.findMany({
         where: {
-          tanggalBayar: {
-            gte: startDate,
-            lte: today,
-          },
-          penjualan: {
-            statusTransaksi: "SELESAI",
-            isDeleted: false,
-          },
+          tanggalBayar: { gte: startDate, lte: today },
+          penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
           jenisPembayaran: "PENJUALAN",
           ...(shouldFilterByUser ? { userId } : {}),
         },
-        select: {
-          tanggalBayar: true,
-          nominal: true,
-        },
+        select: { tanggalBayar: true, nominal: true },
       });
       penjualanEntries = pembayaranPenjualan.map((item) => ({
         tanggal: item.tanggalBayar,
@@ -126,21 +117,12 @@ export async function GET(request: Request) {
 
       const pembayaranPiutang = await prisma.pembayaranPenjualan.findMany({
         where: {
-          tanggalBayar: {
-            gte: startDate,
-            lte: today,
-          },
-          penjualan: {
-            statusTransaksi: "SELESAI",
-            isDeleted: false,
-          },
+          tanggalBayar: { gte: startDate, lte: today },
+          penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
           jenisPembayaran: "PIUTANG",
           ...(shouldFilterByUser ? { userId } : {}),
         },
-        select: {
-          tanggalBayar: true,
-          nominal: true,
-        },
+        select: { tanggalBayar: true, nominal: true },
       });
       piutangEntries = pembayaranPiutang.map((item) => ({
         tanggal: item.tanggalBayar,
@@ -149,10 +131,7 @@ export async function GET(request: Request) {
 
       const piutangOutstanding = await prisma.penjualanHeader.findMany({
         where: {
-          tanggalTransaksi: {
-            gte: startDate,
-            lte: today,
-          },
+          tanggalTransaksi: { gte: startDate, lte: today },
           statusTransaksi: "SELESAI",
           statusPembayaran: "HUTANG",
           isDeleted: false,
@@ -168,25 +147,18 @@ export async function GET(request: Request) {
         tanggal: item.tanggalTransaksi,
         nominal: Math.max(
           0,
-          Number(item.totalHarga) - Number(item.jumlahDibayar || 0)
+          Number(item.totalHarga) - Number(item.jumlahDibayar || 0),
         ),
       }));
     } else {
-      // Fetch data penjualan berdasarkan header (admin/role lain)
       const penjualanHeaders = await prisma.penjualanHeader.findMany({
         where: {
-          tanggalTransaksi: {
-            gte: startDate,
-            lte: today,
-          },
+          tanggalTransaksi: { gte: startDate, lte: today },
           statusTransaksi: "SELESAI",
           isDeleted: false,
           ...(shouldFilterByUser ? { userId } : {}),
         },
-        select: {
-          tanggalTransaksi: true,
-          totalHarga: true,
-        },
+        select: { tanggalTransaksi: true, totalHarga: true },
       });
       penjualanEntries = penjualanHeaders.map((item) => ({
         tanggal: item.tanggalTransaksi,
@@ -195,21 +167,12 @@ export async function GET(request: Request) {
 
       const pembayaranPenjualan = await prisma.pembayaranPenjualan.findMany({
         where: {
-          tanggalBayar: {
-            gte: startDate,
-            lte: today,
-          },
-          penjualan: {
-            statusTransaksi: "SELESAI",
-            isDeleted: false,
-          },
+          tanggalBayar: { gte: startDate, lte: today },
+          penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
           jenisPembayaran: "PENJUALAN",
           ...(shouldFilterByUser ? { userId } : {}),
         },
-        select: {
-          tanggalBayar: true,
-          nominal: true,
-        },
+        select: { tanggalBayar: true, nominal: true },
       });
       pembayaranPenjualanEntries = pembayaranPenjualan.map((item) => ({
         tanggal: item.tanggalBayar,
@@ -218,20 +181,12 @@ export async function GET(request: Request) {
 
       const pembayaranPiutang = await prisma.pembayaranPenjualan.findMany({
         where: {
-          tanggalBayar: {
-            gte: startDate,
-            lte: today,
-          },
+          tanggalBayar: { gte: startDate, lte: today },
           jenisPembayaran: "PIUTANG",
-          penjualan: {
-            isDeleted: false,
-          },
+          penjualan: { isDeleted: false },
           ...(shouldFilterByUser ? { userId } : {}),
         },
-        select: {
-          tanggalBayar: true,
-          nominal: true,
-        },
+        select: { tanggalBayar: true, nominal: true },
       });
       piutangEntries = pembayaranPiutang.map((item) => ({
         tanggal: item.tanggalBayar,
@@ -240,10 +195,7 @@ export async function GET(request: Request) {
 
       const piutangOutstanding = await prisma.penjualanHeader.findMany({
         where: {
-          tanggalTransaksi: {
-            gte: startDate,
-            lte: today,
-          },
+          tanggalTransaksi: { gte: startDate, lte: today },
           statusTransaksi: "SELESAI",
           statusPembayaran: "HUTANG",
           isDeleted: false,
@@ -259,50 +211,31 @@ export async function GET(request: Request) {
         tanggal: item.tanggalTransaksi,
         nominal: Math.max(
           0,
-          Number(item.totalHarga) - Number(item.jumlahDibayar || 0)
+          Number(item.totalHarga) - Number(item.jumlahDibayar || 0),
         ),
       }));
     }
 
-    // Fetch data pembelian
     const pembelianHeaders = await prisma.pembelianHeader.findMany({
       where: {
-        createdAt: {
-          gte: startDate,
-          lte: today,
-        },
+        createdAt: { gte: startDate, lte: today },
         statusTransaksi: "SELESAI",
       },
-      select: {
-        id: true,
-        createdAt: true,
-        totalHarga: true,
-      },
+      select: { id: true, createdAt: true, totalHarga: true },
     });
 
-    // Fetch data pengeluaran
     const pengeluaran = await prisma.pengeluaran.findMany({
       where: {
-        tanggalInput: {
-          gte: startDate,
-          lte: today,
-        },
+        tanggalInput: { gte: startDate, lte: today },
         ...(shouldFilterByUser ? { userId } : {}),
       },
-      select: {
-        tanggalInput: true,
-        jumlah: true,
-      },
+      select: { tanggalInput: true, jumlah: true },
     });
 
-    // Fetch data untuk hitung laba kotor
     const labaItems = await prisma.penjualanItem.findMany({
       where: {
         penjualan: {
-          tanggalTransaksi: {
-            gte: startDate,
-            lte: today,
-          },
+          tanggalTransaksi: { gte: startDate, lte: today },
           statusTransaksi: "SELESAI",
           isDeleted: false,
           ...(shouldFilterByUser ? { userId } : {}),
@@ -312,39 +245,22 @@ export async function GET(request: Request) {
         hargaJual: true,
         hargaBeli: true,
         totalItem: true,
-        barang: {
-          select: {
-            jumlahPerKemasan: true,
-          },
-        },
-        penjualan: {
-          select: { tanggalTransaksi: true },
-        },
+        barang: { select: { jumlahPerKemasan: true } },
+        penjualan: { select: { tanggalTransaksi: true } },
       },
     });
 
-    // Fetch data pengembalian barang rusak/kadaluarsa untuk kerugian
     const pengembalianRusak = await prisma.pengembalianBarang.findMany({
       where: {
-        tanggalPengembalian: {
-          gte: startDate,
-          lte: today,
-        },
-        kondisiBarang: {
-          in: ["RUSAK", "KADALUARSA"],
-        },
+        tanggalPengembalian: { gte: startDate, lte: today },
+        kondisiBarang: { in: ["RUSAK", "KADALUARSA"] },
         ...(shouldFilterByUser ? { userId } : {}),
       },
       select: {
         tanggalPengembalian: true,
         jumlahDus: true,
         jumlahPcs: true,
-        barang: {
-          select: {
-            hargaBeli: true,
-            jumlahPerKemasan: true,
-          },
-        },
+        barang: { select: { hargaBeli: true, jumlahPerKemasan: true } },
       },
     });
 
@@ -357,20 +273,19 @@ export async function GET(request: Request) {
       pengeluaran: number;
       labaKotor: number;
       kerugian: number;
-      laba: number; // ✅ Ini akan dihitung = labaKotor - pengeluaran - kerugian
+      laba: number;
     };
 
     const dataMap: Record<string, DailyValue> = {};
 
-    // Helper function untuk generate key berdasarkan period
     const getKey = (date: Date): string => {
-      if (period === "daily") {
-        return date.toISOString().slice(0, 10); // YYYY-MM-DD
-      } else if (period === "monthly") {
-        return date.toISOString().slice(0, 7); // YYYY-MM
-      } else {
-        return date.toISOString().slice(0, 4); // YYYY
+      if (useCustomRange) {
+        // Custom range selalu gunakan daily (per hari)
+        return date.toISOString().slice(0, 10);
       }
+      if (period === "daily") return date.toISOString().slice(0, 10);
+      if (period === "monthly") return date.toISOString().slice(0, 7);
+      return date.toISOString().slice(0, 4);
     };
 
     // Inisialisasi semua periode dengan 0
@@ -391,7 +306,8 @@ export async function GET(request: Request) {
         };
       }
 
-      if (period === "daily") {
+      // Increment cursor berdasarkan period atau daily untuk custom range
+      if (useCustomRange || period === "daily") {
         cursor.setDate(cursor.getDate() + 1);
       } else if (period === "monthly") {
         cursor.setMonth(cursor.getMonth() + 1);
@@ -400,9 +316,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // Isi data penjualan
-    for (const h of penjualanEntries) {
-      const key = getKey(h.tanggal);
+    const initKey = (key: string) => {
       if (!dataMap[key]) {
         dataMap[key] = {
           penjualan: 0,
@@ -416,121 +330,47 @@ export async function GET(request: Request) {
           laba: 0,
         };
       }
+    };
+
+    for (const h of penjualanEntries) {
+      const key = getKey(h.tanggal);
+      initKey(key);
       dataMap[key].penjualan += h.nominal;
     }
 
-    // Isi data pembayaran penjualan
     for (const h of pembayaranPenjualanEntries) {
       const key = getKey(h.tanggal);
-      if (!dataMap[key]) {
-        dataMap[key] = {
-          penjualan: 0,
-          pembayaranPenjualan: 0,
-          pembayaranPiutang: 0,
-          piutang: 0,
-          pembelian: 0,
-          pengeluaran: 0,
-          labaKotor: 0,
-          kerugian: 0,
-          laba: 0,
-        };
-      }
+      initKey(key);
       dataMap[key].pembayaranPenjualan += h.nominal;
     }
 
-    // Isi data pembayaran piutang
     for (const h of piutangEntries) {
       const key = getKey(h.tanggal);
-      if (!dataMap[key]) {
-        dataMap[key] = {
-          penjualan: 0,
-          pembayaranPenjualan: 0,
-          pembayaranPiutang: 0,
-          piutang: 0,
-          pembelian: 0,
-          pengeluaran: 0,
-          labaKotor: 0,
-          kerugian: 0,
-          laba: 0,
-        };
-      }
+      initKey(key);
       dataMap[key].pembayaranPiutang += h.nominal;
     }
 
-    // Isi data total piutang
     for (const h of piutangOutstandingEntries) {
       const key = getKey(h.tanggal);
-      if (!dataMap[key]) {
-        dataMap[key] = {
-          penjualan: 0,
-          pembayaranPenjualan: 0,
-          pembayaranPiutang: 0,
-          piutang: 0,
-          pembelian: 0,
-          pengeluaran: 0,
-          labaKotor: 0,
-          kerugian: 0,
-          laba: 0,
-        };
-      }
+      initKey(key);
       dataMap[key].piutang += h.nominal;
     }
 
-    // Isi data pembelian
     for (const p of pembelianHeaders) {
       const key = getKey(p.createdAt);
-      if (!dataMap[key]) {
-        dataMap[key] = {
-          penjualan: 0,
-          pembayaranPenjualan: 0,
-          pembayaranPiutang: 0,
-          piutang: 0,
-          pembelian: 0,
-          pengeluaran: 0,
-          labaKotor: 0,
-          kerugian: 0,
-          laba: 0,
-        };
-      }
+      initKey(key);
       dataMap[key].pembelian += Number(p.totalHarga);
     }
 
-    // Isi data pengeluaran
     for (const e of pengeluaran) {
       const key = getKey(e.tanggalInput);
-      if (!dataMap[key]) {
-        dataMap[key] = {
-          penjualan: 0,
-          pembayaranPenjualan: 0,
-          pembayaranPiutang: 0,
-          piutang: 0,
-          pembelian: 0,
-          pengeluaran: 0,
-          labaKotor: 0,
-          kerugian: 0,
-          laba: 0,
-        };
-      }
+      initKey(key);
       dataMap[key].pengeluaran += Number(e.jumlah);
     }
 
-    // ✅ Isi data kerugian dari pengembalian barang rusak/kadaluarsa
     for (const item of pengembalianRusak) {
       const key = getKey(item.tanggalPengembalian);
-      if (!dataMap[key]) {
-        dataMap[key] = {
-          penjualan: 0,
-          pembayaranPenjualan: 0,
-          pembayaranPiutang: 0,
-          piutang: 0,
-          pembelian: 0,
-          pengeluaran: 0,
-          labaKotor: 0,
-          kerugian: 0,
-          laba: 0,
-        };
-      }
-
+      initKey(key);
       const hargaBeli = Number(item.barang.hargaBeli);
       const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan);
       const modalDus = hargaBeli * Number(item.jumlahDus);
@@ -541,29 +381,14 @@ export async function GET(request: Request) {
       dataMap[key].kerugian += modalDus + modalPcs;
     }
 
-    // ✅ Isi data laba kotor
     for (const item of labaItems) {
       const key = getKey(item.penjualan.tanggalTransaksi);
-      if (!dataMap[key]) {
-        dataMap[key] = {
-          penjualan: 0,
-          pembayaranPenjualan: 0,
-          pembayaranPiutang: 0,
-          piutang: 0,
-          pembelian: 0,
-          pengeluaran: 0,
-          labaKotor: 0,
-          kerugian: 0,
-          laba: 0,
-        };
-      }
-
-      // Laba Kotor = (hargaJual - hargaBeli) * total quantity
+      initKey(key);
       const jumlahPerKemasan = Number(item.barang?.jumlahPerKemasan || 1);
       const totalPcs = getTotalItemPcs(item, jumlahPerKemasan);
       const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
         totalPcs,
-        jumlahPerKemasan
+        jumlahPerKemasan,
       );
       const totalQty = jumlahDus + jumlahPcs;
       const labaKotorPerItem =
@@ -571,8 +396,7 @@ export async function GET(request: Request) {
       dataMap[key].labaKotor += labaKotorPerItem;
     }
 
-    // ✅ HITUNG LABA BERSIH = Laba Kotor - Pengeluaran - Kerugian
-    // (setelah semua data terkumpul)
+    // Hitung laba bersih
     for (const key in dataMap) {
       dataMap[key].laba =
         dataMap[key].labaKotor -
@@ -580,7 +404,6 @@ export async function GET(request: Request) {
         dataMap[key].kerugian;
     }
 
-    // Convert ke array & sort
     const data = Object.entries(dataMap)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([date, value]) => ({
@@ -593,40 +416,43 @@ export async function GET(request: Request) {
         pengeluaran: value.pengeluaran,
         labaKotor: value.labaKotor,
         kerugian: value.kerugian,
-        laba: value.laba, // ✅ Sudah dikurangi pengeluaran
+        laba: value.laba,
       }));
 
     const totalPembayaranPenjualan = pembayaranPenjualanEntries.reduce(
       (sum, item) => sum + item.nominal,
-      0
+      0,
     );
     const totalPembayaranPiutang = piutangEntries.reduce(
       (sum, item) => sum + item.nominal,
-      0
+      0,
     );
     const totalPiutangOutstanding = piutangOutstandingEntries.reduce(
       (sum, item) => sum + item.nominal,
-      0
+      0,
     );
 
     return NextResponse.json(
       deepSerialize({
         success: true,
         data,
-        period,
+        period: useCustomRange ? "daily" : period,
         range,
+        useCustomRange,
+        startDate: startDate.toISOString().slice(0, 10),
+        endDate: today.toISOString().slice(0, 10),
         paymentTotals: {
           penjualan: totalPembayaranPenjualan,
           piutang: totalPembayaranPiutang,
         },
         totalPiutang: totalPiutangOutstanding,
-      })
+      }),
     );
   } catch (error) {
-    console.error("Error summary:", error);
+    console.error("Error grafik:", error);
     return NextResponse.json(
       { success: false, error: "Gagal mengambil data" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     await prisma.$disconnect();

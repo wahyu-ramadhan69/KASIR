@@ -2,8 +2,6 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  LineChart,
-  Line,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -25,12 +23,10 @@ import {
   ArrowDownRight,
   BarChart3,
   Sparkles,
-  Clock,
   Wallet,
   CalendarDays,
   CalendarRange,
   CalendarClock,
-  AlertTriangle,
 } from "lucide-react";
 
 interface DailySales {
@@ -69,17 +65,14 @@ const formatNumber = (num: number): string => {
     const rounded = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
     return `${sign}${rounded} ${suffix}`;
   };
-
   if (abs >= 1000000000) return formatShort(abs / 1000000000, "M");
   if (abs >= 1000000) return formatShort(abs / 1000000, "jt");
   if (abs >= 1000) return formatShort(abs / 1000, "rb");
   return `${num}`;
 };
 
-// Custom Tooltip dengan 5 metrics
 const CustomTooltip = ({ active, payload, period }: any) => {
   if (!active || !payload || !payload.length) return null;
-
   const d = payload[0].payload;
 
   let dateLabel = "";
@@ -94,7 +87,7 @@ const CustomTooltip = ({ active, payload, period }: any) => {
     const [year, month] = d.date.split("-");
     dateLabel = new Date(
       parseInt(year),
-      parseInt(month) - 1
+      parseInt(month) - 1,
     ).toLocaleDateString("id-ID", {
       month: "long",
       year: "numeric",
@@ -104,72 +97,66 @@ const CustomTooltip = ({ active, payload, period }: any) => {
   }
 
   return (
-    <div className="bg-white/95 backdrop-blur-xl p-5 rounded-2xl shadow-2xl border border-purple-100 transform transition-all">
+    <div className="bg-white/95 backdrop-blur-xl p-5 rounded-2xl shadow-2xl border border-purple-100">
       <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-100">
         <Calendar className="w-4 h-4 text-purple-600" />
         <p className="font-bold text-gray-800">{dateLabel}</p>
       </div>
-
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-sky-500" />
-            <span className="text-sm text-gray-600">Pembayaran Penjualan</span>
+        {[
+          {
+            label: "Pembayaran Penjualan",
+            key: "pembayaranPenjualan",
+            color: "text-blue-600",
+            dot: "from-blue-500 to-sky-500",
+          },
+          {
+            label: "Pembayaran Piutang",
+            key: "pembayaranPiutang",
+            color: "text-teal-600",
+            dot: "from-teal-500 to-emerald-500",
+          },
+          {
+            label: "Total Piutang",
+            key: "piutang",
+            color: "text-orange-600",
+            dot: "from-orange-500 to-amber-500",
+          },
+          {
+            label: "Pengeluaran",
+            key: "pengeluaran",
+            color: "text-red-500",
+            dot: "from-red-500 to-pink-500",
+          },
+          {
+            label: "Laba Kotor",
+            key: "labaKotor",
+            color: "text-cyan-600",
+            dot: "from-cyan-500 to-blue-500",
+          },
+        ].map((item) => (
+          <div
+            key={item.key}
+            className="flex items-center justify-between gap-8"
+          >
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-3 h-3 rounded-full bg-gradient-to-r ${item.dot}`}
+              />
+              <span className="text-sm text-gray-600">{item.label}</span>
+            </div>
+            <span className={`font-bold ${item.color}`}>
+              {formatRupiah(d[item.key])}
+            </span>
           </div>
-          <span className="font-bold text-blue-600">
-            {formatRupiah(d.pembayaranPenjualan)}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500" />
-            <span className="text-sm text-gray-600">Pembayaran Piutang</span>
-          </div>
-          <span className="font-bold text-teal-600">
-            {formatRupiah(d.pembayaranPiutang)}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500" />
-            <span className="text-sm text-gray-600">Total Piutang</span>
-          </div>
-          <span className="font-bold text-orange-600">
-            {formatRupiah(d.piutang)}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-red-500 to-pink-500" />
-            <span className="text-sm text-gray-600">Pengeluaran</span>
-          </div>
-          <span className="font-bold text-red-500">
-            {formatRupiah(d.pengeluaran)}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" />
-            <span className="text-sm text-gray-600">Laba Kotor</span>
-          </div>
-          <span className="font-bold text-cyan-600">
-            {formatRupiah(d.labaKotor)}
-          </span>
-        </div>
-
+        ))}
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-500" />
             <span className="text-sm text-gray-600">Laba Bersih</span>
           </div>
           <span
-            className={`font-bold ${
-              d.laba >= 0 ? "text-green-600" : "text-red-600"
-            }`}
+            className={`font-bold ${d.laba >= 0 ? "text-green-600" : "text-red-600"}`}
           >
             {formatRupiah(d.laba)}
           </span>
@@ -179,7 +166,6 @@ const CustomTooltip = ({ active, payload, period }: any) => {
   );
 };
 
-// Stat Card Component
 const StatCard = ({
   title,
   value,
@@ -190,16 +176,14 @@ const StatCard = ({
   delay,
 }: any) => {
   const [isVisible, setIsVisible] = useState(false);
-
   useEffect(() => {
-    setTimeout(() => setIsVisible(true), delay);
+    const t = setTimeout(() => setIsVisible(true), delay);
+    return () => clearTimeout(t);
   }, [delay]);
 
   return (
     <div
-      className={`group bg-white rounded-3xl p-6 shadow-lg border border-gray-100 relative overflow-hidden transform transition-all duration-700 hover:scale-105 hover:shadow-2xl ${
-        isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-      }`}
+      className={`group bg-white rounded-3xl p-6 shadow-lg border border-gray-100 relative overflow-hidden transform transition-all duration-700 hover:scale-105 hover:shadow-2xl ${isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"}`}
     >
       <div
         className={`absolute -right-8 -top-8 w-32 h-32 ${gradient} rounded-full opacity-10 group-hover:scale-150 transition-transform duration-700`}
@@ -207,7 +191,6 @@ const StatCard = ({
       <div
         className={`absolute -right-16 -bottom-8 w-40 h-40 ${gradient} rounded-full opacity-5 group-hover:scale-150 transition-transform duration-700`}
       />
-
       <div className="relative flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
@@ -216,13 +199,7 @@ const StatCard = ({
             </p>
             {trend !== undefined && trend !== null && (
               <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                  trend > 0
-                    ? "bg-green-100 text-green-700"
-                    : trend < 0
-                    ? "bg-red-100 text-red-700"
-                    : "bg-gray-100 text-gray-700"
-                }`}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${trend > 0 ? "bg-green-100 text-green-700" : trend < 0 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}
               >
                 {trend > 0 ? (
                   <ArrowUpRight className="w-3 h-3" />
@@ -238,7 +215,6 @@ const StatCard = ({
           </p>
           <p className="text-xs text-gray-500">{subtitle}</p>
         </div>
-
         <div
           className={`${gradient} p-4 rounded-2xl shadow-lg group-hover:rotate-12 transition-transform duration-500`}
         >
@@ -257,7 +233,7 @@ const Penjualan30HariPage = () => {
   const [period, setPeriod] = useState<Period>("daily");
   const [range, setRange] = useState<number>(1);
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [paymentTotals, setPaymentTotals] = useState<PaymentTotals>({
     penjualan: 0,
@@ -272,25 +248,35 @@ const Penjualan30HariPage = () => {
     labaKotor: true,
     laba: true,
   });
-
   const [debouncedRange, setDebouncedRange] = useState<number>(range);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedRange(range);
-    }, 500);
+  // ✅ PINDAH KE ATAS — harus sebelum fetchData
+  const [startDate, setStartDate] = useState<string>(
+    new Date(new Date().setDate(new Date().getDate() - 29))
+      .toISOString()
+      .split("T")[0],
+  );
+  const [endDate, setEndDate] = useState<string>(
+    new Date().toISOString().split("T")[0],
+  );
+  const [useCustomRange, setUseCustomRange] = useState<boolean>(false);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedRange(range), 500);
     return () => clearTimeout(timer);
   }, [range]);
 
+  // ✅ FIX: Tambah useCustomRange, startDate, endDate ke dependency array
   const fetchData = useCallback(async () => {
     try {
       if (!data.length) setLoading(true);
       else setRefreshing(true);
 
-      const res = await fetch(
-        `/api/penjualan/grafik?period=${period}&range=${debouncedRange}&date=${selectedDate}`
-      );
+      const url = useCustomRange
+        ? `/api/penjualan/grafik?period=${period}&startDate=${startDate}&endDate=${endDate}`
+        : `/api/penjualan/grafik?period=${period}&range=${debouncedRange}&date=${selectedDate}`;
+
+      const res = await fetch(url);
       const json = await res.json();
 
       if (json.success) {
@@ -309,43 +295,30 @@ const Penjualan30HariPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, debouncedRange, selectedDate]);
+  }, [
+    period,
+    debouncedRange,
+    selectedDate,
+    useCustomRange,
+    startDate,
+    endDate,
+  ]); // ✅ Fix
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Calculations
   const totalPenjualan = data.reduce((sum, item) => sum + item.penjualan, 0);
   const totalPengeluaran = data.reduce(
     (sum, item) => sum + item.pengeluaran,
-    0
+    0,
   );
   const totalLabaKotor = data.reduce((sum, item) => sum + item.labaKotor, 0);
-  const totalKerugian = data.reduce((sum, item) => sum + item.kerugian, 0);
   const totalLaba = data.reduce((sum, item) => sum + item.laba, 0);
 
-  // Trend calculation
-  const halfPoint = Math.floor(data.length / 2);
-  const firstHalf = data.slice(0, halfPoint);
-  const secondHalf = data.slice(halfPoint);
-  const firstHalfTotal = firstHalf.reduce(
-    (sum, item) => sum + item.penjualan,
-    0
-  );
-  const secondHalfTotal = secondHalf.reduce(
-    (sum, item) => sum + item.penjualan,
-    0
-  );
-  const trendPercentage =
-    firstHalfTotal > 0
-      ? ((secondHalfTotal - firstHalfTotal) / firstHalfTotal) * 100
-      : 0;
-
-  // Format label berdasarkan period
   const chartData = data.map((item) => {
     let label = "";
-    if (period === "daily") {
+    if (period === "daily" || useCustomRange) {
       const dateObj = new Date(item.date + "T00:00:00");
       label = dateObj.toLocaleDateString("id-ID", {
         day: "2-digit",
@@ -368,7 +341,7 @@ const Penjualan30HariPage = () => {
     data.length > 0
       ? data.reduce(
           (max, cur) => (cur.penjualan > max.penjualan ? cur : max),
-          data[0]
+          data[0],
         )
       : null;
 
@@ -377,56 +350,56 @@ const Penjualan30HariPage = () => {
       ? data.reduce((max, cur) => (cur.laba > max.laba ? cur : max), data[0])
       : null;
 
-  const maxKerugian =
-    data.length > 0
-      ? data.reduce(
-          (max, cur) => (cur.kerugian > max.kerugian ? cur : max),
-          data[0]
-        )
-      : null;
-
   const getFilterDateLabel = () => {
-    const endDate = selectedDate
+    if (useCustomRange) {
+      const s = new Date(startDate + "T00:00:00").toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      const e = new Date(endDate + "T00:00:00").toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      return startDate === endDate ? s : `${s} - ${e}`;
+    }
+
+    const endD = selectedDate
       ? new Date(`${selectedDate}T00:00:00`)
       : new Date();
-    const startDate = new Date(endDate);
+    const startD = new Date(endD);
 
     if (period === "daily") {
-      startDate.setDate(startDate.getDate() - (range - 1));
-      const startLabel = startDate.toLocaleDateString("id-ID", {
+      startD.setDate(startD.getDate() - (range - 1));
+      const startLabel = startD.toLocaleDateString("id-ID", {
         day: "2-digit",
         month: "long",
         year: "numeric",
       });
-      const endLabel = endDate.toLocaleDateString("id-ID", {
+      const endLabel = endD.toLocaleDateString("id-ID", {
         day: "2-digit",
         month: "long",
         year: "numeric",
       });
       return range === 1 ? endLabel : `${startLabel} - ${endLabel}`;
     }
-
     if (period === "monthly") {
-      startDate.setMonth(startDate.getMonth() - (range - 1));
-      startDate.setDate(1);
-      const startLabel = startDate.toLocaleDateString("id-ID", {
+      startD.setMonth(startD.getMonth() - (range - 1));
+      startD.setDate(1);
+      const startLabel = startD.toLocaleDateString("id-ID", {
         month: "long",
         year: "numeric",
       });
-      const endLabel = endDate.toLocaleDateString("id-ID", {
+      const endLabel = endD.toLocaleDateString("id-ID", {
         month: "long",
         year: "numeric",
       });
       return range === 1 ? endLabel : `${startLabel} - ${endLabel}`;
     }
-
-    startDate.setFullYear(startDate.getFullYear() - (range - 1));
-    const startLabel = startDate.toLocaleDateString("id-ID", {
-      year: "numeric",
-    });
-    const endLabel = endDate.toLocaleDateString("id-ID", {
-      year: "numeric",
-    });
+    startD.setFullYear(startD.getFullYear() - (range - 1));
+    const startLabel = startD.toLocaleDateString("id-ID", { year: "numeric" });
+    const endLabel = endD.toLocaleDateString("id-ID", { year: "numeric" });
     return range === 1 ? endLabel : `${startLabel} - ${endLabel}`;
   };
 
@@ -436,12 +409,14 @@ const Penjualan30HariPage = () => {
 
   const handlePeriodChange = (newPeriod: Period) => {
     setPeriod(newPeriod);
+    setUseCustomRange(false); // ✅ Reset custom range saat ganti period
     if (newPeriod === "daily") setRange(1);
     else if (newPeriod === "monthly") setRange(12);
     else setRange(5);
   };
 
   const getPeriodLabel = () => {
+    if (useCustomRange) return `${startDate} s/d ${endDate}`;
     if (period === "daily") return `${range} Hari Terakhir`;
     if (period === "monthly") return `${range} Bulan Terakhir`;
     return `${range} Tahun Terakhir`;
@@ -471,28 +446,67 @@ const Penjualan30HariPage = () => {
             </div>
 
             <div className="flex flex-col items-end gap-3">
-              <label className="relative cursor-pointer">
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="absolute inset-0 z-10 opacity-0 cursor-pointer"
-                  aria-label="Filter tanggal"
-                />
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm shadow-lg">
-                  <Calendar className="w-4 h-4" />
-                  <span className="font-semibold">{getFilterDateLabel()}</span>
-                </div>
-              </label>
+              {/* Baris 1: Toggle + Date Inputs */}
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {/* Toggle Custom Range */}
+                <button
+                  onClick={() => setUseCustomRange(!useCustomRange)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-lg ${
+                    useCustomRange
+                      ? "bg-white text-purple-700"
+                      : "bg-white/15 backdrop-blur-sm text-white hover:bg-white/25"
+                  }`}
+                >
+                  <CalendarRange className="w-4 h-4" />
+                  <span>Custom Range</span>
+                </button>
+
+                {useCustomRange ? (
+                  <>
+                    {/* Start Date */}
+                    <input
+                      type="date"
+                      value={startDate}
+                      max={endDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="px-3 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-semibold border border-white/30 focus:outline-none focus:bg-white/25 [color-scheme:dark]"
+                    />
+                    <span className="text-white font-bold">→</span>
+                    {/* End Date */}
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={startDate}
+                      max={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="px-3 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-semibold border border-white/30 focus:outline-none focus:bg-white/25 [color-scheme:dark]"
+                    />
+                  </>
+                ) : (
+                  // Single date picker
+                  <div className="relative flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm shadow-lg cursor-pointer">
+                    <Calendar className="w-4 h-4 pointer-events-none" />
+                    <span className="font-semibold pointer-events-none">
+                      {getFilterDateLabel()}
+                    </span>
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Baris 2: Tombol Refresh */}
               <button
                 onClick={fetchData}
                 disabled={refreshing}
                 className="group bg-white text-purple-700 hover:bg-purple-50 px-6 py-3 rounded-2xl flex items-center gap-3 font-bold transition-all shadow-xl hover:shadow-2xl hover:scale-105 disabled:opacity-50"
               >
                 <RefreshCw
-                  className={`w-5 h-5 transition-transform ${
-                    refreshing ? "animate-spin" : "group-hover:rotate-180"
-                  }`}
+                  className={`w-5 h-5 transition-transform ${refreshing ? "animate-spin" : "group-hover:rotate-180"}`}
                 />
                 <span>{refreshing ? "Memuat..." : "Refresh Data"}</span>
               </button>
@@ -500,157 +514,120 @@ const Penjualan30HariPage = () => {
           </div>
         </div>
 
-        {/* FILTER SECTION */}
-        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            {/* Period Filter */}
-            <div className="flex-1 w-full lg:w-auto">
-              <label className="text-sm font-bold text-gray-700 mb-3 block">
-                Periode Waktu
-              </label>
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  onClick={() => handlePeriodChange("daily")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
-                    period === "daily"
-                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <CalendarDays className="w-6 h-6" />
-                  <span className="text-xs">Harian</span>
-                </button>
-                <button
-                  onClick={() => handlePeriodChange("monthly")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
-                    period === "monthly"
-                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <CalendarRange className="w-6 h-6" />
-                  <span className="text-xs">Bulanan</span>
-                </button>
-                <button
-                  onClick={() => handlePeriodChange("yearly")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
-                    period === "yearly"
-                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <CalendarClock className="w-6 h-6" />
-                  <span className="text-xs">Tahunan</span>
-                </button>
+        {/* FILTER SECTION — disembunyikan saat custom range aktif */}
+        {!useCustomRange && (
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-8">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+              {/* Period Filter */}
+              <div className="flex-1 w-full lg:w-auto">
+                <label className="text-sm font-bold text-gray-700 mb-3 block">
+                  Periode Waktu
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(["daily", "monthly", "yearly"] as Period[]).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => handlePeriodChange(p)}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
+                        period === p
+                          ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {p === "daily" && <CalendarDays className="w-6 h-6" />}
+                      {p === "monthly" && <CalendarRange className="w-6 h-6" />}
+                      {p === "yearly" && <CalendarClock className="w-6 h-6" />}
+                      <span className="text-xs">
+                        {p === "daily"
+                          ? "Harian"
+                          : p === "monthly"
+                            ? "Bulanan"
+                            : "Tahunan"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Range Filter */}
-            <div className="flex-1 w-full lg:w-auto">
-              <label className="text-sm font-bold text-gray-700 mb-3 block">
-                Rentang{" "}
-                {period === "daily"
-                  ? "Hari"
-                  : period === "monthly"
-                  ? "Bulan"
-                  : "Tahun"}
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={1}
-                  max={period === "daily" ? 90 : period === "monthly" ? 24 : 10}
-                  value={range}
-                  onChange={(e) => setRange(parseInt(e.target.value))}
-                  className="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                />
-                <div className="min-w-[120px] px-4 py-2 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl">
-                  <p className="text-2xl font-black text-purple-700 text-center">
-                    {range}
-                  </p>
-                  <p className="text-xs text-purple-600 text-center">
-                    {period === "daily"
-                      ? "Hari"
-                      : period === "monthly"
+              {/* Range Slider */}
+              <div className="flex-1 w-full lg:w-auto">
+                <label className="text-sm font-bold text-gray-700 mb-3 block">
+                  Rentang{" "}
+                  {period === "daily"
+                    ? "Hari"
+                    : period === "monthly"
                       ? "Bulan"
                       : "Tahun"}
-                  </p>
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={
+                      period === "daily" ? 90 : period === "monthly" ? 24 : 10
+                    }
+                    value={range}
+                    onChange={(e) => setRange(parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                  />
+                  <div className="min-w-[120px] px-4 py-2 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl">
+                    <p className="text-2xl font-black text-purple-700 text-center">
+                      {range}
+                    </p>
+                    <p className="text-xs text-purple-600 text-center">
+                      {period === "daily"
+                        ? "Hari"
+                        : period === "monthly"
+                          ? "Bulan"
+                          : "Tahun"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Filters */}
+              <div className="w-full lg:w-auto">
+                <label className="text-sm font-bold text-gray-700 mb-3 block">
+                  Quick Filter
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {period === "daily" &&
+                    [1, 7, 30, 90].map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setRange(d)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        {d} Hari
+                      </button>
+                    ))}
+                  {period === "monthly" &&
+                    [6, 12].map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setRange(m)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        {m} Bulan
+                      </button>
+                    ))}
+                  {period === "yearly" &&
+                    [3, 5].map((y) => (
+                      <button
+                        key={y}
+                        onClick={() => setRange(y)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        {y} Tahun
+                      </button>
+                    ))}
                 </div>
               </div>
             </div>
-
-            {/* Quick Filters */}
-            <div className="w-full lg:w-auto">
-              <label className="text-sm font-bold text-gray-700 mb-3 block">
-                Quick Filter
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {period === "daily" && (
-                  <>
-                    <button
-                      onClick={() => setRange(1)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      1 Hari
-                    </button>
-                    <button
-                      onClick={() => setRange(7)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      7 Hari
-                    </button>
-                    <button
-                      onClick={() => setRange(30)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      30 Hari
-                    </button>
-                    <button
-                      onClick={() => setRange(90)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      90 Hari
-                    </button>
-                  </>
-                )}
-                {period === "monthly" && (
-                  <>
-                    <button
-                      onClick={() => setRange(6)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      6 Bulan
-                    </button>
-                    <button
-                      onClick={() => setRange(12)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      12 Bulan
-                    </button>
-                  </>
-                )}
-                {period === "yearly" && (
-                  <>
-                    <button
-                      onClick={() => setRange(3)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      3 Tahun
-                    </button>
-                    <button
-                      onClick={() => setRange(5)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      5 Tahun
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
           </div>
-        </div>
+        )}
 
-        {/* ✅ UPDATED: STATS CARDS - Now 5 cards (removed Rata-rata) */}
+        {/* STATS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <StatCard
             title="Pembayaran Penjualan"
@@ -660,7 +637,6 @@ const Penjualan30HariPage = () => {
             gradient="bg-gradient-to-br from-blue-500 to-sky-600"
             delay={0}
           />
-
           <StatCard
             title="Pembayaran Piutang"
             value={formatNumber(paymentTotals.piutang)}
@@ -669,7 +645,6 @@ const Penjualan30HariPage = () => {
             gradient="bg-gradient-to-br from-teal-500 to-emerald-600"
             delay={50}
           />
-
           <StatCard
             title="Total Piutang"
             value={formatNumber(totalPiutang)}
@@ -679,7 +654,6 @@ const Penjualan30HariPage = () => {
             delay={75}
           />
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard
             title="Pengeluaran"
@@ -689,7 +663,6 @@ const Penjualan30HariPage = () => {
             gradient="bg-gradient-to-br from-red-500 to-pink-600"
             delay={100}
           />
-
           <StatCard
             title="Laba Kotor"
             value={formatNumber(totalLabaKotor)}
@@ -698,7 +671,6 @@ const Penjualan30HariPage = () => {
             gradient="bg-gradient-to-br from-cyan-500 to-blue-600"
             delay={150}
           />
-
           <StatCard
             title="Laba Bersih"
             value={formatNumber(totalLaba)}
@@ -720,30 +692,19 @@ const Penjualan30HariPage = () => {
                 Visualisasi {getPeriodLabel().toLowerCase()}
               </p>
             </div>
-
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-2xl">
-                <button
-                  onClick={() => setChartType("area")}
-                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    chartType === "area"
-                      ? "bg-white text-purple-600 shadow-md"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  Area
-                </button>
-                <button
-                  onClick={() => setChartType("bar")}
-                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    chartType === "bar"
-                      ? "bg-white text-purple-600 shadow-md"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  Bar
-                </button>
-              </div>
+            <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-2xl">
+              <button
+                onClick={() => setChartType("area")}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${chartType === "area" ? "bg-white text-purple-600 shadow-md" : "text-gray-600 hover:text-gray-800"}`}
+              >
+                Area
+              </button>
+              <button
+                onClick={() => setChartType("bar")}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${chartType === "bar" ? "bg-white text-purple-600 shadow-md" : "text-gray-600 hover:text-gray-800"}`}
+              >
+                Bar
+              </button>
             </div>
           </div>
 
@@ -752,72 +713,61 @@ const Penjualan30HariPage = () => {
             <span className="text-sm font-semibold text-gray-600">
               Tampilkan:
             </span>
-            <button
-              onClick={() => toggleLine("pembayaranPenjualan")}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                visibleLines.pembayaranPenjualan
-                  ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-                  : "bg-gray-100 text-gray-400 border-2 border-gray-200"
-              }`}
-            >
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-sky-500" />
-              Pembayaran Penjualan
-            </button>
-            <button
-              onClick={() => toggleLine("pembayaranPiutang")}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                visibleLines.pembayaranPiutang
-                  ? "bg-teal-100 text-teal-700 border-2 border-teal-300"
-                  : "bg-gray-100 text-gray-400 border-2 border-gray-200"
-              }`}
-            >
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500" />
-              Pembayaran Piutang
-            </button>
-            <button
-              onClick={() => toggleLine("piutang")}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                visibleLines.piutang
-                  ? "bg-orange-100 text-orange-700 border-2 border-orange-300"
-                  : "bg-gray-100 text-gray-400 border-2 border-gray-200"
-              }`}
-            >
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500" />
-              Total Piutang
-            </button>
-            <button
-              onClick={() => toggleLine("pengeluaran")}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                visibleLines.pengeluaran
-                  ? "bg-red-100 text-red-700 border-2 border-red-300"
-                  : "bg-gray-100 text-gray-400 border-2 border-gray-200"
-              }`}
-            >
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-red-500 to-pink-500" />
-              Pengeluaran
-            </button>
-            <button
-              onClick={() => toggleLine("labaKotor")}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                visibleLines.labaKotor
-                  ? "bg-cyan-100 text-cyan-700 border-2 border-cyan-300"
-                  : "bg-gray-100 text-gray-400 border-2 border-gray-200"
-              }`}
-            >
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" />
-              Laba Kotor
-            </button>
-            <button
-              onClick={() => toggleLine("laba")}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                visibleLines.laba
-                  ? "bg-green-100 text-green-700 border-2 border-green-300"
-                  : "bg-gray-100 text-gray-400 border-2 border-gray-200"
-              }`}
-            >
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-500" />
-              Laba Bersih
-            </button>
+            {[
+              {
+                key: "pembayaranPenjualan",
+                label: "Pembayaran Penjualan",
+                bg: "bg-blue-100 text-blue-700 border-blue-300",
+                dot: "from-blue-500 to-sky-500",
+              },
+              {
+                key: "pembayaranPiutang",
+                label: "Pembayaran Piutang",
+                bg: "bg-teal-100 text-teal-700 border-teal-300",
+                dot: "from-teal-500 to-emerald-500",
+              },
+              {
+                key: "piutang",
+                label: "Total Piutang",
+                bg: "bg-orange-100 text-orange-700 border-orange-300",
+                dot: "from-orange-500 to-amber-500",
+              },
+              {
+                key: "pengeluaran",
+                label: "Pengeluaran",
+                bg: "bg-red-100 text-red-700 border-red-300",
+                dot: "from-red-500 to-pink-500",
+              },
+              {
+                key: "labaKotor",
+                label: "Laba Kotor",
+                bg: "bg-cyan-100 text-cyan-700 border-cyan-300",
+                dot: "from-cyan-500 to-blue-500",
+              },
+              {
+                key: "laba",
+                label: "Laba Bersih",
+                bg: "bg-green-100 text-green-700 border-green-300",
+                dot: "from-green-500 to-emerald-500",
+              },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() =>
+                  toggleLine(item.key as keyof typeof visibleLines)
+                }
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all border-2 ${
+                  visibleLines[item.key as keyof typeof visibleLines]
+                    ? item.bg
+                    : "bg-gray-100 text-gray-400 border-gray-200"
+                }`}
+              >
+                <div
+                  className={`w-3 h-3 rounded-full bg-gradient-to-r ${item.dot}`}
+                />
+                {item.label}
+              </button>
+            ))}
           </div>
 
           {loading ? (
@@ -846,114 +796,34 @@ const Penjualan30HariPage = () => {
                 {chartType === "area" ? (
                   <AreaChart data={chartData} margin={{ left: 0, right: 20 }}>
                     <defs>
-                      <linearGradient
-                        id="colorPembayaranPenjualan"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#3b82f6"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#3b82f6"
-                          stopOpacity={0.1}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id="colorPembayaranPiutang"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#14b8a6"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#14b8a6"
-                          stopOpacity={0.1}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id="colorPiutang"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#f97316"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#f97316"
-                          stopOpacity={0.1}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id="colorPengeluaran"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#ef4444"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#ef4444"
-                          stopOpacity={0.1}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id="colorLabaKotor"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#06b6d4"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#06b6d4"
-                          stopOpacity={0.1}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id="colorLaba"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#10b981"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#10b981"
-                          stopOpacity={0.1}
-                        />
-                      </linearGradient>
+                      {[
+                        { id: "colorPembayaranPenjualan", color: "#3b82f6" },
+                        { id: "colorPembayaranPiutang", color: "#14b8a6" },
+                        { id: "colorPiutang", color: "#f97316" },
+                        { id: "colorPengeluaran", color: "#ef4444" },
+                        { id: "colorLabaKotor", color: "#06b6d4" },
+                        { id: "colorLaba", color: "#10b981" },
+                      ].map(({ id, color }) => (
+                        <linearGradient
+                          key={id}
+                          id={id}
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={color}
+                            stopOpacity={0.8}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={color}
+                            stopOpacity={0.1}
+                          />
+                        </linearGradient>
+                      ))}
                     </defs>
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -968,14 +838,19 @@ const Penjualan30HariPage = () => {
                     <YAxis
                       tick={{ fill: "#6b7280", fontSize: 12 }}
                       tickLine={false}
-                      tickFormatter={(value) => formatNumber(value)}
+                      tickFormatter={(v) => formatNumber(v)}
                     />
-                    <Tooltip content={<CustomTooltip period={period} />} />
+                    <Tooltip
+                      content={
+                        <CustomTooltip
+                          period={useCustomRange ? "daily" : period}
+                        />
+                      }
+                    />
                     <Legend
                       wrapperStyle={{ paddingTop: "20px" }}
                       iconType="circle"
                     />
-
                     {visibleLines.pembayaranPenjualan && (
                       <Area
                         type="monotone"
@@ -988,7 +863,6 @@ const Penjualan30HariPage = () => {
                         activeDot={{ r: 7 }}
                       />
                     )}
-
                     {visibleLines.pembayaranPiutang && (
                       <Area
                         type="monotone"
@@ -1001,7 +875,6 @@ const Penjualan30HariPage = () => {
                         activeDot={{ r: 7 }}
                       />
                     )}
-
                     {visibleLines.piutang && (
                       <Area
                         type="monotone"
@@ -1014,7 +887,6 @@ const Penjualan30HariPage = () => {
                         activeDot={{ r: 7 }}
                       />
                     )}
-
                     {visibleLines.pengeluaran && (
                       <Area
                         type="monotone"
@@ -1027,7 +899,6 @@ const Penjualan30HariPage = () => {
                         activeDot={{ r: 7 }}
                       />
                     )}
-
                     {visibleLines.labaKotor && (
                       <Area
                         type="monotone"
@@ -1040,7 +911,6 @@ const Penjualan30HariPage = () => {
                         activeDot={{ r: 7 }}
                       />
                     )}
-
                     {visibleLines.laba && (
                       <Area
                         type="monotone"
@@ -1069,14 +939,19 @@ const Penjualan30HariPage = () => {
                     <YAxis
                       tick={{ fill: "#6b7280", fontSize: 12 }}
                       tickLine={false}
-                      tickFormatter={(value) => formatNumber(value)}
+                      tickFormatter={(v) => formatNumber(v)}
                     />
-                    <Tooltip content={<CustomTooltip period={period} />} />
+                    <Tooltip
+                      content={
+                        <CustomTooltip
+                          period={useCustomRange ? "daily" : period}
+                        />
+                      }
+                    />
                     <Legend
                       wrapperStyle={{ paddingTop: "20px" }}
                       iconType="rect"
                     />
-
                     {visibleLines.pembayaranPenjualan && (
                       <Bar
                         dataKey="pembayaranPenjualan"
@@ -1085,7 +960,6 @@ const Penjualan30HariPage = () => {
                         radius={[8, 8, 0, 0]}
                       />
                     )}
-
                     {visibleLines.pembayaranPiutang && (
                       <Bar
                         dataKey="pembayaranPiutang"
@@ -1094,7 +968,6 @@ const Penjualan30HariPage = () => {
                         radius={[8, 8, 0, 0]}
                       />
                     )}
-
                     {visibleLines.piutang && (
                       <Bar
                         dataKey="piutang"
@@ -1103,7 +976,6 @@ const Penjualan30HariPage = () => {
                         radius={[8, 8, 0, 0]}
                       />
                     )}
-
                     {visibleLines.pengeluaran && (
                       <Bar
                         dataKey="pengeluaran"
@@ -1112,7 +984,6 @@ const Penjualan30HariPage = () => {
                         radius={[8, 8, 0, 0]}
                       />
                     )}
-
                     {visibleLines.labaKotor && (
                       <Bar
                         dataKey="labaKotor"
@@ -1121,7 +992,6 @@ const Penjualan30HariPage = () => {
                         radius={[8, 8, 0, 0]}
                       />
                     )}
-
                     {visibleLines.laba && (
                       <Bar
                         dataKey="laba"
@@ -1148,7 +1018,7 @@ const Penjualan30HariPage = () => {
         </div>
 
         {/* QUICK INSIGHTS */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-200">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-purple-500 rounded-xl">
@@ -1162,25 +1032,28 @@ const Penjualan30HariPage = () => {
                   {formatRupiah(maxPenjualan.penjualan)}
                 </p>
                 <p className="text-sm text-purple-600">
-                  {period === "daily" &&
+                  {(period === "daily" || useCustomRange) &&
                     new Date(
-                      maxPenjualan.date + "T00:00:00"
+                      maxPenjualan.date + "T00:00:00",
                     ).toLocaleDateString("id-ID", {
                       day: "numeric",
                       month: "long",
                     })}
                   {period === "monthly" &&
+                    !useCustomRange &&
                     (() => {
-                      const [year, month] = maxPenjualan.date.split("-");
+                      const [y, m] = maxPenjualan.date.split("-");
                       return new Date(
-                        parseInt(year),
-                        parseInt(month) - 1
+                        parseInt(y),
+                        parseInt(m) - 1,
                       ).toLocaleDateString("id-ID", {
                         month: "long",
                         year: "numeric",
                       });
                     })()}
-                  {period === "yearly" && `Tahun ${maxPenjualan.date}`}
+                  {period === "yearly" &&
+                    !useCustomRange &&
+                    `Tahun ${maxPenjualan.date}`}
                 </p>
               </>
             )}
@@ -1201,26 +1074,26 @@ const Penjualan30HariPage = () => {
                   {formatRupiah(maxLaba.laba)}
                 </p>
                 <p className="text-sm text-green-600">
-                  {period === "daily" &&
+                  {(period === "daily" || useCustomRange) &&
                     new Date(maxLaba.date + "T00:00:00").toLocaleDateString(
                       "id-ID",
-                      {
-                        day: "numeric",
-                        month: "long",
-                      }
+                      { day: "numeric", month: "long" },
                     )}
                   {period === "monthly" &&
+                    !useCustomRange &&
                     (() => {
-                      const [year, month] = maxLaba.date.split("-");
+                      const [y, m] = maxLaba.date.split("-");
                       return new Date(
-                        parseInt(year),
-                        parseInt(month) - 1
+                        parseInt(y),
+                        parseInt(m) - 1,
                       ).toLocaleDateString("id-ID", {
                         month: "long",
                         year: "numeric",
                       });
                     })()}
-                  {period === "yearly" && `Tahun ${maxLaba.date}`}
+                  {period === "yearly" &&
+                    !useCustomRange &&
+                    `Tahun ${maxLaba.date}`}
                 </p>
               </>
             )}
