@@ -427,7 +427,6 @@ model StokHarian {
   tanggal   DateTime @db.Date  // hanya tanggal, tanpa jam
   stok      BigInt
   
-  // opsional tapi berguna untuk audit
   totalMasuk  BigInt @default(0)
   totalKeluar BigInt @default(0)
 
