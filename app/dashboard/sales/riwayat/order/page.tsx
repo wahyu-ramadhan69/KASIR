@@ -275,7 +275,7 @@ const ApprovalPage = () => {
               </div>
             </div>
             <button
-              onClick={fetchOrders}
+              onClick={() => fetchOrders(1, false)}
               className="self-start sm:self-auto bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-lg text-sm"
             >
               <RefreshCw
@@ -453,7 +453,7 @@ const ApprovalPage = () => {
                               ? "Disetujui"
                               : order.statusApproval === "REJECTED"
                                 ? "Ditolak"
-                              : "Menunggu"}
+                                : "Menunggu"}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-center">
