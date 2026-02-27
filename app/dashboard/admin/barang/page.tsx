@@ -168,14 +168,12 @@ const DataBarangPage = () => {
   const [loadingChart, setLoadingChart] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [animationKey, setAnimationKey] = useState(0);
-  const [penjualanBarang, setPenjualanBarang] = useState<PenjualanBarang[]>(
-    []
-  );
+  const [penjualanBarang, setPenjualanBarang] = useState<PenjualanBarang[]>([]);
   const [loadingPenjualanBarang, setLoadingPenjualanBarang] = useState(false);
   const [penjualanFilterMode, setPenjualanFilterMode] =
     useState<PenjualanFilterMode>("date");
   const [penjualanDate, setPenjualanDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [penjualanStartDate, setPenjualanStartDate] = useState<string>("");
   const [penjualanEndDate, setPenjualanEndDate] = useState<string>("");
@@ -313,7 +311,7 @@ const DataBarangPage = () => {
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     if (editingBarang) {
@@ -371,7 +369,7 @@ const DataBarangPage = () => {
           hargaJual: parseRupiahToNumber(addFormHargaJual),
           jenisKemasan: formData.get("jenisKemasan"),
           jumlahPerKemasan: parseInt(
-            formData.get("jumlahPerKemasan") as string
+            formData.get("jumlahPerKemasan") as string,
           ),
           supplierId: parseInt(selectedSupplierId),
           berat: parseKgToGrams(addFormBerat),
@@ -495,11 +493,11 @@ const DataBarangPage = () => {
   const filteredEditSuppliersList = suppliersList.filter((supplier) =>
     supplier.namaSupplier
       .toLowerCase()
-      .includes(editSupplierSearch.toLowerCase())
+      .includes(editSupplierSearch.toLowerCase()),
   );
 
   const filteredSuppliersList = suppliersList.filter((supplier) =>
-    supplier.namaSupplier.toLowerCase().includes(supplierSearch.toLowerCase())
+    supplier.namaSupplier.toLowerCase().includes(supplierSearch.toLowerCase()),
   );
 
   const formatRupiah = (number: number): string => {
@@ -595,15 +593,14 @@ const DataBarangPage = () => {
 
   const uniqueSuppliers = Array.from(
     new Map(
-      barangList.map((item) => [item.supplier?.id, item.supplier])
-    ).values()
+      barangList.map((item) => [item.supplier?.id, item.supplier]),
+    ).values(),
   ).filter((supplier): supplier is Supplier => supplier !== undefined);
 
   const getTotalNilaiBarang = () => {
     return barangList.reduce(
-      (sum, item) =>
-        sum + item.hargaBeli * (item.stok / item.jumlahPerKemasan),
-      0
+      (sum, item) => sum + item.hargaBeli * (item.stok / item.jumlahPerKemasan),
+      0,
     );
   };
 
@@ -631,17 +628,17 @@ const DataBarangPage = () => {
       }
 
       const response = await fetch(
-        `/api/barang/grafik${params.toString() ? `?${params}` : ""}`
+        `/api/barang/grafik${params.toString() ? `?${params}` : ""}`,
       );
       const result = await response.json();
 
       const totalRev = result.reduce(
         (sum: number, item: ChartData) => sum + item.totalPenjualan,
-        0
+        0,
       );
       const totalUnits = result.reduce(
         (sum: number, item: ChartData) => sum + item.totalTerjual,
-        0
+        0,
       );
 
       const dataWithPercentage = result.map((item: ChartData) => ({
@@ -723,9 +720,7 @@ const DataBarangPage = () => {
     setLoadingPenjualanBarang(true);
     try {
       const fetchHistoris = async (date: string) => {
-        const response = await fetch(
-          `/api/stok-harian/historis?tanggal=${date}`
-        );
+        const response = await fetch(`/api/stok-harian/?tanggal=${date}`);
         const result = await response.json();
         if (!result.success || !Array.isArray(result.data)) {
           return [];
@@ -803,7 +798,7 @@ const DataBarangPage = () => {
         const totalMasukPcs = Math.max(0, masukSetelahPrev - masukSetelahEnd);
         const totalTerjualPcs = Math.max(
           0,
-          keluarSetelahPrev - keluarSetelahEnd
+          keluarSetelahPrev - keluarSetelahEnd,
         );
 
         result.push({
@@ -1205,11 +1200,11 @@ const DataBarangPage = () => {
                       {filteredBarang.map((item, index) => {
                         const { profit, percentage } = calculateProfit(
                           item.hargaBeli,
-                          item.hargaJual
+                          item.hargaJual,
                         );
                         const stokStatus = getStokStatus(
                           item.stok,
-                          item.jumlahPerKemasan
+                          item.jumlahPerKemasan,
                         );
 
                         return (
@@ -1274,14 +1269,14 @@ const DataBarangPage = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <div
                                 className={`text-sm font-bold ${getProfitColor(
-                                  profit
+                                  profit,
                                 )}`}
                               >
                                 {formatRupiahSimple(profit)}
                               </div>
                               <div
                                 className={`text-xs ${getProfitColor(
-                                  profit
+                                  profit,
                                 )} opacity-75`}
                               >
                                 {getPercentagePrefix(profit)}
@@ -1455,11 +1450,11 @@ const DataBarangPage = () => {
                   {penjualanQuery.mode === "date" && penjualanQuery.date
                     ? `Tanggal: ${penjualanQuery.date}`
                     : penjualanQuery.mode === "range" &&
-                      (penjualanQuery.startDate || penjualanQuery.endDate)
-                    ? `Rentang: ${penjualanQuery.startDate || "-"} s/d ${
-                        penjualanQuery.endDate || "-"
-                      }`
-                    : "Semua tanggal"}
+                        (penjualanQuery.startDate || penjualanQuery.endDate)
+                      ? `Rentang: ${penjualanQuery.startDate || "-"} s/d ${
+                          penjualanQuery.endDate || "-"
+                        }`
+                      : "Semua tanggal"}
                 </span>
               </div>
             </div>
@@ -1499,7 +1494,7 @@ const DataBarangPage = () => {
                         <p className="text-2xl font-bold text-orange-700">
                           {data.reduce(
                             (sum, item) => sum + item.totalTerjual,
-                            0
+                            0,
                           )}
                         </p>
                       </div>
@@ -1714,7 +1709,9 @@ const DataBarangPage = () => {
                         <input
                           type="date"
                           value={penjualanStartDate}
-                          onChange={(e) => setPenjualanStartDate(e.target.value)}
+                          onChange={(e) =>
+                            setPenjualanStartDate(e.target.value)
+                          }
                           className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
                         />
                       </div>
@@ -1745,11 +1742,11 @@ const DataBarangPage = () => {
                   {penjualanQuery.mode === "date" && penjualanQuery.date
                     ? `Tanggal: ${penjualanQuery.date}`
                     : penjualanQuery.mode === "range" &&
-                      (penjualanQuery.startDate || penjualanQuery.endDate)
-                    ? `Rentang: ${penjualanQuery.startDate || "-"} s/d ${
-                        penjualanQuery.endDate || "-"
-                      }`
-                    : "Semua tanggal"}
+                        (penjualanQuery.startDate || penjualanQuery.endDate)
+                      ? `Rentang: ${penjualanQuery.startDate || "-"} s/d ${
+                          penjualanQuery.endDate || "-"
+                        }`
+                      : "Semua tanggal"}
                 </span>
               </div>
             </div>
@@ -1893,8 +1890,8 @@ const DataBarangPage = () => {
                     {formatDecimal(
                       penjualanBarang.reduce(
                         (sum, item) => sum + item.totalTerjualKemasan,
-                        0
-                      )
+                        0,
+                      ),
                     )}
                   </p>
                 </div>
@@ -1906,8 +1903,8 @@ const DataBarangPage = () => {
                     {formatNumber(
                       penjualanBarang.reduce(
                         (sum, item) => sum + item.totalTerjualPcs,
-                        0
-                      )
+                        0,
+                      ),
                     )}
                   </p>
                 </div>
@@ -1919,8 +1916,8 @@ const DataBarangPage = () => {
                     {formatNumber(
                       penjualanBarang.reduce(
                         (sum, item) => sum + item.totalMasukPcs,
-                        0
-                      )
+                        0,
+                      ),
                     )}
                   </p>
                 </div>
@@ -2022,35 +2019,35 @@ const DataBarangPage = () => {
                           className={`text-xl font-bold ${getProfitColor(
                             calculateProfit(
                               selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).profit
+                              selectedBarang.hargaJual,
+                            ).profit,
                           )}`}
                         >
                           {formatRupiah(
                             calculateProfit(
                               selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).profit
+                              selectedBarang.hargaJual,
+                            ).profit,
                           )}
                         </span>
                         <div
                           className={`text-sm ${getProfitColor(
                             calculateProfit(
                               selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).profit
+                              selectedBarang.hargaJual,
+                            ).profit,
                           )}`}
                         >
                           {getPercentagePrefix(
                             calculateProfit(
                               selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
-                            ).profit
+                              selectedBarang.hargaJual,
+                            ).profit,
                           )}
                           {
                             calculateProfit(
                               selectedBarang.hargaBeli,
-                              selectedBarang.hargaJual
+                              selectedBarang.hargaJual,
                             ).percentage
                           }
                           %
@@ -2060,30 +2057,30 @@ const DataBarangPage = () => {
                   </div>
                 </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                  <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                    Stok
-                  </p>
-                  <p className="text-gray-900 text-xl font-bold">
-                    {selectedBarang.stok} pcs
-                  </p>
-                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
+                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
+                      Stok
+                    </p>
+                    <p className="text-gray-900 text-xl font-bold">
+                      {selectedBarang.stok} pcs
+                    </p>
+                  </div>
 
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
-                  <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
-                    Berat
-                  </p>
-                  <p className="text-gray-900 text-xl font-bold">
-                    {formatGramsToKg(selectedBarang.berat)} KG
-                  </p>
-                </div>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4">
+                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-2">
+                      Berat
+                    </p>
+                    <p className="text-gray-900 text-xl font-bold">
+                      {formatGramsToKg(selectedBarang.berat)} KG
+                    </p>
+                  </div>
 
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
-                  <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-2">
-                    Kemasan
-                  </p>
-                  <p className="text-purple-900 text-xl font-bold">
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
+                    <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-2">
+                      Kemasan
+                    </p>
+                    <p className="text-purple-900 text-xl font-bold">
                       {selectedBarang.jumlahPerKemasan} pcs
                     </p>
                     <p className="text-xs text-purple-600 mt-1">
