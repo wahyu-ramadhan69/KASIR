@@ -21,10 +21,7 @@ function deriveDusPcsFromTotal(totalItem: number, jumlahPerKemasan: number) {
   return { jumlahDus, jumlahPcs };
 }
 
-function getTotalItemPcs(
-  item: any,
-  jumlahPerKemasan: number
-): number {
+function getTotalItemPcs(item: any, jumlahPerKemasan: number): number {
   if (item.totalItem !== undefined && item.totalItem !== null) {
     return toNumber(item.totalItem);
   }
@@ -68,16 +65,16 @@ function calculatePenjualan(items: any[], diskonNota: number = 0) {
   };
 }
 
-// Deep serialize to handle all BigInt in nested objects
+// Deep serialize to handle all BigInt and null values in nested objects
 function deepSerialize(obj: any): any {
-  if (obj === null || obj === undefined) return obj;
+  if (obj === null || obj === undefined) return null;
   if (typeof obj === "bigint") return Number(obj);
-  if (obj instanceof Date) return obj;
+  if (obj instanceof Date) return obj.toISOString();
   if (Array.isArray(obj)) return obj.map(deepSerialize);
   if (typeof obj === "object") {
     const serialized: any = {};
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         serialized[key] = deepSerialize(obj[key]);
       }
     }
@@ -235,13 +232,12 @@ export async function POST(request: NextRequest) {
       for (const item of itemsToProcess) {
         const totalPcs = toNumber(item.totalItem);
         if (toNumber(item.barang.stok) < totalPcs) {
-          throw new Error(
-            `Stok ${item.barang.namaBarang} tidak mencukupi`
-          );
+          throw new Error(`Stok ${item.barang.namaBarang} tidak mencukupi`);
         }
       }
 
-      const finalMetodePembayaran = metodePembayaran || penjualan.metodePembayaran;
+      const finalMetodePembayaran =
+        metodePembayaran || penjualan.metodePembayaran;
       const finalJumlahDibayar =
         jumlahDibayar !== undefined && jumlahDibayar !== null
           ? toNumber(jumlahDibayar)
@@ -342,10 +338,7 @@ export async function GET(request: NextRequest) {
 
     const role = authData.role;
     if (role !== "ADMIN" && role !== "KASIR" && role !== "SALES") {
-      return NextResponse.json(
-        { error: "Forbidden" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -398,10 +391,49 @@ export async function GET(request: NextRequest) {
     }
 
     const totalCount = await prisma.penjualanHeader.count({ where });
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = page < totalPages;
+
+    // Guard: jika page melebihi totalPages atau data memang kosong, return lebih awal
+    if (totalCount === 0 || page > totalPages) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages,
+          hasMore: false,
+        },
+      });
+    }
+
     const data = await prisma.penjualanHeader.findMany({
       where,
-      include: {
-        customer: true,
+      select: {
+        id: true,
+        kodePenjualan: true,
+        namaCustomer: true,
+        statusApproval: true,
+        statusTransaksi: true,
+        statusPembayaran: true,
+        metodePembayaran: true,
+        subtotal: true,
+        totalHarga: true,
+        diskonNota: true,
+        jumlahDibayar: true,
+        kembalian: true,
+        tanggalTransaksi: true,
+        createdAt: true,
+        customerId: true,
+        customer: {
+          select: {
+            id: true,
+            nama: true,
+            namaToko: true,
+          },
+        },
         items: {
           select: {
             id: true,
@@ -434,9 +466,6 @@ export async function GET(request: NextRequest) {
       skip,
       take: limit,
     });
-
-    const totalPages = Math.ceil(totalCount / limit);
-    const hasMore = page < totalPages;
 
     return NextResponse.json(
       deepSerialize({

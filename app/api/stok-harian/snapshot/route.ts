@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isAuthenticated, getAuthData } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
 // ============================================================
 // GET /api/stok-harian?tanggal=2025-01-30
 // GET /api/stok-harian?tanggal=2025-01-30&barangId=1
+// Ambil data snapshot stok pada tanggal tertentu
 // ============================================================
 export async function GET(req: NextRequest) {
   try {
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const tanggalParam = searchParams.get("tanggal");
     const barangIdParam = searchParams.get("barangId");
@@ -33,9 +40,9 @@ export async function GET(req: NextRequest) {
         { status: 400 },
       );
     }
-
     tanggal.setHours(0, 0, 0, 0);
 
+    // Ambil snapshot 1 barang
     if (barangIdParam) {
       const barangId = parseInt(barangIdParam);
       if (isNaN(barangId)) {
@@ -62,7 +69,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            message: `Tidak ada snapshot stok untuk barangId ${barangId} pada tanggal ${tanggalParam}`,
+            message: `Belum ada snapshot untuk barangId ${barangId} pada tanggal ${tanggalParam}`,
           },
           { status: 404 },
         );
@@ -71,15 +78,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         success: true,
         tanggal: tanggalParam,
-        data: {
-          ...stokHarian,
-          stok: stokHarian.stok.toString(),
-          totalMasuk: stokHarian.totalMasuk.toString(),
-          totalKeluar: stokHarian.totalKeluar.toString(),
-        },
+        data: serializeStokHarian(stokHarian),
       });
     }
 
+    // Ambil snapshot semua barang
     const stokHarianList = await prisma.stokHarian.findMany({
       where: { tanggal },
       include: {
@@ -98,12 +101,7 @@ export async function GET(req: NextRequest) {
       success: true,
       tanggal: tanggalParam,
       total: stokHarianList.length,
-      data: stokHarianList.map((item) => ({
-        ...item,
-        stok: item.stok.toString(),
-        totalMasuk: item.totalMasuk.toString(),
-        totalKeluar: item.totalKeluar.toString(),
-      })),
+      data: stokHarianList.map(serializeStokHarian),
     });
   } catch (error) {
     console.error("[GET /api/stok-harian]", error);
@@ -111,28 +109,32 @@ export async function GET(req: NextRequest) {
       { success: false, message: "Terjadi kesalahan pada server" },
       { status: 500 },
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
 // ============================================================
 // POST /api/stok-harian
-// Header: Authorization: Bearer <CRON_SECRET>
 // Body (opsional): { "tanggal": "2025-01-30" } — default hari ini
-//
-// Digunakan oleh cron job untuk snapshot stok harian
-// Crontab: 59 23 * * * curl -X POST http://localhost:3000/api/stok-harian
-//          -H "Authorization: Bearer <secret>"
-//          -H "Content-Type: application/json"
 // ============================================================
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+    const auth = await isAuthenticated();
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Ambil data user untuk log siapa yang menjalankan snapshot
+    const userData = await getAuthData();
+
+    // Opsional: batasi hanya role tertentu
+    // if (userData?.role !== "ADMIN") {
+    //   return NextResponse.json(
+    //     { error: "Hanya admin yang boleh menjalankan snapshot" },
+    //     { status: 403 }
+    //   );
+    // }
 
     const body = await req.json().catch(() => ({}));
     const tanggalParam: string | undefined = body.tanggal;
@@ -151,6 +153,7 @@ export async function POST(req: NextRequest) {
     const endOfDay = new Date(tanggal);
     endOfDay.setHours(23, 59, 59, 999);
 
+    // Ambil semua barang aktif
     const semuaBarang = await prisma.barang.findMany({
       where: { isActive: true },
       select: { id: true, stok: true },
@@ -164,6 +167,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Hitung totalMasuk & totalKeluar per barang di hari tersebut
     const snapshotData = await Promise.all(
       semuaBarang.map(async (barang) => {
         const [masuk, keluar] = await Promise.all([
@@ -200,6 +204,7 @@ export async function POST(req: NextRequest) {
       }),
     );
 
+    // Upsert semua dalam 1 transaksi database
     await prisma.$transaction(
       snapshotData.map((d) =>
         prisma.stokHarian.upsert({
@@ -219,6 +224,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Snapshot stok berhasil untuk tanggal ${tanggal.toISOString().split("T")[0]}`,
+      dijalankanOleh: userData?.username ?? "sistem",
       totalSnapshot: snapshotData.length,
     });
   } catch (error) {
@@ -227,5 +233,25 @@ export async function POST(req: NextRequest) {
       { success: false, message: "Terjadi kesalahan pada server" },
       { status: 500 },
     );
+  } finally {
+    await prisma.$disconnect();
   }
+}
+
+// ============================================================
+// Helper: serialize BigInt ke string untuk JSON response
+// ============================================================
+function serializeStokHarian(item: any) {
+  return {
+    ...item,
+    stok: item.stok.toString(),
+    totalMasuk: item.totalMasuk.toString(),
+    totalKeluar: item.totalKeluar.toString(),
+    barang: item.barang
+      ? {
+          ...item.barang,
+          jumlahPerKemasan: item.barang.jumlahPerKemasan.toString(),
+        }
+      : null,
+  };
 }

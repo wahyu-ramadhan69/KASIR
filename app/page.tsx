@@ -555,7 +555,7 @@ export default function LandingPage() {
               </h1>
               <p className="text-lg text-purple-100 max-w-lg">
                 Dapatkan beras, gula, minyak, dan mie instan terbaik dengan
-                harga pasar. Pengiriman cepat ke seluruh wilayah.
+                harga pasar. Pengiriman cepat ke seluruh wilayah Sarolangun.
               </p>
               <div className="flex flex-wrap gap-4">
                 <button className="px-8 py-4 bg-white text-purple-600 rounded-full font-bold hover:bg-gray-100 transition-colors shadow-lg">

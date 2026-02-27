@@ -105,6 +105,7 @@ interface PenjualanHeader {
   statusPembayaran: "LUNAS" | "HUTANG";
   statusTransaksi: "KERANJANG" | "SELESAI" | "DIBATALKAN";
   tanggalTransaksi: string;
+  statusApproval: "PENDING" | "APPROVED" | "REJECTED";
   tanggalJatuhTempo: string;
   customer: Customer | null;
   items: PenjualanItem[];
@@ -844,7 +845,6 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       const checkoutResult = await checkoutRes.json();
       if (checkoutResult.success) {
         if (editPenjualanId) {
-          toast.success("Order berhasil diupdate");
           setShowCheckoutModal(false);
           setCartItems([]);
           setSelectedCustomer(null);
@@ -863,7 +863,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           setSearchCustomer("");
           setExpandCustomerSearch(false);
           setEditPenjualanId(null);
-          router.replace("/dashboard/sales/riwayat/order");
+          toast.success("Order berhasil diupdate", { duration: 1500 });
         } else {
           setReceiptData(checkoutResult.data);
           setShowCheckoutModal(false);
@@ -875,7 +875,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       } else {
         toast.error(
           checkoutResult.error ||
-            (editPenjualanId ? "Gagal mengupdate order" : "Gagal membuat order"),
+            (editPenjualanId
+              ? "Gagal mengupdate order"
+              : "Gagal membuat order"),
         );
       }
     } catch (error) {
