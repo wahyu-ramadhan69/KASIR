@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const where: any = {
       statusTransaksi: "SELESAI", // Only completed transactions
+      isDeleted: false, // Exclude soft-deleted transactions
     };
 
     // Date filter - Use tanggalTransaksi

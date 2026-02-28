@@ -729,7 +729,7 @@ async function generateDetailReport(
     search?: string | null;
   }
 ) {
-  const where: any = { statusTransaksi: "SELESAI" };
+  const where: any = { statusTransaksi: "SELESAI", isDeleted: false };
 
   if (filters.startDate || filters.endDate) {
     where.tanggalTransaksi = {};

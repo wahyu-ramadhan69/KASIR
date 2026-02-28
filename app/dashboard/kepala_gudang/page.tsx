@@ -38,17 +38,27 @@ interface Barang {
   updatedAt: string;
 }
 
-interface StokHarian {
+interface StokHarianPerhitungan {
   barangId: number;
   namaBarang: string;
   jenisKemasan: string;
-  jumlahPerKemasan: string;
-  masukSetelahTanggal: string;
-  keluarSetelahTanggal: string;
-  stokPadaTanggal: string;
+  jumlahPerKemasan: number;
+  totalTerjualPcs: number; // ⭐ Baru: hasil perhitungan
+  totalTerjualKemasan: number; // ⭐ Baru: hasil perhitungan
+  totalMasukPcs: number; // ⭐ Baru: hasil perhitungan
+  totalMasukKemasan: number; // ⭐ Baru: hasil perhitungan
+  stokPadaTanggalPcs: number;
+  stokPadaTanggalKemasan: number;
+  masukSetelahTanggal: number; // ⭐ Asli dari API
+  keluarSetelahTanggal: number; // ⭐ Asli dari API
 }
 
 type ViewMode = "barang" | "stok-harian";
+
+const getTodayWib = () => {
+  const wib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  return wib.toISOString().split("T")[0];
+};
 
 const DataBarangPage = () => {
   const [barangList, setBarangList] = useState<Barang[]>([]);
@@ -65,12 +75,25 @@ const DataBarangPage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("barang");
 
   // Stok harian state
-  const [stokHarianDate, setStokHarianDate] = useState<string>(
-    new Date().toISOString().split("T")[0],
+  const [stokHarianDate, setStokHarianDate] = useState<string>(getTodayWib());
+  const [stokHarianData, setStokHarianData] = useState<StokHarianPerhitungan[]>(
+    [],
   );
-  const [stokHarianData, setStokHarianData] = useState<StokHarian[]>([]);
   const [loadingStokHarian, setLoadingStokHarian] = useState<boolean>(false);
   const [stokHarianSearch, setStokHarianSearch] = useState<string>("");
+
+  const addDays = (dateStr: string, delta: number) => {
+    const d = new Date(dateStr);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + delta);
+    return d.toISOString().split("T")[0];
+  };
+
+  const toNumber = (value: any) => {
+    if (typeof value === "bigint") return Number(value);
+    if (typeof value === "string") return Number(value);
+    return Number(value || 0);
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 500);
@@ -103,11 +126,89 @@ const DataBarangPage = () => {
   const fetchStokHarian = async () => {
     setLoadingStokHarian(true);
     try {
-      const res = await fetch(
-        `/api/stok-harian/historis?tanggal=${stokHarianDate}`,
-      );
-      const data = await res.json();
-      setStokHarianData(data.success ? data.data : []);
+      const fetchHistoris = async (date: string) => {
+        const response = await fetch(
+          `/api/stok-harian/historis?tanggal=${date}`,
+        );
+        const result = await response.json();
+        if (!result.success || !Array.isArray(result.data)) {
+          return [];
+        }
+        return result.data as any[];
+      };
+
+      const mapById = (rows: any[]) => {
+        const map = new Map<number, any>();
+        rows.forEach((row) => map.set(row.barangId, row));
+        return map;
+      };
+
+      // ⭐ Ambil tanggal SEBELUMNYA (sama seperti kode atas)
+      const prevDateStr = addDays(stokHarianDate, -1);
+
+      // ⭐ Fetch DUA kali: tanggal sebelumnya DAN tanggal target
+      const [prevRows, endRows] = await Promise.all([
+        fetchHistoris(prevDateStr),
+        fetchHistoris(stokHarianDate),
+      ]);
+
+      const prevMap = mapById(prevRows);
+
+      // ⭐ Hitung selisih seperti kode atas
+      const result: StokHarianPerhitungan[] = [];
+      endRows.forEach((row: any) => {
+        const barangId = row.barangId;
+        const prevRow = prevMap.get(barangId);
+        const jumlahPerKemasan = Number(row.jumlahPerKemasan || 1);
+
+        const masukSetelahEnd = toNumber(row.masukSetelahTanggal);
+        const keluarSetelahEnd = toNumber(row.keluarSetelahTanggal);
+        const masukSetelahPrev = prevRow
+          ? toNumber(prevRow.masukSetelahTanggal)
+          : masukSetelahEnd;
+        const keluarSetelahPrev = prevRow
+          ? toNumber(prevRow.keluarSetelahTanggal)
+          : keluarSetelahEnd;
+
+        // ⭐ Hitung selisih (sama seperti kode atas)
+        const totalMasukPcs = Math.max(0, masukSetelahPrev - masukSetelahEnd);
+        const totalTerjualPcs = Math.max(
+          0,
+          keluarSetelahPrev - keluarSetelahEnd,
+        );
+
+        result.push({
+          barangId,
+          namaBarang: row.namaBarang || "-",
+          jenisKemasan: row.jenisKemasan || "-",
+          jumlahPerKemasan,
+          totalTerjualPcs,
+          totalTerjualKemasan: jumlahPerKemasan
+            ? totalTerjualPcs / jumlahPerKemasan
+            : 0,
+          totalMasukPcs,
+          totalMasukKemasan: jumlahPerKemasan
+            ? totalMasukPcs / jumlahPerKemasan
+            : 0,
+          stokPadaTanggalPcs: toNumber(row.stokPadaTanggal),
+          stokPadaTanggalKemasan: jumlahPerKemasan
+            ? toNumber(row.stokPadaTanggal) / jumlahPerKemasan
+            : 0,
+          // ⭐ Simpan data asli juga untuk referensi
+          masukSetelahTanggal: masukSetelahEnd,
+          keluarSetelahTanggal: keluarSetelahEnd,
+        });
+      });
+
+      // ⭐ Sorting sama seperti kode atas
+      result.sort((a, b) => {
+        if (b.totalMasukPcs !== a.totalMasukPcs) {
+          return b.totalMasukPcs - a.totalMasukPcs;
+        }
+        return b.totalTerjualPcs - a.totalTerjualPcs;
+      });
+
+      setStokHarianData(result);
     } catch (error) {
       console.error("Error fetching stok harian:", error);
       setStokHarianData([]);
@@ -122,8 +223,7 @@ const DataBarangPage = () => {
     setStokHarianDate(d.toISOString().split("T")[0]);
   };
 
-  const isToday = (dateStr: string) =>
-    dateStr === new Date().toISOString().split("T")[0];
+  const isToday = (dateStr: string) => dateStr === getTodayWib();
 
   const formatGramsToKg = (grams: number): string => {
     if (!Number.isFinite(grams)) return "";
@@ -654,10 +754,16 @@ const DataBarangPage = () => {
                           Stok (PCS)
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Masuk (PCS)
+                          Terjual (Kemasan)
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Keluar (PCS)
+                          Terjual (PCS)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Masuk (Kemasan)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Masuk (PCS)
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Kemasan
@@ -666,13 +772,6 @@ const DataBarangPage = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {filteredStokHarian.map((item, index) => {
-                        const stokPcs = Number(item.stokPadaTanggal);
-                        const masukPcs = Number(item.masukSetelahTanggal);
-                        const keluarPcs = Number(item.keluarSetelahTanggal);
-                        const jumlahPerKemasan = Number(item.jumlahPerKemasan);
-                        const stokKemasan =
-                          jumlahPerKemasan > 0 ? stokPcs / jumlahPerKemasan : 0;
-
                         return (
                           <tr
                             key={item.barangId}
@@ -691,33 +790,36 @@ const DataBarangPage = () => {
                                 </span>
                               </div>
                             </td>
+
+                            {/* Stok (Kemasan) */}
                             <td className="px-6 py-4 text-center">
-                              <span className="text-sm font-bold text-indigo-700">
-                                {formatDecimal(stokKemasan)} {item.jenisKemasan}
+                              <span className="text-sm font-bold text-amber-700">
+                                {formatDecimal(item.stokPadaTanggalKemasan)}{" "}
+                                {item.jenisKemasan}
                               </span>
                             </td>
+
+                            {/* Stok (PCS) */}
                             <td className="px-6 py-4 text-center">
                               <span className="text-sm font-semibold text-gray-700">
-                                {formatNumber(stokPcs)} pcs
+                                {formatNumber(item.stokPadaTanggalPcs)} pcs
                               </span>
                             </td>
+
+                            {/* Terjual (Kemasan) */}
                             <td className="px-6 py-4 text-center">
-                              {masukPcs > 0 ? (
-                                <span className="inline-flex items-center gap-1 text-sm font-bold text-green-700 bg-green-50 px-3 py-1 rounded-lg">
-                                  <TrendingUp className="w-3.5 h-3.5" />
-                                  {formatNumber(masukPcs)}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-sm text-gray-400">
-                                  <Minus className="w-3.5 h-3.5" /> 0
-                                </span>
-                              )}
+                              <span className="text-sm font-bold text-indigo-700">
+                                {formatDecimal(item.totalTerjualKemasan)}{" "}
+                                {item.jenisKemasan}
+                              </span>
                             </td>
+
+                            {/* Terjual (PCS) */}
                             <td className="px-6 py-4 text-center">
-                              {keluarPcs > 0 ? (
+                              {item.totalTerjualPcs > 0 ? (
                                 <span className="inline-flex items-center gap-1 text-sm font-bold text-red-700 bg-red-50 px-3 py-1 rounded-lg">
                                   <TrendingDown className="w-3.5 h-3.5" />
-                                  {formatNumber(keluarPcs)}
+                                  {formatNumber(item.totalTerjualPcs)}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-sm text-gray-400">
@@ -725,6 +827,30 @@ const DataBarangPage = () => {
                                 </span>
                               )}
                             </td>
+
+                            {/* Masuk (Kemasan) */}
+                            <td className="px-6 py-4 text-center">
+                              <span className="text-sm font-bold text-emerald-700">
+                                {formatDecimal(item.totalMasukKemasan)}{" "}
+                                {item.jenisKemasan}
+                              </span>
+                            </td>
+
+                            {/* Masuk (PCS) */}
+                            <td className="px-6 py-4 text-center">
+                              {item.totalMasukPcs > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-sm font-bold text-green-700 bg-green-50 px-3 py-1 rounded-lg">
+                                  <TrendingUp className="w-3.5 h-3.5" />
+                                  {formatNumber(item.totalMasukPcs)}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-sm text-gray-400">
+                                  <Minus className="w-3.5 h-3.5" /> 0
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Kemasan */}
                             <td className="px-6 py-4 text-center">
                               <span className="text-xs text-gray-500">
                                 {item.jumlahPerKemasan} pcs /{" "}

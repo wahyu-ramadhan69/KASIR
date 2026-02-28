@@ -720,7 +720,9 @@ const DataBarangPage = () => {
     setLoadingPenjualanBarang(true);
     try {
       const fetchHistoris = async (date: string) => {
-        const response = await fetch(`/api/stok-harian/?tanggal=${date}`);
+        const response = await fetch(
+          `/api/stok-harian/historis?tanggal=${date}`,
+        );
         const result = await response.json();
         if (!result.success || !Array.isArray(result.data)) {
           return [];
