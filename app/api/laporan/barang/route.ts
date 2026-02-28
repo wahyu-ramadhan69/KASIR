@@ -115,6 +115,7 @@ export async function GET(request: NextRequest) {
 
     const penjualanFilter: any = {
       statusTransaksi: "SELESAI",
+      isDeleted: false,
     };
 
     if (startDate || endDate) {
