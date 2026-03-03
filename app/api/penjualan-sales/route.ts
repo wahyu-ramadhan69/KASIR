@@ -200,36 +200,12 @@ export async function GET(request: NextRequest) {
           tanggalJatuhTempo: { lte: jatuhTempoLimit },
         },
       });
-      let totalPembayaran = 0;
-      const pembayaranPenjualanWhere: any = { ...summaryWhere };
-      delete pembayaranPenjualanWhere.tanggalTransaksi;
-      const pembayaranIds = await prisma.penjualanHeader.findMany({
-        where: pembayaranPenjualanWhere,
-        select: { id: true },
+      // Total pendapatan = SUM(totalHarga) dari transaksi SELESAI, tidak dihapus
+      const totalHargaAgg = await prisma.penjualanHeader.aggregate({
+        where: summaryWhere,
+        _sum: { totalHarga: true },
       });
-      const idList = pembayaranIds.map((row) => row.id);
-      if (idList.length > 0) {
-        const pembayaranWhere: any = { penjualanId: { in: idList } };
-        if (startDate || endDate) {
-          pembayaranWhere.tanggalBayar = {};
-          if (startDate) {
-            pembayaranWhere.tanggalBayar.gte = new Date(startDate);
-          }
-          if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            pembayaranWhere.tanggalBayar.lte = end;
-          }
-        }
-        const pembayaranRows = await prisma.pembayaranPenjualan.findMany({
-          where: pembayaranWhere,
-          select: { nominal: true },
-        });
-        totalPembayaran = pembayaranRows.reduce(
-          (sum, row) => sum + Number(row.nominal || 0),
-          0
-        );
-      }
+      const totalPembayaran = Number(totalHargaAgg._sum.totalHarga || 0);
 
       return NextResponse.json(
         deepSerialize({

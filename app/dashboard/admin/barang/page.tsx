@@ -172,9 +172,11 @@ const DataBarangPage = () => {
   const [loadingPenjualanBarang, setLoadingPenjualanBarang] = useState(false);
   const [penjualanFilterMode, setPenjualanFilterMode] =
     useState<PenjualanFilterMode>("date");
-  const [penjualanDate, setPenjualanDate] = useState<string>(
-    new Date().toISOString().split("T")[0],
-  );
+  const [penjualanDate, setPenjualanDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [penjualanStartDate, setPenjualanStartDate] = useState<string>("");
   const [penjualanEndDate, setPenjualanEndDate] = useState<string>("");
   const [penjualanQuery, setPenjualanQuery] = useState<{
@@ -182,11 +184,11 @@ const DataBarangPage = () => {
     date: string;
     startDate: string;
     endDate: string;
-  }>({
-    mode: "date",
-    date: new Date().toISOString().split("T")[0],
-    startDate: "",
-    endDate: "",
+  }>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const yesterday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return { mode: "date", date: yesterday, startDate: "", endDate: "" };
   });
 
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -703,14 +705,16 @@ const DataBarangPage = () => {
   };
 
   const resetPenjualanFilter = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const yesterday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     setPenjualanFilterMode("date");
-    setPenjualanDate(today);
+    setPenjualanDate(yesterday);
     setPenjualanStartDate("");
     setPenjualanEndDate("");
     setPenjualanQuery({
       mode: "date",
-      date: today,
+      date: yesterday,
       startDate: "",
       endDate: "",
     });
@@ -719,94 +723,49 @@ const DataBarangPage = () => {
   const fetchPenjualanBarang = async () => {
     setLoadingPenjualanBarang(true);
     try {
-      const fetchHistoris = async (date: string) => {
-        const response = await fetch(
-          `/api/stok-harian/historis?tanggal=${date}`,
-        );
-        const result = await response.json();
-        if (!result.success || !Array.isArray(result.data)) {
-          return [];
-        }
-        return result.data as any[];
-      };
-
       const toNumber = (value: any) => {
         if (typeof value === "bigint") return Number(value);
         if (typeof value === "string") return Number(value);
         return Number(value || 0);
       };
 
-      const mapById = (rows: any[]) => {
-        const map = new Map<number, any>();
-        rows.forEach((row) => map.set(row.barangId, row));
-        return map;
-      };
-
-      const formatDate = (date: Date) => date.toISOString().split("T")[0];
-      const addDays = (dateStr: string, delta: number) => {
-        const d = new Date(dateStr);
-        d.setHours(0, 0, 0, 0);
-        d.setDate(d.getDate() + delta);
-        return formatDate(d);
-      };
-
-      let startDateStr = "";
-      let endDateStr = "";
+      const params = new URLSearchParams();
       if (penjualanQuery.mode === "date" && penjualanQuery.date) {
-        startDateStr = penjualanQuery.date;
-        endDateStr = penjualanQuery.date;
+        params.set("tanggal", penjualanQuery.date);
       } else if (penjualanQuery.mode === "range") {
-        if (penjualanQuery.startDate && penjualanQuery.endDate) {
-          startDateStr = penjualanQuery.startDate;
-          endDateStr = penjualanQuery.endDate;
-        } else if (penjualanQuery.startDate) {
-          startDateStr = penjualanQuery.startDate;
-          endDateStr = penjualanQuery.startDate;
-        } else if (penjualanQuery.endDate) {
-          startDateStr = penjualanQuery.endDate;
-          endDateStr = penjualanQuery.endDate;
+        const start = penjualanQuery.startDate || penjualanQuery.endDate;
+        const end = penjualanQuery.endDate || penjualanQuery.startDate;
+        if (!start || !end) {
+          setPenjualanBarang([]);
+          return;
         }
-      }
-
-      if (!startDateStr || !endDateStr) {
+        params.set("startDate", start);
+        params.set("endDate", end);
+      } else {
         setPenjualanBarang([]);
         return;
       }
 
-      const prevDateStr = addDays(startDateStr, -1);
-      const [prevRows, endRows] = await Promise.all([
-        fetchHistoris(prevDateStr),
-        fetchHistoris(endDateStr),
-      ]);
+      const response = await fetch(`/api/stok-harian?${params}`);
+      const result = await response.json();
 
-      const prevMap = mapById(prevRows);
-      const endMap = mapById(endRows);
+      if (!result.success || !Array.isArray(result.data)) {
+        setPenjualanBarang([]);
+        return;
+      }
 
-      const result: PenjualanBarang[] = [];
-      endRows.forEach((row: any) => {
-        const barangId = row.barangId;
-        const prevRow = prevMap.get(barangId);
-        const jumlahPerKemasan = Number(row.jumlahPerKemasan || 1);
-
-        const masukSetelahEnd = toNumber(row.masukSetelahTanggal);
-        const keluarSetelahEnd = toNumber(row.keluarSetelahTanggal);
-        const masukSetelahPrev = prevRow
-          ? toNumber(prevRow.masukSetelahTanggal)
-          : masukSetelahEnd;
-        const keluarSetelahPrev = prevRow
-          ? toNumber(prevRow.keluarSetelahTanggal)
-          : keluarSetelahEnd;
-
-        const totalMasukPcs = Math.max(0, masukSetelahPrev - masukSetelahEnd);
-        const totalTerjualPcs = Math.max(
-          0,
-          keluarSetelahPrev - keluarSetelahEnd,
+      const mapped: PenjualanBarang[] = result.data.map((row: any) => {
+        const jumlahPerKemasan = toNumber(
+          row.barang?.jumlahPerKemasan ?? row.jumlahPerKemasan ?? 1,
         );
+        const totalMasukPcs = toNumber(row.totalMasuk);
+        const totalTerjualPcs = toNumber(row.totalKeluar);
+        const stokPcs = toNumber(row.stok);
 
-        result.push({
-          barangId,
-          namaBarang: row.namaBarang || "-",
-          jenisKemasan: row.jenisKemasan || "-",
+        return {
+          barangId: row.barangId,
+          namaBarang: row.barang?.namaBarang ?? row.namaBarang ?? "-",
+          jenisKemasan: row.barang?.jenisKemasan ?? row.jenisKemasan ?? "-",
           jumlahPerKemasan,
           totalTerjualPcs,
           totalTerjualKemasan: jumlahPerKemasan
@@ -816,21 +775,20 @@ const DataBarangPage = () => {
           totalMasukKemasan: jumlahPerKemasan
             ? totalMasukPcs / jumlahPerKemasan
             : 0,
-          stokPadaTanggalPcs: toNumber(row.stokPadaTanggal),
+          stokPadaTanggalPcs: stokPcs,
           stokPadaTanggalKemasan: jumlahPerKemasan
-            ? toNumber(row.stokPadaTanggal) / jumlahPerKemasan
+            ? stokPcs / jumlahPerKemasan
             : 0,
-        });
+        };
       });
 
-      result.sort((a, b) => {
-        if (b.totalMasukPcs !== a.totalMasukPcs) {
-          return b.totalMasukPcs - a.totalMasukPcs;
-        }
-        return b.totalTerjualPcs - a.totalTerjualPcs;
+      mapped.sort((a, b) => {
+        if (b.totalTerjualPcs !== a.totalTerjualPcs)
+          return b.totalTerjualPcs - a.totalTerjualPcs;
+        return b.totalMasukPcs - a.totalMasukPcs;
       });
 
-      setPenjualanBarang(result);
+      setPenjualanBarang(mapped);
     } catch (error) {
       console.error("Error fetching penjualan barang:", error);
       setPenjualanBarang([]);
@@ -838,6 +796,20 @@ const DataBarangPage = () => {
       setLoadingPenjualanBarang(false);
     }
   };
+
+  // Saat pertama kali pindah ke tab sales, ambil tanggal snapshot terbaru
+  useEffect(() => {
+    if (view !== "sales") return;
+    fetch("/api/stok-harian?latest=true")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && res.tanggal) {
+          setPenjualanDate(res.tanggal);
+          setPenjualanQuery((prev) => ({ ...prev, date: res.tanggal }));
+        }
+      })
+      .catch(() => {});
+  }, [view]);
 
   useEffect(() => {
     if (view === "sales") {
@@ -1787,16 +1759,16 @@ const DataBarangPage = () => {
                           Nama Barang
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Terjual (Kemasan)
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
-                          Terjual (PCS)
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Stok (Kemasan)
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Stok (PCS)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Terjual (Kemasan)
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Terjual (PCS)
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Masuk (Kemasan)
@@ -1829,17 +1801,6 @@ const DataBarangPage = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <span className="text-sm font-bold text-indigo-700">
-                              {formatDecimal(row.totalTerjualKemasan)}{" "}
-                              {row.jenisKemasan}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="text-sm font-semibold text-gray-700">
-                              {formatNumber(row.totalTerjualPcs)} pcs
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-center">
                             <span className="text-sm font-bold text-amber-700">
                               {formatDecimal(row.stokPadaTanggalKemasan)}{" "}
                               {row.jenisKemasan}
@@ -1848,6 +1809,17 @@ const DataBarangPage = () => {
                           <td className="px-6 py-4 text-center">
                             <span className="text-sm font-semibold text-gray-700">
                               {formatNumber(row.stokPadaTanggalPcs)} pcs
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-bold text-indigo-700">
+                              {formatDecimal(row.totalTerjualKemasan)}{" "}
+                              {row.jenisKemasan}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-semibold text-gray-700">
+                              {formatNumber(row.totalTerjualPcs)} pcs
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center">

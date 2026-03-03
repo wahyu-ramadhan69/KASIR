@@ -32,6 +32,7 @@ function getTodayWib(): string {
 // ============================================================
 // GET /api/stok-harian?tanggal=2026-02-27
 // GET /api/stok-harian?tanggal=2026-02-27&barangId=1
+// GET /api/stok-harian?startDate=2026-02-01&endDate=2026-02-27
 // ============================================================
 export async function GET(req: NextRequest) {
   try {
@@ -43,12 +44,95 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const tanggalParam = searchParams.get("tanggal");
     const barangIdParam = searchParams.get("barangId");
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
+    const latestParam = searchParams.get("latest");
 
+    // ── Latest snapshot date ───────────────────────────────────
+    if (latestParam === "true") {
+      const latest = await prisma.stokHarian.findFirst({
+        orderBy: { tanggal: "desc" },
+        select: { tanggal: true },
+      });
+      if (!latest) {
+        return NextResponse.json(
+          { success: false, message: "Belum ada data snapshot" },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        tanggal: latest.tanggal.toISOString().split("T")[0],
+      });
+    }
+
+    const includeBarang = {
+      select: {
+        namaBarang: true,
+        jenisKemasan: true,
+        jumlahPerKemasan: true,
+      },
+    };
+
+    // ── Range query: startDate + endDate ──────────────────────
+    if (startDateParam || endDateParam) {
+      const startStr = startDateParam || endDateParam!;
+      const endStr = endDateParam || startDateParam!;
+
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(startStr) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(endStr)
+      ) {
+        return NextResponse.json(
+          { success: false, message: "Format tanggal tidak valid, gunakan YYYY-MM-DD" },
+          { status: 400 },
+        );
+      }
+
+      const startTanggal = new Date(`${startStr}T00:00:00.000Z`);
+      const endTanggal = new Date(`${endStr}T00:00:00.000Z`);
+
+      const records = await prisma.stokHarian.findMany({
+        where: { tanggal: { gte: startTanggal, lte: endTanggal } },
+        include: { barang: includeBarang.select ? { select: includeBarang.select } : true },
+        orderBy: { tanggal: "asc" },
+      });
+
+      // Aggregate per barangId: sum totalMasuk/totalKeluar, stok dari hari terakhir
+      const grouped = new Map<number, any>();
+      for (const r of records) {
+        if (!grouped.has(r.barangId)) {
+          grouped.set(r.barangId, {
+            barangId: r.barangId,
+            barang: r.barang,
+            stok: r.stok,
+            totalMasuk: BigInt(0),
+            totalKeluar: BigInt(0),
+          });
+        }
+        const g = grouped.get(r.barangId)!;
+        g.totalMasuk += r.totalMasuk;
+        g.totalKeluar += r.totalKeluar;
+        g.stok = r.stok; // overwrite → stok dari hari terakhir di range
+      }
+
+      const data = Array.from(grouped.values()).map(serializeStokHarian);
+
+      return NextResponse.json({
+        success: true,
+        startDate: startStr,
+        endDate: endStr,
+        total: data.length,
+        data,
+      });
+    }
+
+    // ── Single-date query ─────────────────────────────────────
     if (!tanggalParam) {
       return NextResponse.json(
         {
           success: false,
-          message: "Parameter 'tanggal' wajib diisi (format: YYYY-MM-DD)",
+          message: "Parameter 'tanggal' atau 'startDate'/'endDate' wajib diisi",
         },
         { status: 400 },
       );
@@ -56,10 +140,7 @@ export async function GET(req: NextRequest) {
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggalParam)) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Format tanggal tidak valid, gunakan YYYY-MM-DD",
-        },
+        { success: false, message: "Format tanggal tidak valid, gunakan YYYY-MM-DD" },
         { status: 400 },
       );
     }
@@ -78,15 +159,7 @@ export async function GET(req: NextRequest) {
 
       const stokHarian = await prisma.stokHarian.findUnique({
         where: { barangId_tanggal: { barangId, tanggal } },
-        include: {
-          barang: {
-            select: {
-              namaBarang: true,
-              jenisKemasan: true,
-              jumlahPerKemasan: true,
-            },
-          },
-        },
+        include: { barang: includeBarang },
       });
 
       if (!stokHarian) {
@@ -108,15 +181,7 @@ export async function GET(req: NextRequest) {
 
     const stokHarianList = await prisma.stokHarian.findMany({
       where: { tanggal },
-      include: {
-        barang: {
-          select: {
-            namaBarang: true,
-            jenisKemasan: true,
-            jumlahPerKemasan: true,
-          },
-        },
-      },
+      include: { barang: includeBarang },
       orderBy: { barang: { namaBarang: "asc" } },
     });
 

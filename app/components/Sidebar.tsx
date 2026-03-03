@@ -142,6 +142,11 @@ const adminTransactionLinks: NavLinkWithSub[] = [
         icon: <History className="w-4 h-4" />,
       },
       {
+        label: "Riwayat Pembayaran Toko",
+        href: "/dashboard/admin/penjualan/riwayat/pembayaran",
+        icon: <History className="w-4 h-4" />,
+      },
+      {
         label: "Riwayat Pengembalian",
         href: "/dashboard/admin/penjualan/pengembalian/riwayat",
         icon: <History className="w-4 h-4" />,
@@ -163,9 +168,15 @@ const adminTransactionLinks: NavLinkWithSub[] = [
         href: "/dashboard/admin/penjualan-sales",
         icon: <PackageOpen className="w-4 h-4" />,
       },
+
       {
         label: "Riwayat Transaksi Sales",
         href: "/dashboard/admin/penjualan-sales/riwayat",
+        icon: <History className="w-4 h-4" />,
+      },
+      {
+        label: "Riwayat Pembayaran Sales",
+        href: "/dashboard/admin/penjualan-sales/riwayat/pembayaran",
         icon: <History className="w-4 h-4" />,
       },
     ],
@@ -314,6 +325,7 @@ const kasirTransactionLinks: NavLinkWithSub[] = [
         href: "/dashboard/kasir/penjualan/riwayat",
         icon: <History className="w-4 h-4" />,
       },
+
       {
         label: "Riwayat Pengembalian",
         href: "/dashboard/kasir/penjualan/pengembalian/riwayat",
