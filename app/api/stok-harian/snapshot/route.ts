@@ -115,8 +115,23 @@ export async function GET(req: NextRequest) {
 }
 
 // ============================================================
-// POST /api/stok-harian
-// Body (opsional): { "tanggal": "2025-01-30" } — default hari ini
+// Helpers: WIB (UTC+7) range & today string
+// ============================================================
+function getWibDayRange(tanggalStr: string): { startOfDay: Date; endOfDay: Date } {
+  return {
+    startOfDay: new Date(`${tanggalStr}T00:00:00+07:00`),
+    endOfDay: new Date(`${tanggalStr}T23:59:59.999+07:00`),
+  };
+}
+
+function getTodayWib(): string {
+  const wib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  return wib.toISOString().split("T")[0];
+}
+
+// ============================================================
+// POST /api/stok-harian/snapshot
+// Body (opsional): { "tanggal": "2026-03-03" } — default hari ini (WIB)
 // ============================================================
 export async function POST(req: NextRequest) {
   try {
@@ -125,33 +140,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Ambil data user untuk log siapa yang menjalankan snapshot
     const userData = await getAuthData();
-
-    // Opsional: batasi hanya role tertentu
-    // if (userData?.role !== "ADMIN") {
-    //   return NextResponse.json(
-    //     { error: "Hanya admin yang boleh menjalankan snapshot" },
-    //     { status: 403 }
-    //   );
-    // }
 
     const body = await req.json().catch(() => ({}));
     const tanggalParam: string | undefined = body.tanggal;
 
-    const tanggal = tanggalParam ? new Date(tanggalParam) : new Date();
-    tanggal.setHours(0, 0, 0, 0);
+    const tanggalStr = tanggalParam ?? getTodayWib();
 
-    if (isNaN(tanggal.getTime())) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggalStr)) {
       return NextResponse.json(
-        { success: false, message: "Format tanggal tidak valid" },
+        { success: false, message: "Format tanggal tidak valid, gunakan YYYY-MM-DD" },
         { status: 400 },
       );
     }
 
-    const startOfDay = new Date(tanggal);
-    const endOfDay = new Date(tanggal);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Range transaksi dalam WIB (bukan UTC server)
+    const { startOfDay, endOfDay } = getWibDayRange(tanggalStr);
+
+    // Tanggal snapshot disimpan sebagai UTC midnight agar konsisten di DB
+    const tanggalSnapshot = new Date(`${tanggalStr}T00:00:00.000Z`);
 
     // Ambil semua barang aktif
     const semuaBarang = await prisma.barang.findMany({
@@ -196,7 +203,7 @@ export async function POST(req: NextRequest) {
 
         return {
           barangId: barang.id,
-          tanggal,
+          tanggal: tanggalSnapshot,
           stok: barang.stok,
           totalMasuk: masuk._sum?.totalItem ?? BigInt(0),
           totalKeluar: keluar._sum?.totalItem ?? BigInt(0),
@@ -223,7 +230,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Snapshot stok berhasil untuk tanggal ${tanggal.toISOString().split("T")[0]}`,
+      message: `Snapshot stok berhasil untuk tanggal ${tanggalStr} (WIB)`,
       dijalankanOleh: userData?.username ?? "sistem",
       totalSnapshot: snapshotData.length,
     });

@@ -526,7 +526,7 @@ const RiwayatPenjualanPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">
-                  Total Pendapatan
+                  Total Transaksi
                 </p>
                 <p className="text-lg font-bold text-indigo-700">
                   {formatRupiahSimple(stats.totalPendapatan)}
