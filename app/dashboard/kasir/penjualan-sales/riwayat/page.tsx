@@ -375,7 +375,7 @@ const RiwayatPenjualanPage = () => {
         toast.success("Penjualan berhasil dihapus");
         setShowDeleteModal(false);
         setDeleteTarget(null);
-        fetchPenjualan(1, true);
+        setPenjualanList((prev) => prev.filter((p) => p.id !== penjualanId));
         fetchStats();
       } else {
         toast.error(data.error || "Gagal menghapus penjualan");

@@ -162,11 +162,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const isAdmin = authData.role === "ADMIN";
     const listWhere: any = { ...baseWhere };
+    if (!isAdmin) listWhere.isDeleted = false;
     const summaryWhere: any = { ...baseWhere, isDeleted: false };
     const userId = Number(authData.userId);
     if (!isPrivileged && !Number.isNaN(userId)) {
-      listWhere.isDeleted = false;
       listWhere.userId = userId;
       summaryWhere.userId = userId;
     }
