@@ -5,9 +5,15 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
+const ALLOWED_SN = new Set(
+  (process.env.ZKTECO_ALLOWED_SN ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+);
+
 export async function GET(request: NextRequest) {
-  const sn = request.nextUrl.searchParams.get("SN") ?? "unknown";
-  console.log(`[ZKTeco GETREQUEST] SN: ${sn}`);
+  const sn = request.nextUrl.searchParams.get("SN") ?? "";
+  if (ALLOWED_SN.size > 0 && !ALLOWED_SN.has(sn)) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
   // Tidak ada command → balas OK
   return new NextResponse("OK", {

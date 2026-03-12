@@ -19,6 +19,15 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const ALLOWED_SN = new Set(
+  (process.env.ZKTECO_ALLOWED_SN ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+);
+
+function isAllowedDevice(sn: string): boolean {
+  if (ALLOWED_SN.size === 0) return true; // jika tidak dikonfigurasi, izinkan semua
+  return ALLOWED_SN.has(sn);
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function normalizeTanggal(date: Date): Date {
@@ -53,10 +62,8 @@ function parseADMSData(raw: string): Array<{ pin: string; dateTime: Date }> {
 }
 
 async function processAttendance(pin: string, dateTime: Date) {
-  console.log(`[ZKTeco DEBUG] processAttendance dipanggil: PIN="${pin}", dateTime="${dateTime.toISOString()}"`);
   return prisma.$transaction(async (tx) => {
     const karyawan = await tx.karyawan.findUnique({ where: { nik: pin } });
-    console.log(`[ZKTeco DEBUG] findUnique NIK="${pin}" → karyawan:`, karyawan ? `id=${karyawan.id} nama=${karyawan.nama} isActive=${karyawan.isActive}` : "NULL");
     if (!karyawan || !karyawan.isActive) {
       throw new Error(`Karyawan NIK ${pin} tidak ditemukan`);
     }
@@ -97,8 +104,10 @@ async function processAttendance(pin: string, dateTime: Date) {
  * Device hit ini saat pertama konek untuk dapat konfigurasi dari server.
  */
 export async function GET(request: NextRequest) {
-  const sn = request.nextUrl.searchParams.get("SN") ?? "unknown";
-  console.log(`[ZKTeco] Registrasi device SN: ${sn}`);
+  const sn = request.nextUrl.searchParams.get("SN") ?? "";
+  if (!isAllowedDevice(sn)) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
   const responseText = [
     `GET OPTION FROM: ${request.headers.get("host") ?? "server"}`,
@@ -129,7 +138,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const table = request.nextUrl.searchParams.get("table");
-  const sn = request.nextUrl.searchParams.get("SN") ?? "unknown";
+  const sn = request.nextUrl.searchParams.get("SN") ?? "";
+  if (!isAllowedDevice(sn)) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
   // Device kirim info hardware — tidak perlu diproses, cukup balas OK
   if (table === "options") {
@@ -151,7 +163,6 @@ export async function POST(request: NextRequest) {
   }
 
   const records = parseADMSData(text);
-  console.log(`[ZKTeco DEBUG] Parsed records:`, JSON.stringify(records));
   for (const record of records) {
     try {
       await processAttendance(record.pin, record.dateTime);
