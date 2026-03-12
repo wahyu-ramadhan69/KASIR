@@ -216,7 +216,7 @@ export default function PembayaranSalesPage() {
       <div className="w-full max-w-7xl mx-auto px-6 pb-8">
 
         {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 rounded-xl p-5 mb-6 shadow-xl">
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-xl p-5 mb-6 shadow-xl">
           <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-5 rounded-full -mr-24 -mt-24" />
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-5 rounded-full -ml-16 -mb-16" />
           <div className="relative z-10 flex items-center justify-between">
@@ -231,7 +231,7 @@ export default function PembayaranSalesPage() {
                 <h1 className="text-2xl font-bold text-white tracking-tight">
                   Pembayaran Sales
                 </h1>
-                <p className="text-emerald-100 text-sm">
+                <p className="text-blue-100 text-sm">
                   Rekap pembayaran masuk dari transaksi penjualan sales
                 </p>
               </div>
@@ -276,14 +276,14 @@ export default function PembayaranSalesPage() {
                 <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">
                   Total Nominal
                 </p>
-                <p className="text-lg font-bold text-emerald-700">
+                <p className="text-lg font-bold text-blue-700">
                   {formatRupiahSimple(summary.totalNominal)}
                 </p>
                 <p className="text-[11px] text-gray-500">
                   {formatRupiah(summary.totalNominal)}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-2.5 rounded-lg shadow-md">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2.5 rounded-lg shadow-md">
                 <Banknote className="w-5 h-5 text-white" />
               </div>
             </div>
@@ -300,7 +300,7 @@ export default function PembayaranSalesPage() {
                 placeholder="Cari kode penjualan, nama customer, atau sales..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none transition-all"
+                className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
               />
               {searchTerm && (
                 <button
@@ -319,7 +319,7 @@ export default function PembayaranSalesPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-sm bg-white"
+                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
                 />
               </div>
               <span className="text-gray-400 text-sm hidden lg:block">s/d</span>
@@ -329,7 +329,7 @@ export default function PembayaranSalesPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-sm bg-white"
+                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
                 />
               </div>
               {hasActiveFilters && (
@@ -352,8 +352,8 @@ export default function PembayaranSalesPage() {
             <div className="flex justify-center items-center py-24">
               <div className="text-center">
                 <div className="relative">
-                  <div className="w-24 h-24 border-8 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto" />
-                  <Banknote className="w-10 h-10 text-emerald-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                  <div className="w-24 h-24 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
+                  <Banknote className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
                 </div>
                 <p className="text-gray-500 mt-6 text-lg font-medium">
                   Memuat data pembayaran...
@@ -467,7 +467,7 @@ export default function PembayaranSalesPage() {
 
                         {/* Jumlah Pembayaran */}
                         <td className="px-4 py-3 whitespace-nowrap text-right">
-                          <p className="text-sm font-bold text-emerald-700">
+                          <p className="text-sm font-bold text-blue-700">
                             {formatRupiah(row.nominal)}
                           </p>
                         </td>

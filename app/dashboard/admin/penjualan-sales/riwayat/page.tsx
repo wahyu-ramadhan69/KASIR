@@ -198,6 +198,7 @@ const RiwayatPenjualanPage = () => {
     totalHutangTransaksi: 0,
     totalLunas: 0,
     hutangJatuhTempo: 0,
+    totalPemasukan: 0,
   });
 
   // Debounce search input
@@ -331,6 +332,7 @@ const RiwayatPenjualanPage = () => {
             totalHutangTransaksi: summary.totalHutangTransaksi || 0,
             totalLunas: summary.totalLunas || 0,
             hutangJatuhTempo: summary.hutangJatuhTempo || 0,
+            totalPemasukan: summary.totalPemasukan || 0,
           });
         }
       }
@@ -491,22 +493,7 @@ const RiwayatPenjualanPage = () => {
 
         {/* Statistik */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          <div className="group bg-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all duration-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">
-                  Total Transaksi
-                </p>
-                <p className="text-xl font-bold text-gray-900">
-                  {stats.totalTransaksi}
-                </p>
-                <p className="text-[11px] text-gray-400">Transaksi selesai</p>
-              </div>
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2.5 rounded-lg shadow-md">
-                <Receipt className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
+          {/* 1. Total Transaksi (count) */}
 
           <div className="group bg-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
@@ -527,6 +514,27 @@ const RiwayatPenjualanPage = () => {
             </div>
           </div>
 
+          {/* 2. Total Pemasukan (real dari PembayaranPenjualan) */}
+          <div className="group bg-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">
+                  Total Pemasukan
+                </p>
+                <p className="text-lg font-bold text-blue-700">
+                  {formatRupiahSimple(stats.totalPemasukan)}
+                </p>
+                <p className="text-[11px] text-gray-500">
+                  {formatRupiah(stats.totalPemasukan)}
+                </p>
+              </div>
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2.5 rounded-lg shadow-md">
+                <Banknote className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Total Piutang (rupiah) */}
           <div className="group bg-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div>
@@ -546,23 +554,25 @@ const RiwayatPenjualanPage = () => {
             </div>
           </div>
 
+          {/* 4. Total Transaksi Selesai (rupiah/pendapatan) */}
           <div className="group bg-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">
-                  Jatuh Tempo ≤7 Hari
+                  Transaksi
                 </p>
-                <p className="text-xl font-bold text-orange-600">
-                  {stats.hutangJatuhTempo}
+                <p className="text-xl font-bold text-gray-900">
+                  {stats.totalTransaksi}
                 </p>
-                <p className="text-[11px] text-gray-400">Piutang kritis</p>
+                <p className="text-[11px] text-gray-400">Transaksi selesai</p>
               </div>
-              <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-2.5 rounded-lg shadow-md">
-                <AlertTriangle className="w-5 h-5 text-white" />
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2.5 rounded-lg shadow-md">
+                <Receipt className="w-5 h-5 text-white" />
               </div>
             </div>
           </div>
 
+          {/* 5. Lunas (count) */}
           <div className="group bg-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div>
@@ -580,6 +590,7 @@ const RiwayatPenjualanPage = () => {
             </div>
           </div>
 
+          {/* 6. Piutang (count) */}
           <div className="group bg-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div>

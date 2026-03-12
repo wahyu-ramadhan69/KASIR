@@ -298,6 +298,50 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // Catat ke tabel PembayaranPenjualan
+      if (finalJumlahDibayar > 0) {
+        const pembayaranDate = new Date();
+        const pembayaranDateStr = pembayaranDate
+          .toISOString()
+          .slice(0, 10)
+          .replace(/-/g, "");
+        const lastPembayaran = await tx.pembayaranPenjualan.findFirst({
+          where: {
+            kodePembayaran: {
+              startsWith: `BYR-${pembayaranDateStr}`,
+            },
+          },
+          orderBy: {
+            kodePembayaran: "desc",
+          },
+        });
+
+        let nextPembayaranNumber = 1;
+        if (lastPembayaran) {
+          const lastNumber = parseInt(
+            lastPembayaran.kodePembayaran.split("-")[2]
+          );
+          nextPembayaranNumber = lastNumber + 1;
+        }
+
+        const kodePembayaran = `BYR-${pembayaranDateStr}-${String(
+          nextPembayaranNumber
+        ).padStart(4, "0")}`;
+
+        await tx.pembayaranPenjualan.create({
+          data: {
+            kodePembayaran,
+            penjualanId: id,
+            tanggalBayar: pembayaranDate,
+            nominal: BigInt(finalJumlahDibayar),
+            totalCash: BigInt(totalCashFinal),
+            totalTransfer: BigInt(totalTransferFinal),
+            metode: finalMetodePembayaran,
+            ...(userId ? { userId } : {}),
+          },
+        });
+      }
+
       return updatedHeader;
     });
 
@@ -409,63 +453,112 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const data = await prisma.penjualanHeader.findMany({
-      where,
-      select: {
-        id: true,
-        kodePenjualan: true,
-        namaCustomer: true,
-        statusApproval: true,
-        statusTransaksi: true,
-        statusPembayaran: true,
-        metodePembayaran: true,
-        subtotal: true,
-        totalHarga: true,
-        diskonNota: true,
-        jumlahDibayar: true,
-        kembalian: true,
-        tanggalTransaksi: true,
-        createdAt: true,
-        customerId: true,
-        customer: {
-          select: {
-            id: true,
-            nama: true,
-            namaToko: true,
-          },
+    const fullSelect = {
+      id: true,
+      kodePenjualan: true,
+      namaCustomer: true,
+      statusApproval: true,
+      statusTransaksi: true,
+      statusPembayaran: true,
+      metodePembayaran: true,
+      subtotal: true,
+      totalHarga: true,
+      diskonNota: true,
+      jumlahDibayar: true,
+      kembalian: true,
+      tanggalTransaksi: true,
+      createdAt: true,
+      customerId: true,
+      customer: {
+        select: {
+          id: true,
+          nama: true,
+          namaToko: true,
         },
-        items: {
-          select: {
-            id: true,
-            barangId: true,
-            totalItem: true,
-            hargaJual: true,
-            diskonPerItem: true,
-            barang: {
-              select: {
-                id: true,
-                namaBarang: true,
-                jumlahPerKemasan: true,
-              },
+      },
+      items: {
+        select: {
+          id: true,
+          barangId: true,
+          totalItem: true,
+          hargaJual: true,
+          diskonPerItem: true,
+          barang: {
+            select: {
+              id: true,
+              namaBarang: true,
+              jumlahPerKemasan: true,
             },
           },
         },
-        createdBy: {
-          select: {
-            id: true,
-            username: true,
-            role: true,
-            karyawan: { select: { nama: true } },
-          },
-        },
-        approvedBy: {
-          select: { id: true, username: true, role: true },
+      },
+      createdBy: {
+        select: {
+          id: true,
+          username: true,
+          role: true,
+          karyawan: { select: { nama: true } },
         },
       },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-    });
+      approvedBy: {
+        select: { id: true, username: true, role: true },
+      },
+    };
+
+    let data: any[];
+    try {
+      data = await prisma.penjualanHeader.findMany({
+        where,
+        select: fullSelect,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      });
+    } catch (queryErr: any) {
+      // Fallback: query tanpa items jika engine crash (biasanya karena data terlalu besar)
+      console.warn(
+        "findMany with items failed, retrying without items:",
+        queryErr?.message
+      );
+      try {
+        data = await prisma.penjualanHeader.findMany({
+          where,
+          select: {
+            id: true,
+            kodePenjualan: true,
+            namaCustomer: true,
+            statusApproval: true,
+            statusTransaksi: true,
+            statusPembayaran: true,
+            metodePembayaran: true,
+            subtotal: true,
+            totalHarga: true,
+            diskonNota: true,
+            jumlahDibayar: true,
+            kembalian: true,
+            tanggalTransaksi: true,
+            createdAt: true,
+            customerId: true,
+            customer: { select: { id: true, nama: true, namaToko: true } },
+            createdBy: {
+              select: {
+                id: true,
+                username: true,
+                role: true,
+                karyawan: { select: { nama: true } },
+              },
+            },
+            approvedBy: { select: { id: true, username: true, role: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+        });
+      } catch (fallbackErr: any) {
+        console.error("Fallback query also failed:", fallbackErr?.message);
+        data = [];
+      }
+    }
 
     return NextResponse.json(
       deepSerialize({

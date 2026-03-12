@@ -231,6 +231,14 @@ export async function GET(request: NextRequest) {
         _sum: { totalHarga: true },
       });
       const totalPembayaran = Number(totalHargaAgg._sum.totalHarga || 0);
+
+      // Total pemasukan real = SUM nominal pembayaranPenjualan yang penjualannya sesuai filter
+      const totalPemasukanAgg = await prisma.pembayaranPenjualan.aggregate({
+        where: { penjualan: summaryWhere },
+        _sum: { nominal: true },
+      });
+      const totalPemasukan = Number(totalPemasukanAgg._sum.nominal || 0);
+
       return NextResponse.json(
         deepSerialize({
           success: true,
@@ -242,6 +250,7 @@ export async function GET(request: NextRequest) {
             totalHutangTransaksi,
             totalLunas,
             hutangJatuhTempo,
+            totalPemasukan,
           },
         })
       );
