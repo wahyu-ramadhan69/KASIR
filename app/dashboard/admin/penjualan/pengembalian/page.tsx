@@ -11,6 +11,9 @@ import {
   X,
   RefreshCw,
   Search,
+  ShoppingCart,
+  Store,
+  Warehouse,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -31,6 +34,7 @@ interface PengembalianItem {
   jumlahDus: number;
   jumlahPcs: number;
   kondisiBarang: "BAIK" | "RUSAK" | "KADALUARSA";
+  tipePengembalian: "TRANSAKSI_SALES" | "TRANSAKSI_TOKO" | "BARANG_GUDANG";
   keterangan: string;
 }
 
@@ -79,6 +83,7 @@ const InputPengembalianPage = () => {
           jumlahDus: number;
           jumlahPcs: number;
           kondisiBarang: PengembalianItem["kondisiBarang"];
+          tipePengembalian: PengembalianItem["tipePengembalian"];
           keterangan: string | null;
           barang: Barang;
         };
@@ -89,6 +94,7 @@ const InputPengembalianPage = () => {
             jumlahDus: Number(pengembalian.jumlahDus || 0),
             jumlahPcs: Number(pengembalian.jumlahPcs || 0),
             kondisiBarang: pengembalian.kondisiBarang,
+            tipePengembalian: pengembalian.tipePengembalian || "TRANSAKSI_TOKO",
             keterangan: pengembalian.keterangan || "",
           },
         ]);
@@ -154,6 +160,7 @@ const InputPengembalianPage = () => {
         jumlahDus: 0,
         jumlahPcs: 0,
         kondisiBarang: "BAIK",
+        tipePengembalian: "TRANSAKSI_TOKO",
         keterangan: "",
       },
     ]);
@@ -226,6 +233,7 @@ const InputPengembalianPage = () => {
           jumlahDus: items[0].jumlahDus,
           jumlahPcs: items[0].jumlahPcs,
           kondisiBarang: items[0].kondisiBarang,
+          tipePengembalian: items[0].tipePengembalian,
           keterangan: items[0].keterangan,
         };
 
@@ -656,6 +664,49 @@ const InputPengembalianPage = () => {
 
                         <div className="mb-3">
                           <label className="text-xs font-bold text-gray-700 block mb-1.5 uppercase">
+                            Sumber Pengembalian:
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {(
+                              [
+                                { value: "TRANSAKSI_SALES", label: "Sales", Icon: ShoppingCart, color: "indigo" },
+                                { value: "TRANSAKSI_TOKO", label: "Toko", Icon: Store, color: "blue" },
+                                { value: "BARANG_GUDANG", label: "Gudang", Icon: Warehouse, color: "orange" },
+                              ] as const
+                            ).map(({ value, label, Icon, color }) => {
+                              const isActive = item.tipePengembalian === value;
+                              const activeClass =
+                                color === "indigo"
+                                  ? "bg-indigo-100 text-indigo-700 border-indigo-400"
+                                  : color === "blue"
+                                  ? "bg-blue-100 text-blue-700 border-blue-400"
+                                  : "bg-orange-100 text-orange-700 border-orange-400";
+                              return (
+                                <button
+                                  key={value}
+                                  onClick={() =>
+                                    handleUpdateItem(
+                                      item.barangId,
+                                      "tipePengembalian",
+                                      value
+                                    )
+                                  }
+                                  className={`px-2 py-2 rounded-lg font-bold text-xs transition-all border-2 shadow-sm hover:shadow-md active:scale-95 flex flex-col items-center gap-1 ${
+                                    isActive
+                                      ? activeClass + " shadow-md"
+                                      : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                                  }`}
+                                >
+                                  <Icon className="w-3.5 h-3.5" />
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <label className="text-xs font-bold text-gray-700 block mb-1.5 uppercase">
                             Kondisi Barang:
                           </label>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -711,15 +762,36 @@ const InputPengembalianPage = () => {
                               </span>
                             </p>
                           </div>
-                          {item.kondisiBarang !== "BAIK" && (
-                            <div className="mt-2 bg-red-50 border border-red-200 px-3 py-2 rounded-lg flex items-start gap-2">
-                              <AlertCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0 mt-0.5" />
-                              <p className="text-xs text-red-700 font-bold">
-                                Barang {item.kondisiBarang} tidak ditambahkan ke
-                                stok
-                              </p>
-                            </div>
-                          )}
+                          {item.tipePengembalian === "BARANG_GUDANG" &&
+                            item.kondisiBarang !== "BAIK" && (
+                              <div className="mt-2 bg-red-50 border border-red-200 px-3 py-2 rounded-lg flex items-start gap-2">
+                                <AlertCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-xs text-red-700 font-bold">
+                                  Barang {item.kondisiBarang} di gudang akan
+                                  dikurangi dari stok
+                                </p>
+                              </div>
+                            )}
+                          {item.tipePengembalian !== "BARANG_GUDANG" &&
+                            item.kondisiBarang !== "BAIK" && (
+                              <div className="mt-2 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg flex items-start gap-2">
+                                <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-700 font-bold">
+                                  Barang {item.kondisiBarang} tidak ditambahkan
+                                  ke stok
+                                </p>
+                              </div>
+                            )}
+                          {item.tipePengembalian === "BARANG_GUDANG" &&
+                            item.kondisiBarang === "BAIK" && (
+                              <div className="mt-2 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg flex items-start gap-2">
+                                <AlertCircle className="w-3.5 h-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-xs text-blue-700 font-bold">
+                                  Barang gudang kondisi BAIK — stok tidak
+                                  berubah
+                                </p>
+                              </div>
+                            )}
                         </div>
                       </div>
                     );
@@ -841,6 +913,18 @@ const InputPengembalianPage = () => {
                                 {totalPcs} pcs
                               </span>
                             </div>
+                            <div className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 p-2 rounded-lg border border-gray-200">
+                              <span className="text-xs font-bold text-gray-700 uppercase">
+                                Sumber:
+                              </span>
+                              <span className="text-xs font-bold text-gray-900">
+                                {item.tipePengembalian === "TRANSAKSI_SALES"
+                                  ? "Transaksi Sales"
+                                  : item.tipePengembalian === "TRANSAKSI_TOKO"
+                                  ? "Transaksi Toko"
+                                  : "Barang Gudang"}
+                              </span>
+                            </div>
                             <div
                               className={`flex items-center justify-between p-2 rounded-lg border-2 ${getKondisiColor(
                                 item.kondisiBarang
@@ -877,8 +961,11 @@ const InputPengembalianPage = () => {
                   <div>
                     <p className="font-bold text-sm mb-1">Perhatian!</p>
                     <p className="text-xs leading-relaxed">
-                      Pastikan semua data sudah benar. Barang dengan kondisi
-                      BAIK akan ditambahkan kembali ke stok.
+                      Pastikan semua data sudah benar.{" "}
+                      <strong>Transaksi Sales/Toko</strong> kondisi BAIK →
+                      stok bertambah.{" "}
+                      <strong>Barang Gudang</strong> kondisi RUSAK/KADALUARSA →
+                      stok berkurang.
                     </p>
                   </div>
                 </div>

@@ -290,6 +290,7 @@ model PengembalianBarang {
   jumlahPcs             BigInt
   userId                Int?
   kondisiBarang         KondisiBarang           @default(BAIK)
+  tipePengembalian      TipePengembalian        @default(TRANSAKSI_TOKO)
   keterangan            String?
   tanggalPengembalian   DateTime                @default(now())
   createdAt             DateTime                @default(now())
@@ -363,6 +364,12 @@ enum KondisiBarang {
   KADALUARSA
 }
 
+enum TipePengembalian {
+  TRANSAKSI_SALES
+  TRANSAKSI_TOKO
+  BARANG_GUDANG
+}
+
 enum JenisPengeluaran {
   HARIAN
   MINGGUAN
@@ -418,6 +425,35 @@ enum StatusApproval {
   PENDING
   APPROVED
   REJECTED
+}
+
+model KonfigurasiGaji {
+  id                  Int      @id @default(autoincrement())
+  jamMasukBatas       String   @default("08:10") // Format HH:mm
+  jamKerjaMenit       Int      @default(540)     // Default 9 jam = 540 menit
+  potonganTelat       Int      @default(10000)   // Rupiah sekali jika terlambat
+  potonganKurangJam   Int      @default(10000)   // Rupiah sekali jika kurang jam
+  upahLemburPerJam    Int      @default(10000)   // Rupiah per jam lembur
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model HariKerja {
+  id       Int     @id @default(autoincrement())
+  senin    Boolean @default(true)
+  selasa   Boolean @default(true)
+  rabu     Boolean @default(true)
+  kamis    Boolean @default(true)
+  jumat    Boolean @default(true)
+  sabtu    Boolean @default(true)
+  minggu   Boolean @default(false)
+}
+
+model HariLibur {
+  id         Int      @id @default(autoincrement())
+  tanggal    DateTime @unique
+  keterangan String
+  createdAt  DateTime @default(now())
 }
 
 model StokHarian {

@@ -118,6 +118,7 @@ export async function PUT(
       jumlahDus,
       jumlahPcs,
       kondisiBarang,
+      tipePengembalian,
       keterangan,
     } = body || {};
 
@@ -141,6 +142,17 @@ export async function PUT(
     if (!["BAIK", "RUSAK", "KADALUARSA"].includes(kondisi)) {
       return NextResponse.json(
         { success: false, error: "Kondisi barang tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    const tipe = (tipePengembalian || "TRANSAKSI_TOKO") as
+      | "TRANSAKSI_SALES"
+      | "TRANSAKSI_TOKO"
+      | "BARANG_GUDANG";
+    if (!["TRANSAKSI_SALES", "TRANSAKSI_TOKO", "BARANG_GUDANG"].includes(tipe)) {
+      return NextResponse.json(
+        { success: false, error: "Tipe pengembalian tidak valid" },
         { status: 400 }
       );
     }
@@ -196,14 +208,24 @@ export async function PUT(
 
     const stockUpdates: any[] = [];
 
-    if (
-      existing.kondisiBarang === "BAIK" &&
-      kondisi === "BAIK" &&
-      existing.barangId === barang.id
-    ) {
+    // Determine original and new stock effect
+    const existingTipe = (existing as any).tipePengembalian || "TRANSAKSI_TOKO";
+    const oldAddedStock =
+      existingTipe !== "BARANG_GUDANG" && existing.kondisiBarang === "BAIK";
+    const oldReducedStock =
+      existingTipe === "BARANG_GUDANG" && existing.kondisiBarang !== "BAIK";
+    const newAddStock = tipe !== "BARANG_GUDANG" && kondisi === "BAIK";
+    const newReduceStock = tipe === "BARANG_GUDANG" && kondisi !== "BAIK";
+
+    const sameSituation =
+      existing.barangId === barang.id &&
+      ((oldAddedStock && newAddStock) || (oldReducedStock && newReduceStock));
+
+    if (sameSituation) {
+      // Same effect type, same barang — just adjust the diff
       const diff = newTotalPcs - oldTotalPcs;
       const currentStock = toNumber(existing.barang.stok);
-      if (diff < 0 && currentStock < Math.abs(diff)) {
+      if (oldAddedStock && diff < 0 && currentStock < Math.abs(diff)) {
         return NextResponse.json(
           { success: false, error: "Stok tidak mencukupi untuk perubahan ini" },
           { status: 400 }
@@ -213,19 +235,28 @@ export async function PUT(
         stockUpdates.push(
           prisma.barang.update({
             where: { id: existing.barangId },
-            data: { stok: { increment: BigInt(diff) } },
+            data: {
+              stok: oldAddedStock
+                ? { increment: BigInt(diff) }
+                : { decrement: BigInt(diff) },
+            },
           })
         );
       } else if (diff < 0) {
         stockUpdates.push(
           prisma.barang.update({
             where: { id: existing.barangId },
-            data: { stok: { decrement: BigInt(Math.abs(diff)) } },
+            data: {
+              stok: oldAddedStock
+                ? { decrement: BigInt(Math.abs(diff)) }
+                : { increment: BigInt(Math.abs(diff)) },
+            },
           })
         );
       }
     } else {
-      if (existing.kondisiBarang === "BAIK") {
+      // Reverse old stock effect
+      if (oldAddedStock) {
         const currentStock = toNumber(existing.barang.stok);
         if (currentStock < oldTotalPcs) {
           return NextResponse.json(
@@ -239,13 +270,28 @@ export async function PUT(
             data: { stok: { decrement: BigInt(oldTotalPcs) } },
           })
         );
+      } else if (oldReducedStock) {
+        stockUpdates.push(
+          prisma.barang.update({
+            where: { id: existing.barangId },
+            data: { stok: { increment: BigInt(oldTotalPcs) } },
+          })
+        );
       }
 
-      if (kondisi === "BAIK") {
+      // Apply new stock effect
+      if (newAddStock) {
         stockUpdates.push(
           prisma.barang.update({
             where: { id: barang.id },
             data: { stok: { increment: BigInt(newTotalPcs) } },
+          })
+        );
+      } else if (newReduceStock) {
+        stockUpdates.push(
+          prisma.barang.update({
+            where: { id: barang.id },
+            data: { stok: { decrement: BigInt(newTotalPcs) } },
           })
         );
       }
@@ -260,6 +306,7 @@ export async function PUT(
           jumlahDus: BigInt(jumlahDusNum),
           jumlahPcs: BigInt(jumlahPcsNum),
           kondisiBarang: kondisi,
+          tipePengembalian: tipe,
           keterangan: keterangan || null,
         },
         include: {
@@ -347,11 +394,22 @@ export async function DELETE(
     );
 
     const stockUpdates: any[] = [];
-    if (existing.kondisiBarang === "BAIK" && totalPcs > 0) {
+    const existingTipeDel = (existing as any).tipePengembalian || "TRANSAKSI_TOKO";
+    // Sebelumnya tambah stok (TRANSAKSI/BAIK) → hapus berarti kurangi stok kembali
+    if (existingTipeDel !== "BARANG_GUDANG" && existing.kondisiBarang === "BAIK" && totalPcs > 0) {
       stockUpdates.push(
         prisma.barang.update({
           where: { id: existing.barangId },
           data: { stok: { decrement: BigInt(totalPcs) } },
+        })
+      );
+    }
+    // Sebelumnya kurangi stok (BARANG_GUDANG + RUSAK/KADALUARSA) → hapus berarti tambah stok kembali
+    if (existingTipeDel === "BARANG_GUDANG" && existing.kondisiBarang !== "BAIK" && totalPcs > 0) {
+      stockUpdates.push(
+        prisma.barang.update({
+          where: { id: existing.barangId },
+          data: { stok: { increment: BigInt(totalPcs) } },
         })
       );
     }

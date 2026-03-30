@@ -57,6 +57,13 @@ function getWorkingDays(start: Date, end: Date): Date[] {
   return days;
 }
 
+function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function calcDurationHours(
   start?: Date | null,
   end?: Date | null,
@@ -67,11 +74,6 @@ function calcDurationHours(
   return diffMs / (1000 * 60 * 60);
 }
 
-function diffMinutes(start: Date, end: Date): number {
-  const diffMs = end.getTime() - start.getTime();
-  if (diffMs <= 0) return 0;
-  return Math.floor(diffMs / (1000 * 60));
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -168,6 +170,21 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Ambil konfigurasi gaji dari database
+    let configGaji = await prisma.konfigurasiGaji.findFirst({ orderBy: { id: "asc" } });
+    if (!configGaji) {
+      configGaji = await prisma.konfigurasiGaji.create({
+        data: {
+          jamMasukBatas: "08:10",
+          jamKerjaMenit: 540,
+          potonganTelat: 10000,
+          potonganKurangJam: 10000,
+          upahLemburPerJam: 10000,
+        },
+      });
+    }
+    const [jamBatasMasukH, menitBatasMasukM] = configGaji.jamMasukBatas.split(":").map(Number);
+
     const absensi = await prisma.absensi.findMany({
       where: {
         tanggal: {
@@ -187,7 +204,7 @@ export async function GET(request: NextRequest) {
 
     const absensiMap = new Map<string, (typeof absensi)[number]>();
     for (const item of absensi) {
-      const key = `${item.karyawanId}-${item.tanggal.toISOString().slice(0, 10)}`;
+      const key = `${item.karyawanId}-${toLocalDateKey(item.tanggal)}`;
       absensiMap.set(key, item);
     }
 
@@ -195,93 +212,69 @@ export async function GET(request: NextRequest) {
       const totalBulanan = karyawan.gajiPokok + karyawan.tunjanganMakan;
       const dailyRateMonthly =
         monthlyWorkingDays > 0 ? totalBulanan / monthlyWorkingDays : 0;
-      const totalGross =
-        periodParam === "weekly"
-          ? dailyRateMonthly * totalWorkingDays
-          : totalBulanan;
 
       let totalHadir = 0;
       let totalTerlambat = 0;
       let totalKurangJam = 0;
       let totalLemburJam = 0;
-      let totalTidakHadir = 0;
       let totalJamKerja = 0;
-      let potonganTidakHadir = 0;
       let potonganTelat = 0;
       let potonganKurangJam = 0;
       let lembur = 0;
 
       for (const day of workingDays) {
-        const key = `${karyawan.id}-${day.toISOString().slice(0, 10)}`;
+        const key = `${karyawan.id}-${toLocalDateKey(day)}`;
         const record = absensiMap.get(key);
-        if (!record) {
-          totalTidakHadir += 1;
-          potonganTidakHadir += dailyRateMonthly;
-          continue;
-        }
 
-        if (["IZIN", "SAKIT", "LIBUR"].includes(record.status)) {
-          totalTidakHadir += 1;
-          potonganTidakHadir += dailyRateMonthly;
-          continue;
-        }
+        // Skip hari tanpa absensi, atau status bukan HADIR
+        if (!record || record.status !== "HADIR") continue;
+
+        totalHadir += 1;
 
         const hasMasuk = Boolean(record.jamMasuk);
         const hasKeluar = Boolean(record.jamKeluar);
         const hours = calcDurationHours(record.jamMasuk, record.jamKeluar);
 
         if (hasMasuk && hasKeluar && hours !== null) {
-          totalHadir += 1;
           totalJamKerja += hours;
           const workMinutes = Math.floor(hours * 60);
 
           const batasMasuk = new Date(day);
-          batasMasuk.setHours(8, 10, 0, 0);
+          batasMasuk.setHours(jamBatasMasukH, menitBatasMasukM, 0, 0);
           if (record.jamMasuk && record.jamMasuk > batasMasuk) {
-            const telatMinutes = diffMinutes(batasMasuk, record.jamMasuk);
-            const telatBlocks = Math.floor(telatMinutes / 10);
-            if (telatBlocks > 0) {
-              totalTerlambat += 1;
-              potonganTelat += telatBlocks * 10000;
-            }
+            totalTerlambat += 1;
+            potonganTelat += configGaji!.potonganTelat;
           }
 
-          if (workMinutes < 9 * 60) {
-            const kurangMinutes = 9 * 60 - workMinutes;
-            const kurangBlocks = Math.floor(kurangMinutes / 10);
-            if (kurangBlocks > 0) {
-              totalKurangJam += 1;
-              potonganKurangJam += kurangBlocks * 10000;
-            }
+          if (workMinutes < configGaji!.jamKerjaMenit) {
+            totalKurangJam += 1;
+            potonganKurangJam += configGaji!.potonganKurangJam;
           }
 
-          if (workMinutes > 9 * 60) {
-            const lemburMinutes = workMinutes - 9 * 60;
+          if (workMinutes > configGaji!.jamKerjaMenit) {
+            const lemburMinutes = workMinutes - configGaji!.jamKerjaMenit;
             const lemburHours = Math.floor(lemburMinutes / 60);
             if (lemburHours > 0) {
               totalLemburJam += lemburHours;
-              lembur += lemburHours * 10000;
+              lembur += lemburHours * configGaji!.upahLemburPerJam;
             }
           }
-          continue;
+        } else if (hasMasuk) {
+          // Sudah check-in tapi belum check-out: cek telat saja
+          const batasMasuk = new Date(day);
+          batasMasuk.setHours(jamBatasMasukH, menitBatasMasukM, 0, 0);
+          if (record.jamMasuk && record.jamMasuk > batasMasuk) {
+            totalTerlambat += 1;
+            potonganTelat += configGaji!.potonganTelat;
+          }
         }
-
-        if (hasMasuk || hasKeluar) {
-          totalHadir += 1;
-          potonganTidakHadir += dailyRateMonthly;
-          continue;
-        }
-
-        totalTidakHadir += 1;
-        potonganTidakHadir += dailyRateMonthly;
       }
 
-      const totalGaji =
-        totalGross -
-        potonganTidakHadir -
-        potonganTelat -
-        potonganKurangJam +
-        lembur;
+      // Gaji dihitung hanya dari hari yang hadir
+      const totalGross = dailyRateMonthly * totalHadir;
+      const gajiProrate = totalHadir > 0
+        ? Math.round(totalGross - potonganTelat - potonganKurangJam + lembur)
+        : 0;
 
       return {
         karyawan: {
@@ -295,18 +288,27 @@ export async function GET(request: NextRequest) {
         totalTerlambat,
         totalKurangJam,
         totalLemburJam,
-        totalTidakHadir,
+        totalTidakHadir: 0,
         totalJamKerja: Number(totalJamKerja.toFixed(2)),
         gajiPokokBulanan: karyawan.gajiPokok,
         tunjanganMakanBulanan: karyawan.tunjanganMakan,
         totalBulanan,
-        potonganTidakHadir: Math.round(potonganTidakHadir),
+        potonganTidakHadir: 0,
         potonganTelat: Math.round(potonganTelat),
         potonganKurangJam: Math.round(potonganKurangJam),
         lembur: Math.round(lembur),
-        gajiProrate: Math.round(totalGaji),
+        gajiProrate,
       };
     });
+
+    // DEBUG SEMENTARA - hapus setelah masalah ditemukan
+    const debugAbsensiKeys = absensi.map(a => ({
+      id: a.karyawanId,
+      tanggalRaw: a.tanggal,
+      tanggalKey: toLocalDateKey(a.tanggal),
+      status: a.status,
+    }));
+    const debugWorkingDayKeys = workingDays.slice(0, 5).map(d => toLocalDateKey(d));
 
     return NextResponse.json({
       success: true,
@@ -314,11 +316,23 @@ export async function GET(request: NextRequest) {
       month: periodParam === "monthly" ? monthParam : null,
       range: { start: range.start, end: range.end },
       data: results,
+      _debug: {
+        totalAbsensiDitemukan: absensi.length,
+        absensiKeys: debugAbsensiKeys,
+        workingDayKeysSample: debugWorkingDayKeys,
+        monthlyWorkingDays,
+        configGajiId: configGaji?.id,
+      },
     });
   } catch (error) {
     console.error("Error calculating gaji absensi:", error);
     return NextResponse.json(
-      { success: false, error: "Gagal menghitung gaji absensi" },
+      {
+        success: false,
+        error: "Gagal menghitung gaji absensi",
+        _errorDetail: error instanceof Error ? error.message : String(error),
+        _errorStack: error instanceof Error ? error.stack?.split("\n").slice(0, 5) : undefined,
+      },
       { status: 500 },
     );
   }

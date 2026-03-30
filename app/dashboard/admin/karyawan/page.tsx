@@ -24,6 +24,15 @@ import {
   Building2,
   CreditCard,
   Printer,
+  Settings,
+  Clock,
+  Timer,
+  AlertTriangle,
+  TrendingDown,
+  Zap,
+  CalendarDays,
+  Ban,
+  Trash2 as TrashIcon,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -123,6 +132,26 @@ const DataKaryawanPage = () => {
   const [slipKaryawan, setSlipKaryawan] = useState<Karyawan | null>(null);
   const [showPayModal, setShowPayModal] = useState<boolean>(false);
   const [payKaryawan, setPayKaryawan] = useState<Karyawan | null>(null);
+  const [showKonfigModal, setShowKonfigModal] = useState<boolean>(false);
+  const [isSavingKonfig, setIsSavingKonfig] = useState<boolean>(false);
+  const [konfigForm, setKonfigForm] = useState({
+    jamMasukBatas: "08:10",
+    jamKerjaMenit: 540,
+    potonganTelat: 10000,
+    potonganKurangJam: 10000,
+    upahLemburPerJam: 10000,
+  });
+  // Hari Kerja & Libur
+  const [showHariModal, setShowHariModal] = useState<boolean>(false);
+  const [isSavingHari, setIsSavingHari] = useState<boolean>(false);
+  const [hariKerjaForm, setHariKerjaForm] = useState({
+    senin: true, selasa: true, rabu: true, kamis: true, jumat: true, sabtu: true, minggu: false,
+  });
+  const [hariLiburList, setHariLiburList] = useState<{ id: number; tanggal: string; keterangan: string }[]>([]);
+  const [newLiburTanggal, setNewLiburTanggal] = useState<string>("");
+  const [newLiburKeterangan, setNewLiburKeterangan] = useState<string>("");
+  const [isAddingLibur, setIsAddingLibur] = useState<boolean>(false);
+
   const [payPeriod, setPayPeriod] = useState<"BULANAN" | "MINGGUAN">("BULANAN");
   const [payNominal, setPayNominal] = useState<string>("");
   const [payBonus, setPayBonus] = useState<string>("");
@@ -565,6 +594,130 @@ const DataKaryawanPage = () => {
     fetchKaryawan(true);
   };
 
+  const openKonfigModal = async () => {
+    try {
+      const res = await fetch("/api/konfigurasi-gaji");
+      if (res.ok) {
+        const data = await res.json();
+        setKonfigForm({
+          jamMasukBatas: data.jamMasukBatas,
+          jamKerjaMenit: data.jamKerjaMenit,
+          potonganTelat: data.potonganTelat,
+          potonganKurangJam: data.potonganKurangJam,
+          upahLemburPerJam: data.upahLemburPerJam,
+        });
+      }
+    } catch {
+      // Gunakan nilai default dari state
+    }
+    setShowKonfigModal(true);
+  };
+
+  const handleSaveKonfig = async () => {
+    setIsSavingKonfig(true);
+    try {
+      const res = await fetch("/api/konfigurasi-gaji", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...konfigForm,
+          jamKerjaMenit: Number(konfigForm.jamKerjaMenit),
+          potonganTelat: Number(konfigForm.potonganTelat),
+          potonganKurangJam: Number(konfigForm.potonganKurangJam),
+          upahLemburPerJam: Number(konfigForm.upahLemburPerJam),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menyimpan");
+      toast.success("Konfigurasi gaji berhasil disimpan");
+      setShowKonfigModal(false);
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menyimpan konfigurasi");
+    } finally {
+      setIsSavingKonfig(false);
+    }
+  };
+
+  const openHariModal = async () => {
+    try {
+      const [resHari, resLibur] = await Promise.all([
+        fetch("/api/hari-kerja"),
+        fetch(`/api/hari-libur?year=${new Date().getFullYear()}`),
+      ]);
+      if (resHari.ok) {
+        const d = await resHari.json();
+        if (d.data) setHariKerjaForm({
+          senin: d.data.senin, selasa: d.data.selasa, rabu: d.data.rabu,
+          kamis: d.data.kamis, jumat: d.data.jumat, sabtu: d.data.sabtu, minggu: d.data.minggu,
+        });
+      }
+      if (resLibur.ok) {
+        const d = await resLibur.json();
+        if (Array.isArray(d.data)) setHariLiburList(d.data);
+      }
+    } catch { /* gunakan nilai default */ }
+    setShowHariModal(true);
+  };
+
+  const handleSaveHariKerja = async () => {
+    setIsSavingHari(true);
+    try {
+      const res = await fetch("/api/hari-kerja", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hariKerjaForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menyimpan");
+      toast.success("Konfigurasi hari kerja berhasil disimpan");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan hari kerja");
+    } finally {
+      setIsSavingHari(false);
+    }
+  };
+
+  const handleAddLibur = async () => {
+    if (!newLiburTanggal || !newLiburKeterangan.trim()) {
+      toast.error("Tanggal dan keterangan wajib diisi");
+      return;
+    }
+    setIsAddingLibur(true);
+    try {
+      const res = await fetch("/api/hari-libur", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tanggal: newLiburTanggal, keterangan: newLiburKeterangan.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menambah");
+      toast.success("Hari libur berhasil ditambahkan");
+      setHariLiburList((prev) => [...prev, data.data].sort(
+        (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
+      ));
+      setNewLiburTanggal("");
+      setNewLiburKeterangan("");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Gagal menambah hari libur");
+    } finally {
+      setIsAddingLibur(false);
+    }
+  };
+
+  const handleDeleteLibur = async (id: number) => {
+    try {
+      const res = await fetch(`/api/hari-libur/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Gagal menghapus");
+      }
+      toast.success("Hari libur dihapus");
+      setHariLiburList((prev) => prev.filter((h) => h.id !== id));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus hari libur");
+    }
+  };
+
   const openPayModal = (karyawan: Karyawan) => {
     setPayKaryawan(karyawan);
     setPayPeriod("BULANAN");
@@ -750,6 +903,20 @@ const DataKaryawanPage = () => {
               >
                 <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
                 Tambah Karyawan
+              </button>
+              <button
+                onClick={openKonfigModal}
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg"
+              >
+                <Settings className="w-5 h-5" />
+                Konfigurasi
+              </button>
+              <button
+                onClick={openHariModal}
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg"
+              >
+                <CalendarDays className="w-5 h-5" />
+                Hari Kerja
               </button>
               <button
                 onClick={handleRefresh}
@@ -2205,6 +2372,355 @@ const DataKaryawanPage = () => {
                     className="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl transition-all font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                   >
                     Simpan Pembayaran
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Modal Hari Kerja & Libur */}
+        {showHariModal && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+            onClick={() => setShowHariModal(false)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-lg w-full shadow-2xl animate-in zoom-in duration-200 overflow-hidden max-h-[90vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="relative bg-gradient-to-br from-emerald-700 via-teal-800 to-cyan-900 p-7 shrink-0">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-400 opacity-10 rounded-full -mr-16 -mt-16 pointer-events-none" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/10 border border-white/20 p-3 rounded-2xl">
+                      <CalendarDays className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white leading-tight">Hari Kerja & Hari Libur</h2>
+                      <p className="text-emerald-200 text-sm mt-0.5">Atur hari aktif dan tanggal libur khusus</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowHariModal(false)}
+                    className="text-white/70 hover:text-white hover:bg-white/10 p-2 rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto flex-1 p-6 space-y-6">
+                {/* Hari Kerja Toggle */}
+                <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-emerald-100 p-1.5 rounded-lg">
+                      <Clock className="w-4 h-4 text-emerald-700" />
+                    </div>
+                    <p className="font-bold text-emerald-900 text-sm uppercase tracking-wide">Hari Kerja Aktif</p>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {(["senin","selasa","rabu","kamis","jumat","sabtu","minggu"] as const).map((hari) => {
+                      const label: Record<string, string> = {
+                        senin: "Sen", selasa: "Sel", rabu: "Rab", kamis: "Kam",
+                        jumat: "Jum", sabtu: "Sab", minggu: "Min",
+                      };
+                      const active = hariKerjaForm[hari];
+                      return (
+                        <button
+                          key={hari}
+                          type="button"
+                          onClick={() => setHariKerjaForm((prev) => ({ ...prev, [hari]: !prev[hari] }))}
+                          className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 font-bold text-xs transition-all ${
+                            active
+                              ? "bg-emerald-600 border-emerald-600 text-white shadow-md"
+                              : "bg-white border-gray-200 text-gray-400 hover:border-gray-300"
+                          }`}
+                        >
+                          {label[hari]}
+                          <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-white" : "bg-gray-300"}`} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveHariKerja}
+                    disabled={isSavingHari}
+                    className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {isSavingHari ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    Simpan Hari Kerja
+                  </button>
+                </div>
+
+                {/* Hari Libur Khusus */}
+                <div className="bg-rose-50 rounded-2xl p-5 border border-rose-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-rose-100 p-1.5 rounded-lg">
+                      <Ban className="w-4 h-4 text-rose-700" />
+                    </div>
+                    <p className="font-bold text-rose-900 text-sm uppercase tracking-wide">Hari Libur Khusus</p>
+                  </div>
+
+                  {/* Form tambah */}
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="date"
+                      value={newLiburTanggal}
+                      onChange={(e) => setNewLiburTanggal(e.target.value)}
+                      className="flex-shrink-0 px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-rose-400 focus:border-transparent outline-none transition-all"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Keterangan (mis. Lebaran)"
+                      value={newLiburKeterangan}
+                      onChange={(e) => setNewLiburKeterangan(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddLibur()}
+                      className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-rose-400 focus:border-transparent outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddLibur}
+                      disabled={isAddingLibur}
+                      className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-xl transition-all disabled:opacity-60 shrink-0"
+                    >
+                      {isAddingLibur ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Daftar libur */}
+                  {hariLiburList.length === 0 ? (
+                    <p className="text-center text-sm text-gray-400 py-4">Belum ada hari libur khusus</p>
+                  ) : (
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                      {hariLiburList.map((libur) => {
+                        const tgl = new Intl.DateTimeFormat("id-ID", {
+                          day: "2-digit", month: "short", year: "numeric",
+                        }).format(new Date(libur.tanggal));
+                        return (
+                          <div
+                            key={libur.id}
+                            className="flex items-center justify-between bg-white border border-rose-100 rounded-xl px-3 py-2.5 gap-2"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs font-mono font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg shrink-0">
+                                {tgl}
+                              </span>
+                              <span className="text-sm text-gray-700 truncate">{libur.keterangan}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLibur(libur.id)}
+                              className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-all shrink-0"
+                            >
+                              <TrashIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 pb-6 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowHariModal(false)}
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold text-sm transition-all"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Konfigurasi Parameter Gaji */}
+        {showKonfigModal && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+            onClick={() => setShowKonfigModal(false)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-lg w-full shadow-2xl animate-in zoom-in duration-200 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-950 p-7">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500 opacity-10 rounded-full -mr-16 -mt-16 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-28 h-28 bg-blue-400 opacity-10 rounded-full -ml-10 -mb-10 pointer-events-none" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/10 border border-white/20 p-3 rounded-2xl">
+                      <Settings className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white leading-tight">
+                        Konfigurasi Parameter Gaji
+                      </h2>
+                      <p className="text-slate-400 text-sm mt-0.5">Atur aturan perhitungan otomatis</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowKonfigModal(false)}
+                    className="text-slate-400 hover:text-white hover:bg-white/10 p-2 rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 bg-slate-50">
+                {/* Seksi: Jam Kerja */}
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-blue-50 border-b border-blue-100">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Jam Kerja</span>
+                  </div>
+                  <div className="p-4 grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                        Batas Toleransi Masuk
+                      </label>
+                      <input
+                        type="time"
+                        value={konfigForm.jamMasukBatas}
+                        onChange={(e) =>
+                          setKonfigForm((f) => ({ ...f, jamMasukBatas: e.target.value }))
+                        }
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-slate-50"
+                      />
+                      <p className="text-xs text-slate-400 mt-1.5">Lewat jam ini = terlambat</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                        Durasi Standar (menit)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={konfigForm.jamKerjaMenit}
+                        onChange={(e) =>
+                          setKonfigForm((f) => ({ ...f, jamKerjaMenit: Number(e.target.value) }))
+                        }
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-slate-50"
+                      />
+                      <p className="text-xs text-slate-400 mt-1.5">
+                        {konfigForm.jamKerjaMenit >= 60
+                          ? `${Math.floor(konfigForm.jamKerjaMenit / 60)} jam ${konfigForm.jamKerjaMenit % 60 > 0 ? `${konfigForm.jamKerjaMenit % 60} menit` : ""}`
+                          : `${konfigForm.jamKerjaMenit} menit`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seksi: Potongan */}
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border-b border-red-100">
+                    <TrendingDown className="w-4 h-4 text-red-500" />
+                    <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Potongan</span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="flex-shrink-0 bg-orange-100 p-2 rounded-lg">
+                        <AlertTriangle className="w-4 h-4 text-orange-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-600">Terlambat Masuk</p>
+                        <p className="text-xs text-slate-400">Sekali potong per hari</p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="text-xs text-slate-400 font-medium">Rp</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={konfigForm.potonganTelat}
+                          onChange={(e) =>
+                            setKonfigForm((f) => ({ ...f, potonganTelat: Number(e.target.value) }))
+                          }
+                          className="w-28 px-2 py-1.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all text-right bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="flex-shrink-0 bg-yellow-100 p-2 rounded-lg">
+                        <Timer className="w-4 h-4 text-yellow-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-600">Kurang Jam Kerja</p>
+                        <p className="text-xs text-slate-400">Sekali potong per hari</p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="text-xs text-slate-400 font-medium">Rp</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={konfigForm.potonganKurangJam}
+                          onChange={(e) =>
+                            setKonfigForm((f) => ({ ...f, potonganKurangJam: Number(e.target.value) }))
+                          }
+                          className="w-28 px-2 py-1.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all text-right bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seksi: Lembur */}
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border-b border-green-100">
+                    <Zap className="w-4 h-4 text-green-600" />
+                    <span className="text-xs font-bold text-green-700 uppercase tracking-wider">Lembur</span>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="flex-shrink-0 bg-green-100 p-2 rounded-lg">
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-600">Upah Lembur</p>
+                        <p className="text-xs text-slate-400">Per jam kelebihan kerja</p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="text-xs text-slate-400 font-medium">Rp</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={konfigForm.upahLemburPerJam}
+                          onChange={(e) =>
+                            setKonfigForm((f) => ({ ...f, upahLemburPerJam: Number(e.target.value) }))
+                          }
+                          className="w-28 px-2 py-1.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all text-right bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tombol Aksi */}
+                <div className="flex gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowKonfigModal(false)}
+                    className="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-xl transition-all font-semibold text-sm shadow-sm"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveKonfig}
+                    disabled={isSavingKonfig}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-5 py-3 rounded-xl transition-all font-semibold text-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {isSavingKonfig
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <CheckCircle className="w-4 h-4" />
+                    }
+                    Simpan Konfigurasi
                   </button>
                 </div>
               </div>

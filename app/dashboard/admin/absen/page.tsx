@@ -8,10 +8,15 @@ import {
   Briefcase,
   CheckCircle,
   X,
-  Edit,
   LogIn,
   LogOut,
   Calendar,
+  ClipboardList,
+  AlertCircle,
+  Clock,
+  FileText,
+  ChevronRight,
+  Edit,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -41,6 +46,46 @@ interface AbsensiStatus {
   tanggal: string;
 }
 
+const VALID_STATUS = ["HADIR", "IZIN", "SAKIT", "ALPHA", "LIBUR"] as const;
+const MODAL_STATUS = ["IZIN", "SAKIT"] as const satisfies readonly StatusAbsensi[];
+type StatusAbsensi = (typeof VALID_STATUS)[number];
+
+const STATUS_CONFIG: Record<
+  StatusAbsensi,
+  { label: string; color: string; bg: string; icon: React.ReactNode }
+> = {
+  HADIR: {
+    label: "Hadir",
+    color: "text-green-700",
+    bg: "bg-green-100",
+    icon: <CheckCircle className="w-3.5 h-3.5" />,
+  },
+  IZIN: {
+    label: "Izin",
+    color: "text-blue-700",
+    bg: "bg-blue-100",
+    icon: <FileText className="w-3.5 h-3.5" />,
+  },
+  SAKIT: {
+    label: "Sakit",
+    color: "text-yellow-700",
+    bg: "bg-yellow-100",
+    icon: <AlertCircle className="w-3.5 h-3.5" />,
+  },
+  ALPHA: {
+    label: "Alpha",
+    color: "text-red-700",
+    bg: "bg-red-100",
+    icon: <X className="w-3.5 h-3.5" />,
+  },
+  LIBUR: {
+    label: "Libur",
+    color: "text-purple-700",
+    bg: "bg-purple-100",
+    icon: <Calendar className="w-3.5 h-3.5" />,
+  },
+};
+
 const AbsenKaryawanPage = () => {
   const [karyawanList, setKaryawanList] = useState<Karyawan[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -51,12 +96,6 @@ const AbsenKaryawanPage = () => {
   const [absensiMap, setAbsensiMap] = useState<
     Record<number, AbsensiStatus | undefined>
   >({});
-  const [showEditModal, setShowEditModal] = useState<boolean>(false);
-  const [editTarget, setEditTarget] = useState<{
-    karyawan: Karyawan;
-  } | null>(null);
-  const [editType, setEditType] = useState<"in" | "out">("in");
-  const [editTime, setEditTime] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const today = new Date();
     const year = today.getFullYear();
@@ -68,6 +107,22 @@ const AbsenKaryawanPage = () => {
     Record<number, { checkin?: boolean; checkout?: boolean }>
   >({});
 
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<Karyawan | null>(null);
+  const [editType, setEditType] = useState<"in" | "out">("in");
+  const [editTime, setEditTime] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Input (izin/sakit) modal state
+  const [showInputModal, setShowInputModal] = useState(false);
+  const [inputTarget, setInputTarget] = useState<Karyawan | null>(null);
+  const [inputStatus, setInputStatus] = useState<StatusAbsensi>("HADIR");
+  const [inputJamMasuk, setInputJamMasuk] = useState("");
+  const [inputJamKeluar, setInputJamKeluar] = useState("");
+  const [inputCatatan, setInputCatatan] = useState("");
+  const [isSavingInput, setIsSavingInput] = useState(false);
+
   const observerTarget = useRef<HTMLDivElement>(null);
   const hasMountedRef = useRef<boolean>(false);
 
@@ -76,32 +131,21 @@ const AbsenKaryawanPage = () => {
   }, []);
 
   const fetchKaryawan = async (reset: boolean = false) => {
-    if (reset) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
 
     try {
       let url = `/api/karyawan?limit=20&excludeJenis=OWNER`;
-
-      if (!reset && nextCursor) {
-        url += `&cursor=${nextCursor}`;
-      }
-
-      if (searchTerm.trim()) {
+      if (!reset && nextCursor) url += `&cursor=${nextCursor}`;
+      if (searchTerm.trim())
         url += `&search=${encodeURIComponent(searchTerm)}`;
-      }
 
       const res = await fetch(url);
       const data = await res.json();
-
-      if (!res.ok || !Array.isArray(data.data)) {
-        throw new Error(data.error || "Invalid karyawan response");
-      }
+      if (!res.ok || !Array.isArray(data.data))
+        throw new Error(data.error || "Invalid response");
 
       const incoming: Karyawan[] = data.data;
-
       if (reset) {
         setKaryawanList(incoming);
         setAbsensiMap({});
@@ -111,15 +155,14 @@ const AbsenKaryawanPage = () => {
 
       setNextCursor(data.nextCursor ?? null);
       setHasMore(data.nextCursor !== null);
-
-      const incomingIds = incoming.map((item) => item.id);
-      await fetchAbsensiStatus(incomingIds, selectedDate);
+      await fetchAbsensiStatus(
+        incoming.map((i) => i.id),
+        selectedDate
+      );
     } catch (error) {
       console.error("Error fetching karyawan:", error);
       toast.error("Gagal mengambil data karyawan");
-      if (reset) {
-        setKaryawanList([]);
-      }
+      if (reset) setKaryawanList([]);
       setNextCursor(null);
       setHasMore(false);
     } finally {
@@ -134,35 +177,26 @@ const AbsenKaryawanPage = () => {
       return;
     }
     if (!searchTerm.trim()) return;
-
     const timer = setTimeout(() => {
       setKaryawanList([]);
       setNextCursor(null);
       fetchKaryawan(true);
     }, 500);
-
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore)
           fetchKaryawan(false);
-        }
       },
       { threshold: 0.1 }
     );
-
     const currentTarget = observerTarget.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
-    }
-
+    if (currentTarget) observer.observe(currentTarget);
     return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
+      if (currentTarget) observer.unobserve(currentTarget);
     };
   }, [hasMore, loading, loadingMore, nextCursor]);
 
@@ -180,28 +214,21 @@ const AbsenKaryawanPage = () => {
   ) => {
     setActionLoading((prev) => ({
       ...prev,
-      [id]: {
-        ...prev[id],
-        [type]: value,
-      },
+      [id]: { ...prev[id], [type]: value },
     }));
   };
 
   const fetchAbsensiStatus = async (ids: number[], tanggal: string) => {
     if (!ids.length) return;
     try {
-      const url = `/api/karyawan/absensi?tanggal=${tanggal}&ids=${ids.join(
-        ","
-      )}`;
+      const url = `/api/karyawan/absensi?tanggal=${tanggal}&ids=${ids.join(",")}`;
       const res = await fetch(url);
       const data = await res.json();
-      if (!res.ok || !Array.isArray(data.data)) {
+      if (!res.ok || !Array.isArray(data.data))
         throw new Error(data.error || "Invalid absensi response");
-      }
       const mapUpdate: Record<number, AbsensiStatus> = {};
-      for (const item of data.data as AbsensiStatus[]) {
+      for (const item of data.data as AbsensiStatus[])
         mapUpdate[item.karyawanId] = item;
-      }
       setAbsensiMap((prev) => ({ ...prev, ...mapUpdate }));
     } catch (error) {
       console.error("Error fetching absensi status:", error);
@@ -228,18 +255,16 @@ const AbsenKaryawanPage = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`Check-in berhasil: ${karyawan.nama}`);
-        if (data?.data?.karyawanId) {
+        toast.success(`Check-in: ${karyawan.nama}`);
+        if (data?.data?.karyawanId)
           setAbsensiMap((prev) => ({
             ...prev,
             [data.data.karyawanId]: data.data,
           }));
-        }
       } else {
-        toast.error(data.error || "Gagal melakukan check-in");
+        toast.error(data.error || "Gagal check-in");
       }
-    } catch (error) {
-      console.error("Error check-in:", error);
+    } catch {
       toast.error("Terjadi kesalahan saat check-in");
     } finally {
       setLoadingState(karyawan.id, "checkin", false);
@@ -256,18 +281,16 @@ const AbsenKaryawanPage = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`Check-out berhasil: ${karyawan.nama}`);
-        if (data?.data?.karyawanId) {
+        toast.success(`Check-out: ${karyawan.nama}`);
+        if (data?.data?.karyawanId)
           setAbsensiMap((prev) => ({
             ...prev,
             [data.data.karyawanId]: data.data,
           }));
-        }
       } else {
-        toast.error(data.error || "Gagal melakukan check-out");
+        toast.error(data.error || "Gagal check-out");
       }
-    } catch (error) {
-      console.error("Error check-out:", error);
+    } catch {
       toast.error("Terjadi kesalahan saat check-out");
     } finally {
       setLoadingState(karyawan.id, "checkout", false);
@@ -278,75 +301,114 @@ const AbsenKaryawanPage = () => {
     if (!value) return "";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   };
 
   const handleOpenEdit = (karyawan: Karyawan) => {
     const absensi = absensiMap[karyawan.id];
-    const inTime = toTimeValue(absensi?.jamMasuk ?? null);
-    const outTime = toTimeValue(absensi?.jamKeluar ?? null);
-    const initialType = inTime ? "in" : "out";
-    setEditTarget({ karyawan });
-    setEditType(initialType);
-    setEditTime(initialType === "in" ? inTime : outTime);
+    const inTime = toTimeValue(absensi?.jamMasuk);
+    const outTime = toTimeValue(absensi?.jamKeluar);
+    const type = inTime ? "in" : "out";
+    setEditTarget(karyawan);
+    setEditType(type);
+    setEditTime(type === "in" ? inTime : outTime);
     setShowEditModal(true);
   };
 
   const handleSubmitEdit = async () => {
     if (!editTarget) return;
-    const { karyawan } = editTarget;
+    setIsSavingEdit(true);
     try {
       const payload =
         editType === "in"
-          ? { karyawanId: karyawan.id, tanggal: selectedDate, jamMasuk: editTime }
-          : {
-              karyawanId: karyawan.id,
-              tanggal: selectedDate,
-              jamKeluar: editTime,
-            };
-
+          ? { karyawanId: editTarget.id, tanggal: selectedDate, jamMasuk: editTime }
+          : { karyawanId: editTarget.id, tanggal: selectedDate, jamKeluar: editTime };
       const res = await fetch("/api/karyawan/absensi", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (res.ok) {
-        toast.success(
-          `Edit ${editType === "in" ? "check-in" : "check-out"} berhasil`
-        );
-        if (data?.data?.karyawanId) {
-          setAbsensiMap((prev) => ({
-            ...prev,
-            [data.data.karyawanId]: data.data,
-          }));
-        }
+      if (res.ok && data.success) {
+        toast.success(`Edit ${editType === "in" ? "jam masuk" : "jam keluar"} berhasil`);
+        if (data?.data?.karyawanId)
+          setAbsensiMap((prev) => ({ ...prev, [data.data.karyawanId]: data.data }));
         setShowEditModal(false);
         setEditTarget(null);
       } else {
         toast.error(data.error || "Gagal mengupdate absensi");
       }
-    } catch (error) {
-      console.error("Error updating absensi:", error);
+    } catch {
       toast.error("Terjadi kesalahan saat mengupdate absensi");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleOpenInputModal = (karyawan: Karyawan) => {
+    const absensi = absensiMap[karyawan.id];
+    setInputTarget(karyawan);
+    const existingStatus = absensi?.status as StatusAbsensi | undefined;
+    setInputStatus(MODAL_STATUS.includes(existingStatus as any) ? (existingStatus as typeof MODAL_STATUS[number]) : "IZIN");
+    setInputJamMasuk(toTimeValue(absensi?.jamMasuk));
+    setInputJamKeluar(toTimeValue(absensi?.jamKeluar));
+    setInputCatatan(absensi?.catatan || "");
+    setShowInputModal(true);
+  };
+
+  const handleSubmitInput = async () => {
+    if (!inputTarget) return;
+    setIsSavingInput(true);
+    try {
+      const payload: Record<string, unknown> = {
+        karyawanId: inputTarget.id,
+        tanggal: selectedDate,
+        status: inputStatus,
+        catatan: inputCatatan || null,
+      };
+      if (inputStatus === "HADIR") {
+        if (inputJamMasuk) payload.jamMasuk = inputJamMasuk;
+        if (inputJamKeluar) payload.jamKeluar = inputJamKeluar;
+      }
+
+      const res = await fetch("/api/karyawan/absensi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Absensi ${inputTarget.nama} berhasil disimpan`);
+        if (data?.data?.karyawanId)
+          setAbsensiMap((prev) => ({
+            ...prev,
+            [data.data.karyawanId]: data.data,
+          }));
+        setShowInputModal(false);
+        setInputTarget(null);
+      } else {
+        toast.error(data.error || "Gagal menyimpan absensi");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan saat menyimpan absensi");
+    } finally {
+      setIsSavingInput(false);
     }
   };
 
   const selectedDateLabel = new Intl.DateTimeFormat("id-ID", {
+    weekday: "long",
     day: "2-digit",
-    month: "short",
+    month: "long",
     year: "numeric",
-  }).format(new Date(selectedDate));
+  }).format(new Date(selectedDate + "T00:00:00"));
 
-  const totalCheckin = Object.values(absensiMap).filter(
-    (item) => item?.jamMasuk
-  ).length;
-  const totalCheckout = Object.values(absensiMap).filter(
-    (item) => item?.jamKeluar
-  ).length;
+  const absensiValues = Object.values(absensiMap);
+  const totalHadir = absensiValues.filter((a) => a?.status === "HADIR").length;
+  const totalIzin = absensiValues.filter((a) => a?.status === "IZIN").length;
+  const totalSakit = absensiValues.filter((a) => a?.status === "SAKIT").length;
+  const totalAlpha = absensiValues.filter((a) => a?.status === "ALPHA").length;
+  const totalBelumAbsen = karyawanList.filter((k) => !absensiMap[k.id]).length;
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -355,28 +417,30 @@ const AbsenKaryawanPage = () => {
           position="top-right"
           toastOptions={{
             duration: 3000,
-            style: { background: "#333", color: "#fff" },
-            success: { style: { background: "#22c55e" } },
-            error: { style: { background: "#ef4444" } },
+            style: { background: "#1e293b", color: "#fff", borderRadius: "12px" },
+            success: { style: { background: "#16a34a" } },
+            error: { style: { background: "#dc2626" } },
           }}
         />
 
         {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-8 mb-8 shadow-2xl">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-purple-700 to-indigo-800 rounded-2xl p-8 mb-8 shadow-2xl">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-white opacity-5 rounded-full -mr-40 -mt-40" />
+          <div className="absolute bottom-0 left-0 w-56 h-56 bg-white opacity-5 rounded-full -ml-28 -mb-28" />
+          <div className="absolute top-1/2 right-24 w-32 h-32 bg-white opacity-5 rounded-full" />
 
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
-                <Users className="w-10 h-10 text-white" />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-5">
+              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
+                <ClipboardList className="w-10 h-10 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
+                <h1 className="text-4xl font-bold text-white tracking-tight">
                   Absensi Karyawan
                 </h1>
-                <p className="text-blue-100 text-lg">
-                  Check-in dan check-out karyawan harian
+                <p className="text-purple-200 text-base mt-1 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  {selectedDateLabel}
                 </p>
               </div>
             </div>
@@ -384,11 +448,9 @@ const AbsenKaryawanPage = () => {
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg"
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 font-medium shadow-lg border border-white/20"
               >
-                <RefreshCw
-                  className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
-                />
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 Refresh
               </button>
             </div>
@@ -396,115 +458,94 @@ const AbsenKaryawanPage = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Total Karyawan
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {karyawanList.length}
-                </p>
-                <p className="text-xs text-gray-400 mt-2">Karyawan aktif</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+          <div className="bg-white rounded-2xl p-5 shadow-md border border-gray-100 hover:shadow-lg transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-blue-100 p-2.5 rounded-xl">
+                <Users className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Users className="w-8 h-8 text-white" />
-              </div>
+              <span className="text-3xl font-bold text-gray-900">{karyawanList.length}</span>
             </div>
+            <p className="text-sm font-semibold text-gray-500">Total</p>
+            <p className="text-xs text-gray-400 mt-0.5">Karyawan aktif</p>
           </div>
 
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Tanggal
-                </p>
-                <p className="text-2xl font-bold text-indigo-600 mt-2">
-                  {selectedDateLabel}
-                </p>
-                <p className="text-xs text-indigo-400 mt-2">
-                  Tanggal terpilih
-                </p>
+          <div className="bg-white rounded-2xl p-5 shadow-md border border-green-100 hover:shadow-lg transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-green-100 p-2.5 rounded-xl">
+                <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
-              <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Calendar className="w-8 h-8 text-white" />
-              </div>
+              <span className="text-3xl font-bold text-green-700">{totalHadir}</span>
             </div>
+            <p className="text-sm font-semibold text-green-600">Hadir</p>
+            <p className="text-xs text-gray-400 mt-0.5">Hari ini</p>
           </div>
 
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Total Check-in
-                </p>
-                <p className="text-3xl font-bold text-green-600 mt-2">
-                  {totalCheckin}
-                </p>
-                <p className="text-xs text-green-400 mt-2">
-                  Tanggal terpilih
-                </p>
+          <div className="bg-white rounded-2xl p-5 shadow-md border border-blue-100 hover:shadow-lg transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-blue-100 p-2.5 rounded-xl">
+                <FileText className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <LogIn className="w-8 h-8 text-white" />
-              </div>
+              <span className="text-3xl font-bold text-blue-700">{totalIzin}</span>
             </div>
+            <p className="text-sm font-semibold text-blue-600">Izin</p>
+            <p className="text-xs text-gray-400 mt-0.5">Hari ini</p>
           </div>
 
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
-                  Total Check-out
-                </p>
-                <p className="text-3xl font-bold text-orange-600 mt-2">
-                  {totalCheckout}
-                </p>
-                <p className="text-xs text-orange-400 mt-2">
-                  Tanggal terpilih
-                </p>
+          <div className="bg-white rounded-2xl p-5 shadow-md border border-yellow-100 hover:shadow-lg transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-yellow-100 p-2.5 rounded-xl">
+                <AlertCircle className="w-5 h-5 text-yellow-600" />
               </div>
-              <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <LogOut className="w-8 h-8 text-white" />
-              </div>
+              <span className="text-3xl font-bold text-yellow-700">{totalSakit + totalAlpha}</span>
             </div>
+            <p className="text-sm font-semibold text-yellow-600">Sakit/Alpha</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {totalSakit} sakit · {totalAlpha} alpha
+            </p>
+          </div>
+
+          <div className="bg-white rounded-2xl p-5 shadow-md border border-gray-200 hover:shadow-lg transition-all col-span-2 sm:col-span-1">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-slate-100 p-2.5 rounded-xl">
+                <Clock className="w-5 h-5 text-slate-500" />
+              </div>
+              <span className="text-3xl font-bold text-slate-500">{totalBelumAbsen}</span>
+            </div>
+            <p className="text-sm font-semibold text-slate-500">Belum Absen</p>
+            <p className="text-xs text-gray-400 mt-0.5">Perlu diisi</p>
           </div>
         </div>
 
-        {/* Search Section */}
-        <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
+        {/* Search & Date Filter */}
+        <div className="bg-white rounded-2xl p-5 mb-6 shadow-md border border-gray-100">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
                 placeholder="Cari nama, NIK..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none transition-all text-sm"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm("")}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => {
-                    setSelectedDate(e.target.value);
-                  }}
-                  className="pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                />
-              </div>
+            <div className="relative">
+              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none transition-all text-sm"
+              />
             </div>
           </div>
         </div>
@@ -513,91 +554,85 @@ const AbsenKaryawanPage = () => {
         {loading ? (
           <div className="flex justify-center items-center py-32">
             <div className="text-center">
-              <div className="relative">
-                <div className="w-24 h-24 border-8 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-                <Users className="w-10 h-10 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-              </div>
-              <p className="text-gray-500 mt-6 text-lg font-medium">
-                Memuat data karyawan...
-              </p>
+              <div className="w-16 h-16 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin mx-auto" />
+              <p className="text-gray-500 mt-4 font-medium">Memuat data...</p>
             </div>
           </div>
         ) : karyawanList.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-16 text-center">
-            <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Users className="w-12 h-12 text-gray-400" />
+          <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-16 text-center">
+            <div className="bg-gray-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="w-10 h-10 text-gray-400" />
             </div>
-            <p className="text-gray-500 text-lg font-medium">
+            <p className="text-gray-500 font-medium">
               {searchTerm
-                ? `Tidak ada karyawan ditemukan untuk "${searchTerm}"`
+                ? `Tidak ada karyawan untuk "${searchTerm}"`
                 : "Tidak ada data karyawan"}
             </p>
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                    <tr>
-                      <th className="px-6 py-4 text-left font-bold uppercase text-sm tracking-wide">
-                        Nama
+                  <thead>
+                    <tr className="bg-gradient-to-r from-violet-600 to-indigo-700 text-white">
+                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-widest">
+                        Karyawan
                       </th>
-                      <th className="px-6 py-4 text-left font-bold uppercase text-sm tracking-wide">
-                        NIK
+                      <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-widest hidden sm:table-cell">
+                        NIK / Jabatan
                       </th>
-                      <th className="px-6 py-4 text-left font-bold uppercase text-sm tracking-wide">
-                        Jenis
+                      <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-widest">
+                        Status
                       </th>
-                      <th className="px-6 py-4 text-center font-bold uppercase text-sm tracking-wide">
+                      <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-widest hidden md:table-cell">
+                        Jam Masuk / Keluar
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-widest">
                         Aksi
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {karyawanList.map((karyawan) => {
-                      const isCheckinLoading =
-                        actionLoading[karyawan.id]?.checkin ?? false;
-                      const isCheckoutLoading =
-                        actionLoading[karyawan.id]?.checkout ?? false;
+                      const isCheckinLoading = actionLoading[karyawan.id]?.checkin ?? false;
+                      const isCheckoutLoading = actionLoading[karyawan.id]?.checkout ?? false;
                       const absensi = absensiMap[karyawan.id];
+                      const currentStatus = absensi?.status as StatusAbsensi | undefined;
+                      const isHadir = currentStatus === "HADIR";
                       const isCheckedIn = Boolean(absensi?.jamMasuk);
                       const isCheckedOut = Boolean(absensi?.jamKeluar);
-                      const disableCheckin =
-                        isCheckedIn || isCheckinLoading || isCheckoutLoading;
-                      const disableCheckout =
-                        !isCheckedIn ||
-                        isCheckedOut ||
-                        isCheckoutLoading ||
-                        isCheckinLoading;
+
                       return (
                         <tr
                           key={karyawan.id}
-                          className="hover:bg-blue-50 transition-colors group"
+                          className="hover:bg-slate-50 transition-colors group"
                         >
+                          {/* Karyawan */}
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md group-hover:scale-110 transition-transform">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0">
                                 {karyawan.nama.charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <p className="font-semibold text-gray-900">
+                                <p className="font-semibold text-gray-900 text-sm">
                                   {karyawan.nama}
+                                </p>
+                                <p className="text-xs text-gray-400 sm:hidden">
+                                  {karyawan.nik}
                                 </p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <CreditCard className="w-4 h-4 text-gray-400" />
-                              <span className="font-mono text-sm text-gray-700">
-                                {karyawan.nik}
-                              </span>
+
+                          {/* NIK / Jabatan */}
+                          <td className="px-4 py-4 hidden sm:table-cell">
+                            <div className="flex items-center gap-1.5 text-gray-500 text-sm mb-1">
+                              <CreditCard className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <span className="font-mono">{karyawan.nik}</span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
                             <span
-                              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
                                 karyawan.jenis === "KASIR"
                                   ? "bg-purple-100 text-purple-700"
                                   : "bg-blue-100 text-blue-700"
@@ -607,51 +642,105 @@ const AbsenKaryawanPage = () => {
                               {karyawan.jenis}
                             </span>
                           </td>
+
+                          {/* Status */}
+                          <td className="px-4 py-4 text-center">
+                            {currentStatus ? (
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${STATUS_CONFIG[currentStatus].bg} ${STATUS_CONFIG[currentStatus].color}`}
+                              >
+                                {STATUS_CONFIG[currentStatus].icon}
+                                {STATUS_CONFIG[currentStatus].label}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-400">
+                                <Clock className="w-3.5 h-3.5" />
+                                Belum
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Jam */}
+                          <td className="px-4 py-4 text-center hidden md:table-cell">
+                            {isHadir ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-center gap-1.5 text-xs text-green-700">
+                                  <LogIn className="w-3.5 h-3.5" />
+                                  <span className="font-mono font-semibold">
+                                    {toTimeValue(absensi?.jamMasuk) || "—"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-center gap-1.5 text-xs text-orange-600">
+                                  <LogOut className="w-3.5 h-3.5" />
+                                  <span className="font-mono font-semibold">
+                                    {toTimeValue(absensi?.jamKeluar) || "—"}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300 text-sm">—</span>
+                            )}
+                          </td>
+
+                          {/* Aksi */}
                           <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex items-center justify-end gap-2">
+                              {/* Check-in */}
                               <button
                                 onClick={() => handleCheckin(karyawan)}
-                                disabled={disableCheckin}
-                                className="px-4 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Absen Masuk"
+                                disabled={isCheckedIn || isCheckinLoading || isCheckoutLoading}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                                  isCheckedIn
+                                    ? "bg-green-50 text-green-600 cursor-default"
+                                    : "bg-green-100 text-green-700 hover:bg-green-200"
+                                }`}
+                                title={isCheckedIn ? `Masuk: ${toTimeValue(absensi?.jamMasuk)}` : "Absen Masuk"}
                               >
-                                <LogIn className="w-4 h-4" />
-                                {isCheckinLoading
-                                  ? "Memproses..."
-                                  : isCheckedIn
-                                  ? toTimeValue(absensi?.jamMasuk ?? null) ||
-                                    "Check-in"
-                                  : "Check-in"}
+                                <LogIn className="w-3.5 h-3.5" />
+                                {isCheckinLoading ? "..." : isCheckedIn ? toTimeValue(absensi?.jamMasuk) || "Masuk" : "Masuk"}
                               </button>
+
+                              {/* Check-out */}
                               <button
                                 onClick={() => handleCheckout(karyawan)}
-                                disabled={disableCheckout}
-                                className="px-4 py-2 rounded-lg bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Absen Keluar"
+                                disabled={!isCheckedIn || isCheckedOut || isCheckoutLoading || isCheckinLoading}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                                  isCheckedOut
+                                    ? "bg-orange-50 text-orange-600 cursor-default"
+                                    : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                }`}
+                                title={isCheckedOut ? `Keluar: ${toTimeValue(absensi?.jamKeluar)}` : "Absen Keluar"}
                               >
-                                <LogOut className="w-4 h-4" />
-                                {isCheckoutLoading
-                                  ? "Memproses..."
-                                  : isCheckedOut
-                                  ? toTimeValue(absensi?.jamKeluar ?? null) ||
-                                    "Check-out"
-                                  : "Check-out"}
+                                <LogOut className="w-3.5 h-3.5" />
+                                {isCheckoutLoading ? "..." : isCheckedOut ? toTimeValue(absensi?.jamKeluar) || "Keluar" : "Keluar"}
                               </button>
+
+                              {/* Input Izin/Sakit */}
+                              <button
+                                onClick={() => handleOpenInputModal(karyawan)}
+                                className="px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors text-xs font-semibold flex items-center gap-1.5"
+                              >
+                                <ClipboardList className="w-3.5 h-3.5" />
+                                Izin/Sakit
+                              </button>
+
+                              {/* Edit Jam */}
                               <button
                                 onClick={() => handleOpenEdit(karyawan)}
                                 disabled={!absensi}
-                                className="px-3 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Edit Absensi"
+                                className="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                               >
-                                <Edit className="w-4 h-4" />
+                                <Edit className="w-3.5 h-3.5" />
                                 Edit
                               </button>
+
+                              {/* Detail */}
                               <Link
                                 href={`/dashboard/admin/absen/detail?karyawanId=${karyawan.id}`}
-                                className="px-3 py-2 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors font-semibold flex items-center gap-2"
-                                title="Detail Absen Bulanan"
+                                className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors text-xs font-semibold flex items-center gap-1"
                               >
                                 Detail
+                                <ChevronRight className="w-3 h-3" />
                               </Link>
                             </div>
                           </td>
@@ -663,25 +752,18 @@ const AbsenKaryawanPage = () => {
               </div>
             </div>
 
-            {/* Infinite Scroll Trigger */}
-            <div ref={observerTarget} className="mt-10">
+            {/* Infinite Scroll */}
+            <div ref={observerTarget} className="mt-8">
               {loadingMore && (
-                <div className="flex justify-center items-center py-12">
-                  <div className="text-center">
-                    <div className="relative">
-                      <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-4 font-medium">
-                      Memuat lebih banyak...
-                    </p>
-                  </div>
+                <div className="flex justify-center py-8">
+                  <div className="w-10 h-10 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
                 </div>
               )}
               {!hasMore && karyawanList.length > 0 && (
-                <div className="text-center py-12">
-                  <div className="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 rounded-full">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <p className="text-sm text-gray-600 font-medium">
+                <div className="text-center py-8">
+                  <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-white rounded-full shadow-sm border border-gray-200">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <p className="text-sm text-gray-500 font-medium">
                       Semua data telah ditampilkan
                     </p>
                   </div>
@@ -691,33 +773,36 @@ const AbsenKaryawanPage = () => {
           </>
         )}
 
-        {showEditModal && editTarget && (
+        {/* Input Absensi Modal */}
+        {showInputModal && inputTarget && (
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
-            onClick={() => setShowEditModal(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowInputModal(false)}
           >
             <div
-              className="bg-white rounded-2xl max-w-lg w-full shadow-2xl animate-in zoom-in duration-200"
+              className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="sticky top-0 z-10 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-6 rounded-t-2xl">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-br from-violet-600 to-indigo-700 p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
-                      <Edit className="w-6 h-6 text-white" />
+                    <div className="bg-white/20 p-2.5 rounded-xl">
+                      <ClipboardList className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-white">
-                        Edit Absensi
-                      </h2>
-                      <p className="text-blue-100 text-sm">
-                        {editTarget.karyawan.nama}
+                      <h2 className="text-xl font-bold text-white">Input Absensi</h2>
+                      <p className="text-violet-200 text-sm flex items-center gap-1 mt-0.5">
+                        <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
+                          {inputTarget.nama.charAt(0).toUpperCase()}
+                        </span>
+                        {inputTarget.nama}
                       </p>
                     </div>
                   </div>
                   <button
-                    onClick={() => setShowEditModal(false)}
-                    className="text-white hover:bg-white/20 p-2 rounded-xl transition-all"
+                    onClick={() => setShowInputModal(false)}
+                    className="text-white/70 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -725,57 +810,188 @@ const AbsenKaryawanPage = () => {
               </div>
 
               <div className="p-6 space-y-5">
+                {/* Status Selector */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
-                    Tipe
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
+                    Status Kehadiran
                   </label>
-                  <select
-                    value={editType}
-                    onChange={(e) => {
-                      const nextType = e.target.value as "in" | "out";
-                      setEditType(nextType);
-                      const absensi = absensiMap[editTarget.karyawan.id];
-                      const nextTime =
-                        nextType === "in"
-                          ? toTimeValue(absensi?.jamMasuk ?? null)
-                          : toTimeValue(absensi?.jamKeluar ?? null);
-                      setEditTime(nextTime);
-                    }}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                  <div className="grid grid-cols-2 gap-2">
+                    {MODAL_STATUS.map((s) => {
+                      const cfg = STATUS_CONFIG[s];
+                      const isSelected = inputStatus === s;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setInputStatus(s)}
+                          className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 transition-all text-xs font-bold ${
+                            isSelected
+                              ? `${cfg.bg} ${cfg.color} border-current shadow-sm`
+                              : "bg-gray-50 text-gray-400 border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          {cfg.icon}
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Catatan */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Catatan <span className="text-gray-400 normal-case font-normal">(opsional)</span>
+                  </label>
+                  <textarea
+                    value={inputCatatan}
+                    onChange={(e) => setInputCatatan(e.target.value)}
+                    placeholder="Tambahkan catatan..."
+                    rows={2}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none text-sm resize-none transition-all"
+                  />
+                </div>
+
+                {/* Tanggal info */}
+                <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-50 rounded-xl px-4 py-3">
+                  <Calendar className="w-4 h-4 shrink-0" />
+                  <span>
+                    Tanggal: <strong className="text-gray-600">{selectedDateLabel}</strong>
+                  </span>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowInputModal(false)}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold transition-all text-sm"
                   >
-                    <option value="in">Check-in</option>
-                    <option value="out">Check-out</option>
-                  </select>
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitInput}
+                    disabled={isSavingInput}
+                    className="flex-1 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white py-3 rounded-xl font-semibold transition-all text-sm shadow-md disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {isSavingInput ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    {isSavingInput ? "Menyimpan..." : "Simpan"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Jam Modal */}
+        {showEditModal && editTarget && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowEditModal(false)}
+          >
+            <div
+              className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/20 p-2.5 rounded-xl">
+                      <Edit className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-white">Edit Jam Absensi</h2>
+                      <p className="text-blue-200 text-sm">{editTarget.nama}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    className="text-white/70 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
+                    Pilih Jam
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["in", "out"] as const).map((type) => {
+                      const isSelected = editType === type;
+                      const ab = absensiMap[editTarget.id];
+                      const currentTime = type === "in"
+                        ? toTimeValue(ab?.jamMasuk)
+                        : toTimeValue(ab?.jamKeluar);
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            setEditType(type);
+                            setEditTime(currentTime);
+                          }}
+                          className={`flex flex-col items-center gap-1.5 py-3 px-4 rounded-xl border-2 transition-all text-sm font-semibold ${
+                            isSelected
+                              ? type === "in"
+                                ? "bg-green-100 text-green-700 border-green-400 shadow-sm"
+                                : "bg-orange-100 text-orange-700 border-orange-400 shadow-sm"
+                              : "bg-gray-50 text-gray-400 border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          {type === "in"
+                            ? <LogIn className="w-5 h-5" />
+                            : <LogOut className="w-5 h-5" />
+                          }
+                          <span>{type === "in" ? "Jam Masuk" : "Jam Keluar"}</span>
+                          {currentTime && (
+                            <span className={`text-xs font-mono font-bold ${isSelected ? "" : "text-gray-400"}`}>
+                              {currentTime}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
-                    Jam {editType === "in" ? "Masuk" : "Keluar"} (HH:MM)
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Ubah {editType === "in" ? "Jam Masuk" : "Jam Keluar"}
                   </label>
                   <input
                     type="time"
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm transition-all"
                   />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Kosongkan untuk menghapus jam.
-                  </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="flex gap-3 pt-1">
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-3 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-semibold transition-all text-sm"
                   >
                     Batal
                   </button>
                   <button
                     type="button"
                     onClick={handleSubmitEdit}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 py-3 rounded-xl transition-all font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                    disabled={isSavingEdit}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-2.5 rounded-xl font-semibold transition-all text-sm shadow-md disabled:opacity-60 flex items-center justify-center gap-2"
                   >
-                    <CheckCircle className="w-5 h-5" />
-                    Simpan
+                    {isSavingEdit ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    {isSavingEdit ? "Menyimpan..." : "Simpan"}
                   </button>
                 </div>
               </div>

@@ -79,6 +79,13 @@ function getWeekRangeByMonthWeek(
   return { start, end };
 }
 
+function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function calcDurationHours(
   start?: Date | null,
   end?: Date | null,
@@ -89,11 +96,6 @@ function calcDurationHours(
   return diffMs / (1000 * 60 * 60);
 }
 
-function diffMinutes(start: Date, end: Date): number {
-  const diffMs = end.getTime() - start.getTime();
-  if (diffMs <= 0) return 0;
-  return Math.floor(diffMs / (1000 * 60));
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -221,6 +223,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Ambil konfigurasi gaji dari database
+    let configGaji = await prisma.konfigurasiGaji.findFirst({ orderBy: { id: "asc" } });
+    if (!configGaji) {
+      configGaji = await prisma.konfigurasiGaji.create({
+        data: {
+          jamMasukBatas: "08:10",
+          jamKerjaMenit: 540,
+          potonganTelat: 10000,
+          potonganKurangJam: 10000,
+          upahLemburPerJam: 10000,
+        },
+      });
+    }
+    const [jamBatasMasukH, menitBatasMasukM] = configGaji.jamMasukBatas.split(":").map(Number);
+
     const { start: rangeStart, end: rangeEnd } = range;
     const absensi = await prisma.absensi.findMany({
       where: {
@@ -237,7 +254,7 @@ export async function GET(request: NextRequest) {
 
     const absensiMap = new Map<string, (typeof absensi)[number]>();
     for (const item of absensi) {
-      const key = item.tanggal.toISOString().slice(0, 10);
+      const key = toLocalDateKey(item.tanggal);
       absensiMap.set(key, item);
     }
 
@@ -272,7 +289,7 @@ export async function GET(request: NextRequest) {
     let lembur = pembayaran.lembur;
 
     for (const day of workingDays) {
-      const key = day.toISOString().slice(0, 10);
+      const key = toLocalDateKey(day);
       const record = absensiMap.get(key);
 
       if (!record) {
@@ -297,31 +314,20 @@ export async function GET(request: NextRequest) {
         const workMinutes = Math.floor(hours * 60);
 
         const batasMasuk = new Date(day);
-        batasMasuk.setHours(8, 10, 0, 0);
+        batasMasuk.setHours(jamBatasMasukH, menitBatasMasukM, 0, 0);
         if (record.jamMasuk && record.jamMasuk > batasMasuk) {
-          const telatMinutes = diffMinutes(batasMasuk, record.jamMasuk);
-          const telatBlocks = Math.floor(telatMinutes / 10);
-          if (telatBlocks > 0) {
-            totalTerlambat += 1;
-            potonganTelat += telatBlocks * 10000;
-          }
+          totalTerlambat += 1;
         }
 
-        if (workMinutes < 9 * 60) {
-          const kurangMinutes = 9 * 60 - workMinutes;
-          const kurangBlocks = Math.floor(kurangMinutes / 10);
-          if (kurangBlocks > 0) {
-            totalKurangJam += 1;
-            potonganKurangJam += kurangBlocks * 10000;
-          }
+        if (workMinutes < configGaji.jamKerjaMenit) {
+          totalKurangJam += 1;
         }
 
-        if (workMinutes > 9 * 60) {
-          const lemburMinutes = workMinutes - 9 * 60;
+        if (workMinutes > configGaji.jamKerjaMenit) {
+          const lemburMinutes = workMinutes - configGaji.jamKerjaMenit;
           const lemburHours = Math.floor(lemburMinutes / 60);
           if (lemburHours > 0) {
             totalLemburJam += lemburHours;
-            lembur += lemburHours * 10000;
           }
         }
         continue;

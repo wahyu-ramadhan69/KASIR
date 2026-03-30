@@ -209,24 +209,34 @@ export async function POST(request: NextRequest) {
         Number(item.jumlahDus) * Number(barang.jumlahPerKemasan) +
         Number(item.jumlahPcs);
 
+      const tipe = item.tipePengembalian || "TRANSAKSI_TOKO";
+
       pengembalianData.push({
         barangId: item.barangId,
         jumlahDus: BigInt(item.jumlahDus),
         jumlahPcs: BigInt(item.jumlahPcs),
         kondisiBarang: item.kondisiBarang,
+        tipePengembalian: tipe,
         keterangan: item.keterangan,
         userId: Number(authData.userId),
       });
 
-      if (item.kondisiBarang === "BAIK") {
+      // TRANSAKSI_SALES / TRANSAKSI_TOKO + BAIK → tambah stok
+      if (tipe !== "BARANG_GUDANG" && item.kondisiBarang === "BAIK") {
         barangUpdates.push(
           prisma.barang.update({
             where: { id: item.barangId },
-            data: {
-              stok: {
-                increment: BigInt(totalKembaliPcs),
-              },
-            },
+            data: { stok: { increment: BigInt(totalKembaliPcs) } },
+          })
+        );
+      }
+
+      // BARANG_GUDANG + RUSAK / KADALUARSA → kurangi stok
+      if (tipe === "BARANG_GUDANG" && item.kondisiBarang !== "BAIK") {
+        barangUpdates.push(
+          prisma.barang.update({
+            where: { id: item.barangId },
+            data: { stok: { decrement: BigInt(totalKembaliPcs) } },
           })
         );
       }

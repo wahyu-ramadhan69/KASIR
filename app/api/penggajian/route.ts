@@ -63,6 +63,13 @@ function getWorkingDays(start: Date, end: Date): Date[] {
   return days;
 }
 
+function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function calcDurationHours(
   start?: Date | null,
   end?: Date | null,
@@ -73,11 +80,6 @@ function calcDurationHours(
   return diffMs / (1000 * 60 * 60);
 }
 
-function diffMinutes(start: Date, end: Date): number {
-  const diffMs = end.getTime() - start.getTime();
-  if (diffMs <= 0) return 0;
-  return Math.floor(diffMs / (1000 * 60));
-}
 
 async function computeBreakdown(params: {
   karyawanId: number;
@@ -114,6 +116,21 @@ async function computeBreakdown(params: {
     throw new Error("Karyawan tidak ditemukan");
   }
 
+  // Ambil konfigurasi gaji dari database
+  let configGaji = await prisma.konfigurasiGaji.findFirst({ orderBy: { id: "asc" } });
+  if (!configGaji) {
+    configGaji = await prisma.konfigurasiGaji.create({
+      data: {
+        jamMasukBatas: "08:10",
+        jamKerjaMenit: 540,
+        potonganTelat: 10000,
+        potonganKurangJam: 10000,
+        upahLemburPerJam: 10000,
+      },
+    });
+  }
+  const [jamBatasMasukH, menitBatasMasukM] = configGaji.jamMasukBatas.split(":").map(Number);
+
   const absensi = await prisma.absensi.findMany({
     where: {
       karyawanId: params.karyawanId,
@@ -129,7 +146,7 @@ async function computeBreakdown(params: {
 
   const absensiMap = new Map<string, (typeof absensi)[number]>();
   for (const item of absensi) {
-    const key = item.tanggal.toISOString().slice(0, 10);
+    const key = toLocalDateKey(item.tanggal);
     absensiMap.set(key, item);
   }
 
@@ -143,7 +160,6 @@ async function computeBreakdown(params: {
   const dailyRateMonthly =
     monthlyWorkingDays > 0 ? totalBulanan / monthlyWorkingDays : 0;
 
-  let potonganTidakHadir = 0;
   let potonganTelat = 0;
   let potonganKurangJam = 0;
   let lembur = 0;
@@ -151,86 +167,72 @@ async function computeBreakdown(params: {
   let totalTerlambat = 0;
   let totalKurangJam = 0;
   let totalLemburJam = 0;
-  let totalTidakHadir = 0;
   let totalJamKerja = 0;
 
   for (const day of workingDays) {
-    const key = day.toISOString().slice(0, 10);
+    const key = toLocalDateKey(day);
     const record = absensiMap.get(key);
-    if (!record || ["IZIN", "SAKIT", "LIBUR"].includes(record.status)) {
-      totalTidakHadir += 1;
-      potonganTidakHadir += dailyRateMonthly;
-      continue;
-    }
+
+    // Skip hari tanpa absensi, atau status bukan HADIR
+    if (!record || record.status !== "HADIR") continue;
+
+    totalHadir += 1;
 
     const hasMasuk = Boolean(record.jamMasuk);
     const hasKeluar = Boolean(record.jamKeluar);
     const hours = calcDurationHours(record.jamMasuk, record.jamKeluar);
 
     if (hasMasuk && hasKeluar && hours !== null) {
-      totalHadir += 1;
       totalJamKerja += hours;
       const workMinutes = Math.floor(hours * 60);
 
       const batasMasuk = new Date(day);
-      batasMasuk.setHours(8, 10, 0, 0);
+      batasMasuk.setHours(jamBatasMasukH, menitBatasMasukM, 0, 0);
       if (record.jamMasuk && record.jamMasuk > batasMasuk) {
-        const telatMinutes = diffMinutes(batasMasuk, record.jamMasuk);
-        const telatBlocks = Math.floor(telatMinutes / 10);
-        if (telatBlocks > 0) {
-          totalTerlambat += 1;
-          potonganTelat += telatBlocks * 10000;
-        }
+        totalTerlambat += 1;
+        potonganTelat += configGaji.potonganTelat;
       }
 
-      if (workMinutes < 9 * 60) {
-        const kurangMinutes = 9 * 60 - workMinutes;
-        const kurangBlocks = Math.floor(kurangMinutes / 10);
-        if (kurangBlocks > 0) {
-          totalKurangJam += 1;
-          potonganKurangJam += kurangBlocks * 10000;
-        }
+      if (workMinutes < configGaji.jamKerjaMenit) {
+        totalKurangJam += 1;
+        potonganKurangJam += configGaji.potonganKurangJam;
       }
 
-      if (workMinutes > 9 * 60) {
-        const lemburMinutes = workMinutes - 9 * 60;
+      if (workMinutes > configGaji.jamKerjaMenit) {
+        const lemburMinutes = workMinutes - configGaji.jamKerjaMenit;
         const lemburHours = Math.floor(lemburMinutes / 60);
         if (lemburHours > 0) {
           totalLemburJam += lemburHours;
-          lembur += lemburHours * 10000;
+          lembur += lemburHours * configGaji.upahLemburPerJam;
         }
       }
-      continue;
+    } else if (hasMasuk) {
+      // Check-in ada tapi belum check-out: cek telat saja
+      const batasMasuk = new Date(day);
+      batasMasuk.setHours(jamBatasMasukH, menitBatasMasukM, 0, 0);
+      if (record.jamMasuk && record.jamMasuk > batasMasuk) {
+        totalTerlambat += 1;
+        potonganTelat += configGaji.potonganTelat;
+      }
     }
-
-    if (hasMasuk || hasKeluar) {
-      totalHadir += 1;
-      potonganTidakHadir += dailyRateMonthly;
-      continue;
-    }
-
-    totalTidakHadir += 1;
-    potonganTidakHadir += dailyRateMonthly;
   }
 
-  const totalGross =
-    params.periode === "MINGGUAN"
-      ? dailyRateMonthly * totalWorkingDays
-      : totalBulanan;
-  const totalPotongan = potonganTidakHadir + potonganTelat + potonganKurangJam;
+  // Gaji dihitung hanya dari hari yang hadir
+  const totalGross = dailyRateMonthly * totalHadir;
+  const totalPotongan = potonganTelat + potonganKurangJam;
   const totalDiterima = Math.max(0, totalGross + lembur - totalPotongan);
 
   return {
     karyawan,
     totalGross: Math.round(totalGross),
     totalPotongan: Math.round(totalPotongan),
-    potonganTidakHadir: Math.round(potonganTidakHadir),
+    potonganTidakHadir: 0,
     potonganTelat: Math.round(potonganTelat),
     potonganKurangJam: Math.round(potonganKurangJam),
     lembur: Math.round(lembur),
     totalDiterima: Math.round(totalDiterima),
     totalHadir,
-    totalTidakHadir,
+    totalTidakHadir: 0,
     totalTerlambat,
     totalKurangJam,
     totalLemburJam,
