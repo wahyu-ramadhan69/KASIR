@@ -866,7 +866,7 @@ const DataKaryawanPage = () => {
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="w-full px-6 pb-8">
+      <div className="w-full px-3 md:px-6 pb-6 md:pb-8">
         <Toaster
           position="top-right"
           toastOptions={{
@@ -878,62 +878,62 @@ const DataKaryawanPage = () => {
         />
 
         {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-8 mb-8 shadow-2xl">
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-5 md:p-8 mb-6 md:mb-8 shadow-2xl">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
 
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
-                <Users className="w-10 h-10 text-white" />
+          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="bg-white/20 backdrop-blur-sm p-3 md:p-4 rounded-xl flex-shrink-0">
+                <Users className="w-7 h-7 md:w-10 md:h-10 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
+                <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white tracking-tight">
                   Data Karyawan
                 </h1>
-                <p className="text-blue-100 text-lg">
+                <p className="text-blue-100 text-sm md:text-base">
                   Kelola informasi karyawan dan penggajian
                 </p>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 md:gap-3">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="group bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
+                className="group bg-white hover:bg-blue-50 text-blue-600 px-3 md:px-6 py-2 md:py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform text-sm md:text-base"
               >
-                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                Tambah Karyawan
+                <Plus className="w-4 h-4 md:w-5 md:h-5 group-hover:rotate-90 transition-transform" />
+                <span>Tambah Karyawan</span>
               </button>
               <button
                 onClick={openKonfigModal}
-                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg"
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-3 md:px-6 py-2 md:py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg text-sm md:text-base"
               >
-                <Settings className="w-5 h-5" />
-                Konfigurasi
+                <Settings className="w-4 h-4 md:w-5 md:h-5" />
+                <span>Konfigurasi</span>
               </button>
               <button
                 onClick={openHariModal}
-                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg"
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-3 md:px-6 py-2 md:py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg text-sm md:text-base"
               >
-                <CalendarDays className="w-5 h-5" />
-                Hari Kerja
+                <CalendarDays className="w-4 h-4 md:w-5 md:h-5" />
+                <span>Hari Kerja</span>
               </button>
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg"
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-3 md:px-6 py-2 md:py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg text-sm md:text-base"
               >
                 <RefreshCw
-                  className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
+                  className={`w-4 h-4 md:w-5 md:h-5 ${loading ? "animate-spin" : ""}`}
                 />
-                Refresh
+                <span>Refresh</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
@@ -988,9 +988,9 @@ const DataKaryawanPage = () => {
         </div>
 
         {/* Search Section */}
-        <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
+        <div className="bg-white rounded-2xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg border border-gray-100">
+          <div className="flex flex-col gap-3">
+            <div className="relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
@@ -1008,20 +1008,20 @@ const DataKaryawanPage = () => {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative">
+            <div className="flex flex-wrap gap-3">
+              <div className="relative flex-1 min-w-[160px]">
                 <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="month"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
                 />
               </div>
               <select
                 value={selectedWeek}
                 onChange={(e) => setSelectedWeek(Number(e.target.value))}
-                className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
+                className="flex-1 min-w-[130px] px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
               >
                 {Array.from({ length: maxWeek }, (_, i) => i + 1).map(
                   (week) => (
@@ -1066,49 +1066,49 @@ const DataKaryawanPage = () => {
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                     <tr>
-                      <th className="px-6 py-4 text-left">
+                      <th className="px-3 md:px-6 py-3 md:py-4 text-left">
                         <button
                           onClick={() => handleSort("nama")}
-                          className="flex items-center gap-2 font-bold uppercase text-sm tracking-wide hover:text-blue-100 transition-colors"
+                          className="flex items-center gap-2 font-bold uppercase text-xs md:text-sm tracking-wide hover:text-blue-100 transition-colors"
                         >
                           Nama
                           <SortIcon field="nama" />
                         </button>
                       </th>
-                      <th className="px-6 py-4 text-left">
+                      <th className="px-3 md:px-6 py-3 md:py-4 text-left">
                         <button
                           onClick={() => handleSort("nik")}
-                          className="flex items-center gap-2 font-bold uppercase text-sm tracking-wide hover:text-blue-100 transition-colors"
+                          className="flex items-center gap-2 font-bold uppercase text-xs md:text-sm tracking-wide hover:text-blue-100 transition-colors"
                         >
                           NIK
                           <SortIcon field="nik" />
                         </button>
                       </th>
-                      <th className="px-6 py-4 text-left">
+                      <th className="px-3 md:px-6 py-3 md:py-4 text-left">
                         <button
                           onClick={() => handleSort("jenis")}
-                          className="flex items-center gap-2 font-bold uppercase text-sm tracking-wide hover:text-blue-100 transition-colors"
+                          className="flex items-center gap-2 font-bold uppercase text-xs md:text-sm tracking-wide hover:text-blue-100 transition-colors"
                         >
                           Jenis
                           <SortIcon field="jenis" />
                         </button>
                       </th>
-                      <th className="px-6 py-4 text-left">
+                      <th className="px-3 md:px-6 py-3 md:py-4 text-left">
                         <button
                           onClick={() => handleSort("gajiPokok")}
-                          className="flex items-center gap-2 font-bold uppercase text-sm tracking-wide hover:text-blue-100 transition-colors"
+                          className="flex items-center gap-2 font-bold uppercase text-xs md:text-sm tracking-wide hover:text-blue-100 transition-colors"
                         >
                           Gaji Pokok
                           <SortIcon field="gajiPokok" />
                         </button>
                       </th>
-                      <th className="px-6 py-4 text-left font-bold uppercase text-sm tracking-wide">
+                      <th className="px-3 md:px-6 py-3 md:py-4 text-left font-bold uppercase text-xs md:text-sm tracking-wide">
                         Estimasi Gaji
                       </th>
-                      <th className="px-6 py-4 text-left font-bold uppercase text-sm tracking-wide">
+                      <th className="px-3 md:px-6 py-3 md:py-4 text-left font-bold uppercase text-xs md:text-sm tracking-wide">
                         Estimasi Mingguan
                       </th>
-                      <th className="px-6 py-4 text-center font-bold uppercase text-sm tracking-wide">
+                      <th className="px-3 md:px-6 py-3 md:py-4 text-center font-bold uppercase text-xs md:text-sm tracking-wide">
                         Aksi
                       </th>
                     </tr>
@@ -1119,7 +1119,7 @@ const DataKaryawanPage = () => {
                         key={karyawan.id}
                         className="hover:bg-blue-50 transition-colors group"
                       >
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-3 md:py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md group-hover:scale-110 transition-transform">
                               {karyawan.nama.charAt(0).toUpperCase()}
@@ -1135,17 +1135,17 @@ const DataKaryawanPage = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-3 md:py-4">
                           <div className="flex items-center gap-2">
-                            <CreditCard className="w-4 h-4 text-gray-400" />
-                            <span className="font-mono text-sm text-gray-700">
+                            <CreditCard className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <span className="font-mono text-xs md:text-sm text-gray-700">
                               {karyawan.nik}
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-3 md:py-4">
                           <span
-                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
+                            className={`inline-flex items-center gap-1 px-2 md:px-3 py-1 rounded-full text-xs font-semibold ${
                               karyawan.jenis === "KASIR"
                                 ? "bg-purple-100 text-purple-700"
                                 : "bg-blue-100 text-blue-700"
@@ -1155,9 +1155,9 @@ const DataKaryawanPage = () => {
                             {karyawan.jenis}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-3 md:py-4">
                           <div>
-                            <p className="font-bold text-green-600">
+                            <p className="font-bold text-green-600 text-xs md:text-sm">
                               {formatRupiah(karyawan.gajiPokok)}
                             </p>
                             <p className="text-xs text-gray-500">
@@ -1165,7 +1165,7 @@ const DataKaryawanPage = () => {
                             </p>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-3 md:py-4">
                           {(() => {
                             const weeks =
                               pembayaranMingguanAllMap[karyawan.id]
@@ -1189,7 +1189,7 @@ const DataKaryawanPage = () => {
                               ? estimasiBulanan
                               : Math.max(0, estimasiBulanan - weeklyPaidTotal);
                             return (
-                              <p className="font-bold text-blue-600">
+                              <p className="font-bold text-blue-600 text-xs md:text-sm">
                                 {formatRupiah(estimasiDisplay)}
                               </p>
                             );
@@ -1226,8 +1226,8 @@ const DataKaryawanPage = () => {
                             );
                           })()}
                         </td>
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-indigo-600">
+                        <td className="px-3 md:px-6 py-3 md:py-4">
+                          <p className="font-bold text-indigo-600 text-xs md:text-sm">
                             {formatRupiah(estimasiMingguanMap[karyawan.id] ?? 0)}
                           </p>
                           <p className="text-xs text-gray-500">
@@ -1247,8 +1247,8 @@ const DataKaryawanPage = () => {
                               : "Belum dibayar"}
                           </p>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="px-3 md:px-6 py-3 md:py-4">
+                          <div className="flex items-center justify-center gap-1 md:gap-2">
                             <button
                               onClick={() => setSelectedKaryawan(karyawan)}
                               className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors group/btn"

@@ -22,6 +22,9 @@ import {
   Activity,
   BarChart3,
   ShoppingBag,
+  Globe,
+  Image,
+  Tag,
 } from "lucide-react";
 
 import {
@@ -45,6 +48,12 @@ interface Supplier {
   limitPembelian: number;
 }
 
+interface KategoriBarang {
+  id: number;
+  namaKategori: string;
+  deskripsi: string | null;
+}
+
 interface Barang {
   id: number;
   namaBarang: string;
@@ -56,6 +65,10 @@ interface Barang {
   supplierId: number;
   berat: number;
   limitPenjualan: number;
+  kategoriId: number | null;
+  kategori: KategoriBarang | null;
+  gambar: string | null;
+  tampilDiHalaman: boolean;
   createdAt: string;
   updatedAt: string;
   supplier: Supplier;
@@ -70,6 +83,9 @@ interface BarangFormData {
   supplierId: string;
   berat: string;
   limitPenjualan: string;
+  kategoriId: string;
+  gambar: string;
+  tampilDiHalaman: boolean;
 }
 
 interface PaginationInfo {
@@ -146,6 +162,20 @@ const DataBarangPage = () => {
   const [addFormLimitPenjualan, setAddFormLimitPenjualan] =
     useState<string>("0");
   const [addFormBerat, setAddFormBerat] = useState<string>("");
+  const [addFormKategoriId, setAddFormKategoriId] = useState<string>("");
+  const [addFormGambar, setAddFormGambar] = useState<string>("");
+  const [addFormTampilDiHalaman, setAddFormTampilDiHalaman] = useState<boolean>(false);
+  const [kategoriList, setKategoriList] = useState<KategoriBarang[]>([]);
+  const [showKategoriModal, setShowKategoriModal] = useState<boolean>(false);
+  const [showKategoriAddForm, setShowKategoriAddForm] = useState<boolean>(false);
+  const [editingKategori, setEditingKategori] = useState<KategoriBarang | null>(null);
+  const [kategoriFormNama, setKategoriFormNama] = useState<string>("");
+  const [kategoriFormDeskripsi, setKategoriFormDeskripsi] = useState<string>("");
+  const [isSubmittingKategori, setIsSubmittingKategori] = useState<boolean>(false);
+  const [uploadingGambar, setUploadingGambar] = useState<boolean>(false);
+  const [editUploadingGambar, setEditUploadingGambar] = useState<boolean>(false);
+  const [addGambarPreview, setAddGambarPreview] = useState<string>("");
+  const [editGambarPreview, setEditGambarPreview] = useState<string>("");
   const [showEditLimitPenjualan, setShowEditLimitPenjualan] =
     useState<boolean>(false);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -204,6 +234,7 @@ const DataBarangPage = () => {
   useEffect(() => {
     fetchBarang();
     fetchSuppliers();
+    fetchKategori();
   }, []);
 
   const formatInputRupiah = (value: string): string => {
@@ -243,11 +274,105 @@ const DataBarangPage = () => {
     try {
       const res = await fetch("/api/supplier");
       const data = await res.json();
-      if (data.success) {
-        setSuppliersList(data.data);
-      }
+      if (data.success) setSuppliersList(data.data);
     } catch (error) {
       console.error("Error fetching suppliers:", error);
+    }
+  };
+
+  const fetchKategori = async () => {
+    try {
+      const res = await fetch("/api/kategori-barang");
+      const data = await res.json();
+      if (data.success) setKategoriList(data.data);
+    } catch (error) {
+      console.error("Error fetching kategori:", error);
+    }
+  };
+
+  const handleKategoriAdd = async () => {
+    if (!kategoriFormNama.trim()) {
+      toast.error("Nama kategori wajib diisi");
+      return;
+    }
+    setIsSubmittingKategori(true);
+    try {
+      const res = await fetch("/api/kategori-barang", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          namaKategori: kategoriFormNama.trim(),
+          deskripsi: kategoriFormDeskripsi.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Kategori berhasil ditambahkan!");
+        setKategoriFormNama("");
+        setKategoriFormDeskripsi("");
+        setShowKategoriAddForm(false);
+        fetchKategori();
+      } else {
+        toast.error(data.error || "Gagal menambahkan kategori");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setIsSubmittingKategori(false);
+    }
+  };
+
+  const handleKategoriEdit = async () => {
+    if (!editingKategori || !kategoriFormNama.trim()) {
+      toast.error("Nama kategori wajib diisi");
+      return;
+    }
+    setIsSubmittingKategori(true);
+    try {
+      const res = await fetch(`/api/kategori-barang/${editingKategori.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          namaKategori: kategoriFormNama.trim(),
+          deskripsi: kategoriFormDeskripsi.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Kategori berhasil diupdate!");
+        setEditingKategori(null);
+        setKategoriFormNama("");
+        setKategoriFormDeskripsi("");
+        fetchKategori();
+      } else {
+        toast.error(data.error || "Gagal mengupdate kategori");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setIsSubmittingKategori(false);
+    }
+  };
+
+  const handleKategoriDelete = async (item: KategoriBarang) => {
+    const jumlah = (item as any)._count?.barang ?? 0;
+    const konfirmasi =
+      jumlah > 0
+        ? `Kategori "${item.namaKategori}" digunakan ${jumlah} barang. Barang tersebut akan kehilangan kategorinya.\n\nLanjutkan hapus?`
+        : `Hapus kategori "${item.namaKategori}"?`;
+    if (!confirm(konfirmasi)) return;
+    try {
+      const res = await fetch(`/api/kategori-barang/${item.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Kategori berhasil dihapus!");
+        fetchKategori();
+        fetchBarang();
+      } else {
+        toast.error(data.error || "Gagal menghapus kategori");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan");
     }
   };
 
@@ -280,12 +405,105 @@ const DataBarangPage = () => {
         supplierId: barang.supplierId.toString(),
         berat: formatGramsToKg(barang.berat || 0),
         limitPenjualan: limitValue.toString(),
+        kategoriId: barang.kategoriId ? barang.kategoriId.toString() : "",
+        gambar: barang.gambar || "",
+        tampilDiHalaman: barang.tampilDiHalaman,
       },
     });
+    setEditGambarPreview(barang.gambar || "");
     setEditSupplierSearch(barang.supplier?.namaSupplier || "");
-    // Show checkbox if limit > 0
     setShowEditLimitPenjualan(limitValue > 0);
     setShowEditModal(true);
+  };
+
+  const handleToggleTampil = async (barang: Barang) => {
+    try {
+      const res = await fetch(`/api/barang/${barang.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tampilDiHalaman: !barang.tampilDiHalaman }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(
+          !barang.tampilDiHalaman
+            ? `${barang.namaBarang} ditampilkan di halaman utama`
+            : `${barang.namaBarang} disembunyikan dari halaman utama`
+        );
+        fetchBarang();
+      } else {
+        toast.error(data.error || "Gagal mengubah status tampil");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan");
+    }
+  };
+
+  // Hapus file gambar dari server (hanya file yang disimpan di /uploads/barang/)
+  const deleteGambarFile = async (url: string) => {
+    if (!url || !url.startsWith("/uploads/barang/")) return;
+    const filename = url.split("/").pop();
+    if (!filename) return;
+    try {
+      await fetch("/api/upload/barang", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+    } catch {
+      // silent — tidak perlu blokir user jika hapus file gagal
+    }
+  };
+
+  const handleUploadGambarAdd = async (file: File) => {
+    // Hapus file lama jika sudah ada upload sebelumnya di sesi ini
+    if (addFormGambar) await deleteGambarFile(addFormGambar);
+
+    setUploadingGambar(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload/barang", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success) {
+        setAddFormGambar(data.url);
+        setAddGambarPreview(data.url);
+        toast.success("Gambar berhasil diupload");
+      } else {
+        toast.error(data.error || "Gagal upload gambar");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan saat upload");
+    } finally {
+      setUploadingGambar(false);
+    }
+  };
+
+  const handleUploadGambarEdit = async (file: File) => {
+    // Hapus file lama — bisa file yang sudah tersimpan di DB atau yang baru diupload di sesi ini
+    const urlLama = editingBarang?.data.gambar;
+    if (urlLama) await deleteGambarFile(urlLama);
+
+    setEditUploadingGambar(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload/barang", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success) {
+        setEditingBarang((prev) =>
+          prev ? { ...prev, data: { ...prev.data, gambar: data.url } } : prev
+        );
+        setEditGambarPreview(data.url);
+        toast.success("Gambar berhasil diupload");
+      } else {
+        toast.error(data.error || "Gagal upload gambar");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan saat upload");
+    } finally {
+      setEditUploadingGambar(false);
+    }
   };
 
   const handleDelete = async (id: number, namaBarang: string) => {
@@ -321,27 +539,31 @@ const DataBarangPage = () => {
         const formattedValue = formatInputRupiah(value);
         setEditingBarang({
           ...editingBarang,
-          data: {
-            ...editingBarang.data,
-            [name]: formattedValue,
-          },
+          data: { ...editingBarang.data, [name]: formattedValue },
         });
       } else if (name === "berat") {
-        const formattedValue = normalizeDecimalInput(value);
         setEditingBarang({
           ...editingBarang,
           data: {
             ...editingBarang.data,
-            berat: formattedValue,
+            berat: normalizeDecimalInput(value),
           },
+        });
+      } else if (name === "tampilDiHalaman") {
+        const checked = (e.target as HTMLInputElement).checked;
+        setEditingBarang({
+          ...editingBarang,
+          data: { ...editingBarang.data, tampilDiHalaman: checked },
+        });
+      } else if (name === "kategoriId") {
+        setEditingBarang({
+          ...editingBarang,
+          data: { ...editingBarang.data, kategoriId: value },
         });
       } else {
         setEditingBarang({
           ...editingBarang,
-          data: {
-            ...editingBarang.data,
-            [name]: value,
-          },
+          data: { ...editingBarang.data, [name]: value },
         });
       }
     }
@@ -378,6 +600,9 @@ const DataBarangPage = () => {
           limitPenjualan: showAddLimitPenjualan
             ? parseInt(addFormLimitPenjualan)
             : 0,
+          kategoriId: addFormKategoriId ? parseInt(addFormKategoriId) : null,
+          gambar: addFormGambar || null,
+          tampilDiHalaman: addFormTampilDiHalaman,
         }),
       });
 
@@ -394,6 +619,10 @@ const DataBarangPage = () => {
         setAddFormBerat("");
         setShowAddLimitPenjualan(false);
         setAddFormLimitPenjualan("0");
+        setAddFormKategoriId("");
+        setAddFormGambar("");
+        setAddGambarPreview("");
+        setAddFormTampilDiHalaman(false);
         fetchBarang();
       } else {
         toast.error(data.error || "Gagal menambahkan barang");
@@ -429,6 +658,9 @@ const DataBarangPage = () => {
           limitPenjualan: showEditLimitPenjualan
             ? parseInt(editingBarang.data.limitPenjualan)
             : 0,
+          kategoriId: editingBarang.data.kategoriId ? parseInt(editingBarang.data.kategoriId) : null,
+          gambar: editingBarang.data.gambar || null,
+          tampilDiHalaman: editingBarang.data.tampilDiHalaman,
         }),
       });
 
@@ -874,7 +1106,7 @@ const DataBarangPage = () => {
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="w-full px-6 pb-8">
+      <div className="w-full px-3 md:px-6 pb-6 md:pb-8">
         <Toaster
           position="top-right"
           toastOptions={{
@@ -886,75 +1118,89 @@ const DataBarangPage = () => {
         />
 
         {/* Enhanced Header Section */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-8 mb-8 shadow-2xl">
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-5 md:p-8 mb-6 md:mb-8 shadow-2xl">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
 
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
-                <Package className="w-10 h-10 text-white" />
+          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="bg-white/20 backdrop-blur-sm p-3 md:p-4 rounded-xl flex-shrink-0">
+                <Package className="w-7 h-7 md:w-10 md:h-10 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
+                <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white tracking-tight">
                   Data Barang
                 </h1>
-                <p className="text-blue-100 text-lg">
+                <p className="text-blue-100 text-sm md:text-base">
                   Kelola dan pantau inventori barang Anda
                 </p>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 md:gap-3">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="group bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
+                className="group bg-white hover:bg-blue-50 text-blue-600 px-3 md:px-6 py-2 md:py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform text-sm md:text-base"
               >
-                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                <Plus className="w-4 h-4 md:w-5 md:h-5 group-hover:rotate-90 transition-transform" />
                 Tambah Barang
               </button>
 
               <div className="flex items-center bg-white/10 backdrop-blur-sm p-1 rounded-xl shadow-lg">
                 <button
                   onClick={() => setView("products")}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                  className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-1.5 ${
                     view === "products"
                       ? "bg-white text-blue-700 shadow-md"
                       : "text-white/90 hover:bg-white/20"
                   }`}
                 >
-                  <ShoppingBag className="w-4 h-4" />
+                  <ShoppingBag className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   Barang
                 </button>
                 <button
                   onClick={() => setView("sales")}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                  className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-1.5 ${
                     view === "sales"
                       ? "bg-white text-blue-700 shadow-md"
                       : "text-white/90 hover:bg-white/20"
                   }`}
                 >
-                  <BarChart3 className="w-4 h-4" />
+                  <BarChart3 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   Penjualan
                 </button>
                 <button
                   onClick={() => setView("chart")}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                  className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-1.5 ${
                     view === "chart"
                       ? "bg-white text-blue-700 shadow-md"
                       : "text-white/90 hover:bg-white/20"
                   }`}
                 >
-                  <TrendingUp className="w-4 h-4" />
+                  <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   Terlaris
                 </button>
               </div>
               <button
+                onClick={() => {
+                  setShowKategoriModal(true);
+                  setShowKategoriAddForm(false);
+                  setEditingKategori(null);
+                  setKategoriFormNama("");
+                  setKategoriFormDeskripsi("");
+                }}
+                className="bg-purple-500 hover:bg-purple-400 text-white px-3 md:px-6 py-2 md:py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg text-sm md:text-base"
+              >
+                <Tag className="w-4 h-4 md:w-5 md:h-5" />
+                Kategori
+              </button>
+
+              <button
                 onClick={fetchBarang}
                 disabled={loading}
-                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg"
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-3 md:px-6 py-2 md:py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg text-sm md:text-base"
               >
                 <RefreshCw
-                  className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
+                  className={`w-4 h-4 md:w-5 md:h-5 ${loading ? "animate-spin" : ""}`}
                 />
                 Refresh
               </button>
@@ -963,7 +1209,7 @@ const DataBarangPage = () => {
         </div>
 
         {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
@@ -1040,8 +1286,8 @@ const DataBarangPage = () => {
         {view === "products" ? (
           <>
             {/* Search and Filter Section */}
-            <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
-              <div className="flex flex-col lg:flex-row gap-4">
+            <div className="bg-white rounded-2xl p-4 md:p-6 mb-6 md:mb-8 shadow-lg border border-gray-100">
+              <div className="flex flex-col gap-3">
                 <div className="flex-1 relative">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
@@ -1061,11 +1307,11 @@ const DataBarangPage = () => {
                   )}
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-2 md:gap-3">
                   <select
                     value={filterSupplier}
                     onChange={(e) => setFilterSupplier(e.target.value)}
-                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
+                    className="flex-1 min-w-[140px] px-3 md:px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white text-sm"
                   >
                     <option value="all">Semua Supplier</option>
                     {uniqueSuppliers.map((supplier) => (
@@ -1078,7 +1324,7 @@ const DataBarangPage = () => {
                   <select
                     value={filterStok}
                     onChange={(e) => setFilterStok(e.target.value as any)}
-                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white"
+                    className="flex-1 min-w-[130px] px-3 md:px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white text-sm"
                   >
                     <option value="all">Semua Stok</option>
                     <option value="low">Stok Rendah</option>
@@ -1086,9 +1332,9 @@ const DataBarangPage = () => {
                     <option value="high">Stok Aman</option>
                   </select>
 
-                  <button className="px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2">
+                  <button className="px-3 md:px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2">
                     <Filter className="w-5 h-5 text-gray-600" />
-                    <span className="hidden lg:inline text-gray-700 font-medium">
+                    <span className="hidden md:inline text-gray-700 font-medium text-sm">
                       Filter
                     </span>
                   </button>
@@ -1138,34 +1384,37 @@ const DataBarangPage = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="bg-gradient-to-r from-blue-600 to-indigo-700">
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                           No
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                           Nama Barang
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                           Supplier
                         </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
                           Harga Beli
                         </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
                           Harga Jual
                         </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
                           Profit
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Stok
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Berat (KG)
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Kemasan
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider sticky right-0 bg-gradient-to-r from-blue-600 to-indigo-700">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                          Tampil
+                        </th>
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider sticky right-0 bg-gradient-to-r from-blue-600 to-indigo-700">
                           Aksi
                         </th>
                       </tr>
@@ -1186,10 +1435,10 @@ const DataBarangPage = () => {
                             key={item.id}
                             className="hover:bg-blue-50 transition-colors group"
                           >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium text-gray-900">
                               {index + 1}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
                                   <Package className="w-4 h-4 text-blue-600" />
@@ -1216,7 +1465,7 @@ const DataBarangPage = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <Store className="w-4 h-4 text-gray-400" />
                                 <span className="text-sm text-gray-700 font-medium">
@@ -1224,7 +1473,7 @@ const DataBarangPage = () => {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-right">
                               <div className="text-sm font-semibold text-gray-900">
                                 {formatRupiahSimple(item.hargaBeli)}
                               </div>
@@ -1232,7 +1481,7 @@ const DataBarangPage = () => {
                                 {formatRupiah(item.hargaBeli)}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-right">
                               <div className="text-sm font-semibold text-blue-600">
                                 {formatRupiahSimple(item.hargaJual)}
                               </div>
@@ -1240,7 +1489,7 @@ const DataBarangPage = () => {
                                 {formatRupiah(item.hargaJual)}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-right">
                               <div
                                 className={`text-sm font-bold ${getProfitColor(
                                   profit,
@@ -1257,7 +1506,7 @@ const DataBarangPage = () => {
                                 {percentage}%
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-center">
                               <span
                                 className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${stokStatus.color}`}
                               >
@@ -1268,12 +1517,12 @@ const DataBarangPage = () => {
                                 {item.jenisKemasan}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-center">
                               <span className="text-sm font-semibold text-gray-700">
                                 {formatGramsToKg(item.berat)} KG
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-center">
                               <div className="flex flex-col items-center gap-1">
                                 <span className="text-sm font-bold text-purple-700 bg-purple-100 px-3 py-1 rounded-lg">
                                   {item.jumlahPerKemasan} pcs
@@ -1283,7 +1532,28 @@ const DataBarangPage = () => {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-blue-50 transition-colors">
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-center">
+                              <button
+                                onClick={() => handleToggleTampil(item)}
+                                title={item.tampilDiHalaman ? "Sembunyikan dari halaman utama" : "Tampilkan di halaman utama"}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                  item.tampilDiHalaman ? "bg-green-500" : "bg-gray-300"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                                    item.tampilDiHalaman ? "translate-x-6" : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                              {item.tampilDiHalaman && (
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <Globe className="w-3 h-3 text-green-600" />
+                                  <span className="text-xs text-green-600 font-semibold">Aktif</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-blue-50 transition-colors">
                               <div className="flex items-center justify-center gap-2">
                                 <button
                                   onClick={() => {
@@ -1433,7 +1703,7 @@ const DataBarangPage = () => {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 shadow-xl border border-gray-200 mb-8 relative overflow-hidden">
+            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-4 md:p-8 shadow-xl border border-gray-200 mb-6 md:mb-8 relative overflow-hidden">
               {/* Decorative background elements */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -z-0"></div>
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -z-0"></div>
@@ -1452,7 +1722,7 @@ const DataBarangPage = () => {
                     </p>
                   </div>
                   {data.length > 0 && (
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap gap-3 md:gap-4">
                       <div className="bg-gradient-to-br from-blue-50 to-blue-100 px-4 py-2 rounded-xl border border-blue-200">
                         <p className="text-xs text-blue-600 font-semibold">
                           Total Produk
@@ -1752,31 +2022,31 @@ const DataBarangPage = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="bg-gradient-to-r from-blue-600 to-indigo-700">
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                           No
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                           Nama Barang
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Stok (Kemasan)
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Stok (PCS)
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Terjual (Kemasan)
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Terjual (PCS)
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Masuk (Kemasan)
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Masuk (PCS)
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                        <th className="px-3 md:px-6 py-3 md:py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
                           Kemasan
                         </th>
                       </tr>
@@ -1787,10 +2057,10 @@ const DataBarangPage = () => {
                           key={row.barangId}
                           className="hover:bg-blue-50 transition-colors"
                         >
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          <td className="px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium text-gray-900">
                             {index + 1}
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-3 md:px-6 py-3 md:py-4">
                             <div className="flex items-center gap-2">
                               <div className="bg-blue-100 p-2 rounded-lg">
                                 <Package className="w-4 h-4 text-blue-600" />
@@ -1800,40 +2070,40 @@ const DataBarangPage = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                             <span className="text-sm font-bold text-amber-700">
                               {formatDecimal(row.stokPadaTanggalKemasan)}{" "}
                               {row.jenisKemasan}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                             <span className="text-sm font-semibold text-gray-700">
                               {formatNumber(row.stokPadaTanggalPcs)} pcs
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                             <span className="text-sm font-bold text-indigo-700">
                               {formatDecimal(row.totalTerjualKemasan)}{" "}
                               {row.jenisKemasan}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                             <span className="text-sm font-semibold text-gray-700">
                               {formatNumber(row.totalTerjualPcs)} pcs
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                             <span className="text-sm font-bold text-emerald-700">
                               {formatDecimal(row.totalMasukKemasan)}{" "}
                               {row.jenisKemasan}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                             <span className="text-sm font-semibold text-gray-700">
                               {formatNumber(row.totalMasukPcs)} pcs
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                             <span className="text-sm text-gray-700">
                               {row.jumlahPerKemasan} pcs / {row.jenisKemasan}
                             </span>
@@ -1910,13 +2180,13 @@ const DataBarangPage = () => {
               className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="sticky top-0 z-10 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-8">
+              <div className="sticky top-0 z-10 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-5 md:p-8">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
                       <Eye className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">
+                    <h2 className="text-xl md:text-3xl font-bold text-white">
                       Detail Barang
                     </h2>
                   </div>
@@ -1929,7 +2199,7 @@ const DataBarangPage = () => {
                 </div>
               </div>
 
-              <div className="p-8 space-y-6">
+              <div className="p-4 md:p-8 space-y-6">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5">
                   <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-2">
                     Nama Barang
@@ -2091,7 +2361,7 @@ const DataBarangPage = () => {
 
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="w-full mt-4 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-6 py-4 rounded-xl transition-all font-bold text-base shadow-lg hover:shadow-xl"
+                  className="w-full mt-4 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 md:px-6 py-3 md:py-4 rounded-xl transition-all font-bold text-sm md:text-base shadow-lg hover:shadow-xl"
                 >
                   Tutup
                 </button>
@@ -2110,13 +2380,13 @@ const DataBarangPage = () => {
               className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="sticky top-0 z-10 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-8">
+              <div className="sticky top-0 z-10 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-5 md:p-8">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
                       <Plus className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">
+                    <h2 className="text-xl md:text-3xl font-bold text-white">
                       Tambah Barang Baru
                     </h2>
                   </div>
@@ -2131,6 +2401,10 @@ const DataBarangPage = () => {
                       setAddFormBerat("");
                       setShowAddLimitPenjualan(false);
                       setAddFormLimitPenjualan("0");
+                      setAddFormKategoriId("");
+                      setAddFormGambar("");
+                      setAddGambarPreview("");
+                      setAddFormTampilDiHalaman(false);
                     }}
                     className="text-white hover:bg-white/20 p-3 rounded-xl transition-all"
                   >
@@ -2139,7 +2413,7 @@ const DataBarangPage = () => {
                 </div>
               </div>
 
-              <form onSubmit={handleSubmitAdd} className="p-8">
+              <form onSubmit={handleSubmitAdd} className="p-4 md:p-8">
                 <div className="space-y-5">
                   <div className="group">
                     <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
@@ -2314,6 +2588,78 @@ const DataBarangPage = () => {
                     </div>
                   </div>
 
+                  <div className="group">
+                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                      <Tag className="w-4 h-4 text-blue-600" />
+                      Kategori
+                    </label>
+                    <select
+                      value={addFormKategoriId}
+                      onChange={(e) => setAddFormKategoriId(e.target.value)}
+                      className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all bg-white group-hover:border-gray-300"
+                    >
+                      <option value="">— Pilih Kategori —</option>
+                      {kategoriList.map((k) => (
+                        <option key={k.id} value={k.id.toString()}>
+                          {k.namaKategori}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="group">
+                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                      <Image className="w-4 h-4 text-blue-600" />
+                      Gambar Produk
+                    </label>
+                    <div className="flex items-start gap-4">
+                      {addGambarPreview && (
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={addGambarPreview}
+                            alt="Preview"
+                            className="w-24 h-24 object-cover rounded-xl border-2 border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                            await deleteGambarFile(addFormGambar);
+                            setAddFormGambar("");
+                            setAddGambarPreview("");
+                          }}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all">
+                        {uploadingGambar ? (
+                          <div className="flex items-center gap-2 text-blue-600">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span className="text-sm font-medium">Mengupload...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <Image className="w-8 h-8 text-gray-400 mb-2" />
+                            <span className="text-sm font-medium text-gray-600">Klik untuk pilih gambar</span>
+                            <span className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP, GIF · Maks 2MB</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadGambarAdd(file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
                   {/* Checkbox untuk Limit Pembelian */}
                   <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border-2 border-blue-100">
                     <input
@@ -2331,6 +2677,27 @@ const DataBarangPage = () => {
                     >
                       Aktifkan Limit Pembelian
                     </label>
+                  </div>
+
+                  {/* Checkbox tampil di halaman utama */}
+                  <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border-2 border-green-100">
+                    <input
+                      type="checkbox"
+                      id="addFormTampilDiHalaman"
+                      checked={addFormTampilDiHalaman}
+                      onChange={(e) => setAddFormTampilDiHalaman(e.target.checked)}
+                      className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                    />
+                    <div>
+                      <label
+                        htmlFor="addFormTampilDiHalaman"
+                        className="text-sm font-bold text-gray-700 cursor-pointer uppercase tracking-wide flex items-center gap-2"
+                      >
+                        <Globe className="w-4 h-4 text-green-600" />
+                        Tampilkan di Halaman Utama
+                      </label>
+                      <p className="text-xs text-gray-500 mt-0.5">Produk akan muncul di halaman utama website</p>
+                    </div>
                   </div>
 
                   {/* Limit Pembelian Field - Hidden by default */}
@@ -2373,15 +2740,19 @@ const DataBarangPage = () => {
                       setAddFormBerat("");
                       setShowAddLimitPenjualan(false);
                       setAddFormLimitPenjualan("0");
+                      setAddFormKategoriId("");
+                      setAddFormGambar("");
+                      setAddGambarPreview("");
+                      setAddFormTampilDiHalaman(false);
                     }}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-4 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 md:px-6 py-3 md:py-4 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-4 rounded-xl transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 md:px-6 py-3 md:py-4 rounded-xl transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                   >
                     {isSubmitting ? (
                       <>
@@ -2411,13 +2782,13 @@ const DataBarangPage = () => {
               className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="sticky top-0 z-10 bg-gradient-to-br from-yellow-500 via-yellow-600 to-orange-600 p-8">
+              <div className="sticky top-0 z-10 bg-gradient-to-br from-yellow-500 via-yellow-600 to-orange-600 p-5 md:p-8">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
                       <Edit className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">
+                    <h2 className="text-xl md:text-3xl font-bold text-white">
                       Edit Barang
                     </h2>
                   </div>
@@ -2435,7 +2806,7 @@ const DataBarangPage = () => {
                 </div>
               </div>
 
-              <form onSubmit={handleSubmitEdit} className="p-8">
+              <form onSubmit={handleSubmitEdit} className="p-4 md:p-8">
                 <div className="space-y-5">
                   <div className="group">
                     <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
@@ -2610,6 +2981,81 @@ const DataBarangPage = () => {
                     </div>
                   </div>
 
+                  <div className="group">
+                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                      <Tag className="w-4 h-4 text-yellow-600" />
+                      Kategori
+                    </label>
+                    <select
+                      name="kategoriId"
+                      value={editingBarang.data.kategoriId}
+                      onChange={handleInputChange}
+                      className="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-white group-hover:border-gray-300"
+                    >
+                      <option value="">— Pilih Kategori —</option>
+                      {kategoriList.map((k) => (
+                        <option key={k.id} value={k.id.toString()}>
+                          {k.namaKategori}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="group">
+                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                      <Image className="w-4 h-4 text-yellow-600" />
+                      Gambar Produk
+                    </label>
+                    <div className="flex items-start gap-4">
+                      {editGambarPreview && (
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={editGambarPreview}
+                            alt="Preview"
+                            className="w-24 h-24 object-cover rounded-xl border-2 border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await deleteGambarFile(editingBarang.data.gambar);
+                              setEditGambarPreview("");
+                              setEditingBarang((prev) =>
+                                prev ? { ...prev, data: { ...prev.data, gambar: "" } } : prev
+                              );
+                            }}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 transition-all">
+                        {editUploadingGambar ? (
+                          <div className="flex items-center gap-2 text-yellow-600">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span className="text-sm font-medium">Mengupload...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <Image className="w-8 h-8 text-gray-400 mb-2" />
+                            <span className="text-sm font-medium text-gray-600">Klik untuk ganti gambar</span>
+                            <span className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP, GIF · Maks 2MB</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadGambarEdit(file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
                   {/* Checkbox untuk Limit Pembelian */}
                   <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-100">
                     <input
@@ -2627,6 +3073,28 @@ const DataBarangPage = () => {
                     >
                       Aktifkan Limit Pembelian
                     </label>
+                  </div>
+
+                  {/* Checkbox tampil di halaman utama */}
+                  <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border-2 border-green-100">
+                    <input
+                      type="checkbox"
+                      id="editTampilDiHalaman"
+                      name="tampilDiHalaman"
+                      checked={editingBarang.data.tampilDiHalaman}
+                      onChange={handleInputChange}
+                      className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                    />
+                    <div>
+                      <label
+                        htmlFor="editTampilDiHalaman"
+                        className="text-sm font-bold text-gray-700 cursor-pointer uppercase tracking-wide flex items-center gap-2"
+                      >
+                        <Globe className="w-4 h-4 text-green-600" />
+                        Tampilkan di Halaman Utama
+                      </label>
+                      <p className="text-xs text-gray-500 mt-0.5">Produk akan muncul di halaman utama website</p>
+                    </div>
                   </div>
 
                   {/* Limit Pembelian Field - Hidden by default */}
@@ -2663,14 +3131,14 @@ const DataBarangPage = () => {
                       setShowEditSupplierDropdown(false);
                       setShowEditLimitPenjualan(false);
                     }}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-4 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 md:px-6 py-3 md:py-4 rounded-xl transition-all font-bold shadow-md hover:shadow-lg"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-6 py-4 rounded-xl transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                    className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-4 md:px-6 py-3 md:py-4 rounded-xl transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                   >
                     {isSubmitting ? (
                       <>
@@ -2686,6 +3154,195 @@ const DataBarangPage = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Kelola Kategori */}
+        {showKategoriModal && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+            onClick={() => {
+              setShowKategoriModal(false);
+              setShowKategoriAddForm(false);
+              setEditingKategori(null);
+              setKategoriFormNama("");
+              setKategoriFormDeskripsi("");
+            }}
+          >
+            <div
+              className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header modal */}
+              <div className="bg-gradient-to-br from-purple-600 to-indigo-700 p-5 md:p-6 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 p-2.5 rounded-xl">
+                    <Tag className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Kelola Kategori</h2>
+                    <p className="text-purple-100 text-xs mt-0.5">{kategoriList.length} kategori terdaftar</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowKategoriModal(false);
+                    setShowKategoriAddForm(false);
+                    setEditingKategori(null);
+                    setKategoriFormNama("");
+                    setKategoriFormDeskripsi("");
+                  }}
+                  className="text-white hover:bg-white/20 p-2 rounded-xl transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Form tambah / edit inline */}
+              {(showKategoriAddForm || editingKategori) && (
+                <div className="border-b border-gray-100 p-5 bg-gray-50 flex-shrink-0">
+                  <p className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">
+                    {editingKategori ? `Edit: ${editingKategori.namaKategori}` : "Tambah Kategori Baru"}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      value={kategoriFormNama}
+                      onChange={(e) => setKategoriFormNama(e.target.value)}
+                      placeholder="Nama kategori *"
+                      className="flex-1 px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") editingKategori ? handleKategoriEdit() : handleKategoriAdd();
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={kategoriFormDeskripsi}
+                      onChange={(e) => setKategoriFormDeskripsi(e.target.value)}
+                      placeholder="Deskripsi (opsional)"
+                      className="flex-1 px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") editingKategori ? handleKategoriEdit() : handleKategoriAdd();
+                      }}
+                    />
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          setShowKategoriAddForm(false);
+                          setEditingKategori(null);
+                          setKategoriFormNama("");
+                          setKategoriFormDeskripsi("");
+                        }}
+                        className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        onClick={editingKategori ? handleKategoriEdit : handleKategoriAdd}
+                        disabled={isSubmittingKategori || !kategoriFormNama.trim()}
+                        className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2 transition-all"
+                      >
+                        {isSubmittingKategori ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        {editingKategori ? "Simpan" : "Tambah"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tombol tambah (saat form belum muncul) */}
+              {!showKategoriAddForm && !editingKategori && (
+                <div className="px-5 pt-4 flex-shrink-0">
+                  <button
+                    onClick={() => {
+                      setShowKategoriAddForm(true);
+                      setKategoriFormNama("");
+                      setKategoriFormDeskripsi("");
+                    }}
+                    className="w-full py-2.5 border-2 border-dashed border-purple-300 text-purple-600 hover:bg-purple-50 hover:border-purple-500 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Tambah Kategori Baru
+                  </button>
+                </div>
+              )}
+
+              {/* Daftar kategori */}
+              <div className="overflow-y-auto flex-1 p-5 space-y-2">
+                {kategoriList.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <Tag className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                    <p className="text-sm">Belum ada kategori</p>
+                  </div>
+                ) : (
+                  kategoriList.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
+                        editingKategori?.id === item.id
+                          ? "border-purple-400 bg-purple-50"
+                          : "border-gray-100 hover:border-gray-200 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="bg-purple-100 p-2 rounded-lg flex-shrink-0">
+                          <Tag className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm truncate">{item.namaKategori}</p>
+                          {item.deskripsi && (
+                            <p className="text-xs text-gray-500 truncate">{item.deskripsi}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full whitespace-nowrap">
+                          {(item as any)._count?.barang ?? 0} barang
+                        </span>
+                        <button
+                          onClick={() => {
+                            setEditingKategori(item);
+                            setKategoriFormNama(item.namaKategori);
+                            setKategoriFormDeskripsi(item.deskripsi || "");
+                            setShowKategoriAddForm(false);
+                          }}
+                          className="p-1.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-600 rounded-lg transition-all"
+                          title="Edit"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleKategoriDelete(item)}
+                          className="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
+                          title="Hapus"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-4 border-t border-gray-100 flex-shrink-0">
+                <button
+                  onClick={() => {
+                    setShowKategoriModal(false);
+                    setShowKategoriAddForm(false);
+                    setEditingKategori(null);
+                    setKategoriFormNama("");
+                    setKategoriFormDeskripsi("");
+                  }}
+                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-all"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -26,19 +26,32 @@ model User {
   penjualanDisetujui PenjualanHeader[] @relation("PenjualanDisetujui")
 }
 
+model KategoriBarang {
+  id            Int       @id @default(autoincrement())
+  namaKategori  String    @unique
+  deskripsi     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  barang        Barang[]
+}
+
 model Barang {
-  id                    Int             @id @default(autoincrement())
+  id                    Int              @id @default(autoincrement())
   namaBarang            String
   hargaBeli             BigInt
   hargaJual             BigInt
-  stok                  BigInt          @default(0)
+  stok                  BigInt           @default(0)
   jenisKemasan          String
   jumlahPerKemasan      BigInt
-  supplier              Supplier        @relation(fields: [supplierId], references: [id])
+  supplier              Supplier         @relation(fields: [supplierId], references: [id])
   supplierId            Int
-  berat                 BigInt          @default(0)
-  limitStok             BigInt          @default(0)
-  limitPenjualan        BigInt          @default(0)
+  berat                 BigInt           @default(0)
+  limitStok             BigInt           @default(0)
+  limitPenjualan        BigInt           @default(0)
+  kategori              KategoriBarang?  @relation(fields: [kategoriId], references: [id])
+  kategoriId            Int?
+  gambar                String?
+  tampilDiHalaman       Boolean          @default(false)
   pembelianItems        PembelianItem[]
   penjualanItems        PenjualanItem[]
   manifestBarang        ManifestBarang[]

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ShoppingCart,
   Search,
   Menu,
   X,
-  Star,
   Truck,
   Shield,
   Clock,
@@ -28,10 +27,9 @@ type Product = {
   category: string;
   price: number;
   unit: string;
-  rating: number;
-  color: string;
-  icon: React.ReactNode;
+  gambar: string | null;
 };
+
 
 type CartItem = Product & { quantity: number };
 
@@ -187,88 +185,15 @@ const NoodleIcon = () => (
   </svg>
 );
 
-// --- Data ---
-const products: Product[] = [
-  {
-    id: 1,
-    name: "Beras Premium",
-    category: "Beras",
-    price: 65000,
-    unit: "5kg",
-    rating: 4.8,
-    color: "bg-amber-100",
-    icon: <RiceIcon />,
-  },
-  {
-    id: 2,
-    name: "Gula Pasir",
-    category: "Gula",
-    price: 15000,
-    unit: "1kg",
-    rating: 4.9,
-    color: "bg-red-50",
-    icon: <SugarIcon />,
-  },
-  {
-    id: 3,
-    name: "Minyak Goreng",
-    category: "Minyak",
-    price: 28000,
-    unit: "2L",
-    rating: 4.7,
-    color: "bg-yellow-50",
-    icon: <OilIcon />,
-  },
-  {
-    id: 4,
-    name: "Mie Instan",
-    category: "Mie",
-    price: 120000,
-    unit: "1 dus (40pcs)",
-    rating: 4.9,
-    color: "bg-orange-50",
-    icon: <NoodleIcon />,
-  },
-  {
-    id: 5,
-    name: "Beras Medium",
-    category: "Beras",
-    price: 55000,
-    unit: "5kg",
-    rating: 4.5,
-    color: "bg-amber-100",
-    icon: <RiceIcon />,
-  },
-  {
-    id: 6,
-    name: "Minyak Goreng Premium",
-    category: "Minyak",
-    price: 45000,
-    unit: "2L",
-    rating: 4.8,
-    color: "bg-yellow-50",
-    icon: <OilIcon />,
-  },
-  {
-    id: 7,
-    name: "Gula Merah",
-    category: "Gula",
-    price: 18000,
-    unit: "1kg",
-    rating: 4.6,
-    color: "bg-red-50",
-    icon: <SugarIcon />,
-  },
-  {
-    id: 8,
-    name: "Mie Instan Premium",
-    category: "Mie",
-    price: 150000,
-    unit: "1 dus (40pcs)",
-    rating: 4.7,
-    color: "bg-orange-50",
-    icon: <NoodleIcon />,
-  },
+const CARD_COLORS = [
+  "bg-amber-100",
+  "bg-red-50",
+  "bg-yellow-50",
+  "bg-orange-50",
+  "bg-green-50",
+  "bg-blue-50",
+  "bg-purple-50",
+  "bg-pink-50",
 ];
 
 // --- Components ---
@@ -280,6 +205,8 @@ export default function LandingPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [searchQuery, setSearchQuery] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   // Login form state
   const [username, setUsername] = useState("");
@@ -292,7 +219,30 @@ export default function LandingPage() {
   const [otpCode, setOtpCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
 
-  const categories = ["Semua", "Beras", "Gula", "Minyak", "Mie"];
+  useEffect(() => {
+    fetch("/api/produk-tampil")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          const mapped: Product[] = res.data.map((item: any) => ({
+            id: item.id,
+            name: item.namaBarang,
+            category: item.kategori?.namaKategori || "Lainnya",
+            price: item.hargaJual,
+            unit: `${item.jumlahPerKemasan} pcs`,
+            gambar: item.gambar || null,
+          }));
+          setProducts(mapped);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, []);
+
+  const categories = [
+    "Semua",
+    ...Array.from(new Set(products.map((p) => p.category))).sort(),
+  ];
 
   const filteredProducts = products.filter((product) => {
     const matchesCategory =
@@ -679,65 +629,82 @@ export default function LandingPage() {
         </div>
 
         {/* Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <div
-              key={product.id}
-              className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-            >
-              <div
-                className={`${product.color} p-6 aspect-square relative overflow-hidden`}
-              >
-                <div className="w-full h-full transform group-hover:scale-110 transition-transform duration-300">
-                  {product.icon}
-                </div>
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm">
-                  {product.unit}
+        {loadingProducts ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+                <div className="bg-gray-200 aspect-square" />
+                <div className="p-5 space-y-3">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  <div className="h-6 bg-gray-200 rounded w-1/3" />
                 </div>
               </div>
-
-              <div className="p-5">
-                <div className="flex items-center gap-1 mb-2">
-                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  <span className="text-sm font-medium text-gray-600">
-                    {product.rating}
-                  </span>
-                </div>
-
-                <h3 className="font-bold text-gray-800 text-lg mb-1">
-                  {product.name}
-                </h3>
-                <p className="text-sm text-gray-500 mb-4">{product.category}</p>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-400 line-through">
-                      {formatPrice(product.price * 1.2)}
-                    </p>
-                    <p className="text-xl font-bold text-purple-600">
-                      {formatPrice(product.price)}
-                    </p>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredProducts.map((product, idx) => {
+              const cardColor = CARD_COLORS[idx % CARD_COLORS.length];
+              return (
+                <div
+                  key={product.id}
+                  className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                >
+                  <div className={`${cardColor} aspect-square relative overflow-hidden flex items-center justify-center`}>
+                    {product.gambar ? (
+                      <img
+                        src={product.gambar}
+                        alt={product.name}
+                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center w-full h-full">
+                        <span className="text-6xl font-bold text-gray-300 select-none">
+                          {product.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm">
+                      {product.unit}
+                    </div>
                   </div>
 
-                  <button
-                    onClick={() => addToCart(product)}
-                    className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-600/30 active:scale-95"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                  <div className="p-5">
+                    <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full mb-2">
+                      {product.category}
+                    </span>
+                    <h3 className="font-bold text-gray-800 text-lg mb-3">
+                      {product.name}
+                    </h3>
 
-        {filteredProducts.length === 0 && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xl font-bold text-purple-600">
+                        {formatPrice(product.price)}
+                      </p>
+                      <button
+                        onClick={() => addToCart(product)}
+                        className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-600/30 active:scale-95"
+                      >
+                        <ShoppingCart className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!loadingProducts && filteredProducts.length === 0 && (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">
-              Produk tidak ditemukan
+              {products.length === 0 ? "Belum ada produk yang ditampilkan" : "Produk tidak ditemukan"}
             </h3>
-            <p className="text-gray-600">Coba cari dengan kata kunci lain</p>
+            <p className="text-gray-600">
+              {products.length === 0 ? "Admin belum mengaktifkan produk untuk halaman ini" : "Coba cari dengan kata kunci lain"}
+            </p>
           </div>
         )}
       </section>
@@ -1103,10 +1070,12 @@ export default function LandingPage() {
                       key={item.id}
                       className="flex gap-4 bg-gray-50 p-4 rounded-xl"
                     >
-                      <div
-                        className={`w-20 h-20 ${item.color} rounded-lg p-2 flex-shrink-0`}
-                      >
-                        <div className="w-full h-full">{item.icon}</div>
+                      <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+                        {item.gambar ? (
+                          <img src={item.gambar} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-3xl font-bold text-gray-300">{item.name.charAt(0)}</span>
+                        )}
                       </div>
 
                       <div className="flex-1">

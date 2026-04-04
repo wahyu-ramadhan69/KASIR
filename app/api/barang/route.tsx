@@ -5,15 +5,10 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
-// Helper function to convert BigInt to number safely
 function bigIntToNumber(value: bigint | number): number {
-  if (typeof value === "bigint") {
-    return Number(value);
-  }
-  return value;
+  return typeof value === "bigint" ? Number(value) : value;
 }
 
-// Helper to serialize barang data with BigInt conversion
 function serializeBarang(barang: any) {
   return {
     ...barang,
@@ -21,7 +16,6 @@ function serializeBarang(barang: any) {
     hargaJual: bigIntToNumber(barang.hargaJual),
     stok: bigIntToNumber(barang.stok),
     jumlahPerKemasan: bigIntToNumber(barang.jumlahPerKemasan),
-    ukuran: bigIntToNumber(barang.ukuran),
     berat: bigIntToNumber(barang.berat),
     limitStok: bigIntToNumber(barang.limitStok),
     limitPenjualan: bigIntToNumber(barang.limitPenjualan),
@@ -53,6 +47,9 @@ export async function POST(request: NextRequest) {
       supplierId,
       berat,
       limitPenjualan,
+      kategoriId,
+      gambar,
+      tampilDiHalaman,
     } = body;
 
     if (
@@ -69,7 +66,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert to BigInt for database
     const barang = await prisma.barang.create({
       data: {
         namaBarang: String(namaBarang).trim(),
@@ -80,20 +76,16 @@ export async function POST(request: NextRequest) {
         jumlahPerKemasan: BigInt(jumlahPerKemasan),
         supplierId: Number(supplierId),
         berat: berat != null ? BigInt(berat) : BigInt(0),
-        limitPenjualan:
-          limitPenjualan != null ? BigInt(limitPenjualan) : BigInt(0),
+        limitPenjualan: limitPenjualan != null ? BigInt(limitPenjualan) : BigInt(0),
+        kategoriId: kategoriId ? Number(kategoriId) : null,
+        gambar: gambar ? String(gambar).trim() : null,
+        tampilDiHalaman: tampilDiHalaman === true,
       },
-      include: {
-        supplier: true,
-      },
+      include: { supplier: true, kategori: true },
     });
 
     return NextResponse.json(
-      {
-        success: true,
-        message: "Barang berhasil ditambahkan",
-        data: serializeBarang(barang),
-      },
+      { success: true, message: "Barang berhasil ditambahkan", data: serializeBarang(barang) },
       { status: 201 }
     );
   } catch (error) {
@@ -116,17 +108,12 @@ export async function GET() {
   try {
     const barang = await prisma.barang.findMany({
       orderBy: { id: "desc" },
-      include: {
-        supplier: true,
-      },
+      include: { supplier: true, kategori: true },
       where: { isActive: true },
     });
 
-    // Serialize all barang to convert BigInt to number
-    const serializedBarang = barang.map(serializeBarang);
-
     return NextResponse.json(
-      { success: true, data: serializedBarang },
+      { success: true, data: barang.map(serializeBarang) },
       { status: 200 }
     );
   } catch (error) {
