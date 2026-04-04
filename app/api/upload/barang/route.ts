@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/app/AuthGuard";
-import { writeFile, unlink } from "fs/promises";
+import { writeFile, unlink, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "barang");
+
+// Pastikan folder ada — otomatis dibuat jika belum ada (termasuk di production)
+async function ensureUploadDir() {
+  await mkdir(UPLOAD_DIR, { recursive: true });
+}
 const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
@@ -71,6 +76,7 @@ export async function POST(request: NextRequest) {
     const uniqueName = `${crypto.randomUUID()}${ext}`;
     const filePath = path.join(UPLOAD_DIR, uniqueName);
 
+    await ensureUploadDir();
     await writeFile(filePath, buffer);
 
     const publicUrl = `/uploads/barang/${uniqueName}`;

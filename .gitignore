@@ -17,7 +17,8 @@
 /.next/
 /out/
 
-/public/uploads/barang
+/public/uploads/barang/*
+!/public/uploads/barang/.gitkeep
 
 # production
 /build
