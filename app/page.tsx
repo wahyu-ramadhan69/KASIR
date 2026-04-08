@@ -229,7 +229,7 @@ export default function LandingPage() {
             name: item.namaBarang,
             category: item.kategori?.namaKategori || "Lainnya",
             price: item.hargaJual,
-            unit: `${item.jumlahPerKemasan} pcs`,
+            unit: `${item.jumlahPerKemasan} pcs / ${item.jenisKemasan}`,
             gambar: item.gambar || null,
           }));
           setProducts(mapped);

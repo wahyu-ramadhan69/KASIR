@@ -363,8 +363,6 @@ export async function POST(request: NextRequest) {
       { success: false, error: err.message || "Gagal approval" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -579,7 +577,5 @@ export async function GET(request: NextRequest) {
       { success: false, error: err.message || "Gagal mengambil data" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
