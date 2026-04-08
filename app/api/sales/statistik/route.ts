@@ -42,12 +42,12 @@ export async function GET(request: NextRequest) {
 
     const baseWhere = { createdById: userId, ...dateFilter };
 
-    const approvedWhere = { ...baseWhere, statusApproval: "APPROVED" };
+    const approvedWhere = { ...baseWhere, statusApproval: "APPROVED" as const };
 
     const [approved, rejected, pending, totalAggregate, setoranAggregate] = await Promise.all([
       prisma.penjualanHeader.count({ where: approvedWhere }),
-      prisma.penjualanHeader.count({ where: { ...baseWhere, statusApproval: "REJECTED" } }),
-      prisma.penjualanHeader.count({ where: { ...baseWhere, statusApproval: "PENDING" } }),
+      prisma.penjualanHeader.count({ where: { ...baseWhere, statusApproval: "REJECTED" as const } }),
+      prisma.penjualanHeader.count({ where: { ...baseWhere, statusApproval: "PENDING" as const } }),
       prisma.penjualanHeader.aggregate({
         where: approvedWhere,
         _sum: { totalHarga: true },
