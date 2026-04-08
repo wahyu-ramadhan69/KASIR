@@ -25,6 +25,8 @@ import {
   CalendarClock,
   CheckCircle,
   XCircle,
+  ShoppingCart,
+  Banknote,
 } from "lucide-react";
 
 interface DailySales {
@@ -43,6 +45,8 @@ interface SalesApprovalStats {
   approved: number;
   rejected: number;
   pending: number;
+  totalNominal: number;
+  totalSetoran: number;
 }
 
 const formatRupiah = (number: number): string => {
@@ -244,8 +248,19 @@ const Penjualan30HariPage = () => {
     approved: 0,
     rejected: 0,
     pending: 0,
+    totalNominal: 0,
+    totalSetoran: 0,
   });
   const [loadingStats, setLoadingStats] = useState<boolean>(true);
+  const [startDate, setStartDate] = useState<string>(
+    new Date(new Date().setDate(new Date().getDate() - 29))
+      .toISOString()
+      .split("T")[0],
+  );
+  const [endDate, setEndDate] = useState<string>(
+    new Date().toISOString().split("T")[0],
+  );
+  const [useCustomRange, setUseCustomRange] = useState<boolean>(false);
 
   const [debouncedRange, setDebouncedRange] = useState<number>(range);
 
@@ -261,9 +276,11 @@ const Penjualan30HariPage = () => {
       if (!data.length) setLoading(true);
       else setRefreshing(true);
 
-      const res = await fetch(
-        `/api/penjualan/grafik?period=${period}&range=${debouncedRange}`,
-      );
+      const url = useCustomRange
+        ? `/api/penjualan/grafik?period=daily&startDate=${startDate}&endDate=${endDate}`
+        : `/api/penjualan/grafik?period=${period}&range=${debouncedRange}`;
+
+      const res = await fetch(url);
       const json = await res.json();
 
       if (json.success) {
@@ -277,18 +294,50 @@ const Penjualan30HariPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, debouncedRange]);
+  }, [period, debouncedRange, useCustomRange, startDate, endDate]);
 
   const fetchApprovalStats = useCallback(async () => {
     try {
       setLoadingStats(true);
-      const res = await fetch("/api/sales/statistik");
+
+      let startStr: string;
+      let endStr: string;
+
+      if (useCustomRange) {
+        startStr = startDate;
+        endStr = endDate;
+      } else {
+        const now = new Date();
+        let start: Date;
+        if (period === "daily") {
+          start = new Date(now);
+          start.setDate(now.getDate() - debouncedRange + 1);
+        } else if (period === "monthly") {
+          start = new Date(
+            now.getFullYear(),
+            now.getMonth() - debouncedRange + 1,
+            1,
+          );
+        } else {
+          start = new Date(now.getFullYear() - debouncedRange + 1, 0, 1);
+        }
+        startStr = start.toISOString().slice(0, 10);
+        endStr = now.toISOString().slice(0, 10);
+      }
+
+      const params = new URLSearchParams({
+        startDate: startStr,
+        endDate: endStr,
+      });
+      const res = await fetch(`/api/sales/statistik?${params}`);
       const json = await res.json();
       if (json.success) {
         setApprovalStats({
           approved: json.data?.approved ?? 0,
           rejected: json.data?.rejected ?? 0,
           pending: json.data?.pending ?? 0,
+          totalNominal: json.data?.totalNominal ?? 0,
+          totalSetoran: json.data?.totalSetoran ?? 0,
         });
       } else {
         console.error(json.error);
@@ -298,7 +347,7 @@ const Penjualan30HariPage = () => {
     } finally {
       setLoadingStats(false);
     }
-  }, []);
+  }, [period, debouncedRange, useCustomRange, startDate, endDate]);
 
   useEffect(() => {
     fetchData();
@@ -423,9 +472,45 @@ const Penjualan30HariPage = () => {
             </div>
 
             <div className="flex flex-col items-end gap-3">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm shadow-lg">
-                <Clock className="w-4 h-4" />
-                <span className="font-semibold">{tanggalHariIni}</span>
+              {/* Baris 1: Toggle + Date Inputs */}
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button
+                  onClick={() => setUseCustomRange(!useCustomRange)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-lg ${
+                    useCustomRange
+                      ? "bg-white text-purple-700"
+                      : "bg-white/15 backdrop-blur-sm text-white hover:bg-white/25"
+                  }`}
+                >
+                  <CalendarRange className="w-4 h-4" />
+                  <span>Custom Range</span>
+                </button>
+
+                {useCustomRange ? (
+                  <>
+                    <input
+                      type="date"
+                      value={startDate}
+                      max={endDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="px-3 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-semibold border border-white/30 focus:outline-none focus:bg-white/25 [color-scheme:dark]"
+                    />
+                    <span className="text-white font-bold">→</span>
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={startDate}
+                      max={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="px-3 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-semibold border border-white/30 focus:outline-none focus:bg-white/25 [color-scheme:dark]"
+                    />
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm shadow-lg">
+                    <Clock className="w-4 h-4" />
+                    <span className="font-semibold">{tanggalHariIni}</span>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => {
@@ -446,158 +531,188 @@ const Penjualan30HariPage = () => {
           </div>
         </div>
 
-        {/* FILTER SECTION */}
-        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            {/* Period Filter */}
-            <div className="flex-1 w-full lg:w-auto">
-              <label className="text-sm font-bold text-gray-700 mb-3 block">
-                Periode Waktu
-              </label>
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  onClick={() => handlePeriodChange("daily")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
-                    period === "daily"
-                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <CalendarDays className="w-6 h-6" />
-                  <span className="text-xs">Harian</span>
-                </button>
-                <button
-                  onClick={() => handlePeriodChange("monthly")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
-                    period === "monthly"
-                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <CalendarRange className="w-6 h-6" />
-                  <span className="text-xs">Bulanan</span>
-                </button>
-                <button
-                  onClick={() => handlePeriodChange("yearly")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
-                    period === "yearly"
-                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <CalendarClock className="w-6 h-6" />
-                  <span className="text-xs">Tahunan</span>
-                </button>
+        {/* FILTER SECTION — disembunyikan saat custom range aktif */}
+        {!useCustomRange && (
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-8">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+              {/* Period Filter */}
+              <div className="flex-1 w-full lg:w-auto">
+                <label className="text-sm font-bold text-gray-700 mb-3 block">
+                  Periode Waktu
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => handlePeriodChange("daily")}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
+                      period === "daily"
+                        ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    <CalendarDays className="w-6 h-6" />
+                    <span className="text-xs">Harian</span>
+                  </button>
+                  <button
+                    onClick={() => handlePeriodChange("monthly")}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
+                      period === "monthly"
+                        ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    <CalendarRange className="w-6 h-6" />
+                    <span className="text-xs">Bulanan</span>
+                  </button>
+                  <button
+                    onClick={() => handlePeriodChange("yearly")}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-semibold transition-all ${
+                      period === "yearly"
+                        ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    <CalendarClock className="w-6 h-6" />
+                    <span className="text-xs">Tahunan</span>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Range Filter */}
-            <div className="flex-1 w-full lg:w-auto">
-              <label className="text-sm font-bold text-gray-700 mb-3 block">
-                Rentang{" "}
-                {period === "daily"
-                  ? "Hari"
-                  : period === "monthly"
-                    ? "Bulan"
-                    : "Tahun"}
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={1}
-                  max={period === "daily" ? 90 : period === "monthly" ? 24 : 10}
-                  value={range}
-                  onChange={(e) => setRange(parseInt(e.target.value))}
-                  className="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                />
-                <div className="min-w-[120px] px-4 py-2 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl">
-                  <p className="text-2xl font-black text-purple-700 text-center">
-                    {range}
-                  </p>
-                  <p className="text-xs text-purple-600 text-center">
-                    {period === "daily"
-                      ? "Hari"
-                      : period === "monthly"
-                        ? "Bulan"
-                        : "Tahun"}
-                  </p>
+              {/* Range Filter */}
+              <div className="flex-1 w-full lg:w-auto">
+                <label className="text-sm font-bold text-gray-700 mb-3 block">
+                  Rentang{" "}
+                  {period === "daily"
+                    ? "Hari"
+                    : period === "monthly"
+                      ? "Bulan"
+                      : "Tahun"}
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={
+                      period === "daily" ? 90 : period === "monthly" ? 24 : 10
+                    }
+                    value={range}
+                    onChange={(e) => setRange(parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                  />
+                  <div className="min-w-[120px] px-4 py-2 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl">
+                    <p className="text-2xl font-black text-purple-700 text-center">
+                      {range}
+                    </p>
+                    <p className="text-xs text-purple-600 text-center">
+                      {period === "daily"
+                        ? "Hari"
+                        : period === "monthly"
+                          ? "Bulan"
+                          : "Tahun"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Filters */}
+              <div className="w-full lg:w-auto">
+                <label className="text-sm font-bold text-gray-700 mb-3 block">
+                  Quick Filter
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {period === "daily" && (
+                    <>
+                      <button
+                        onClick={() => setRange(1)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        1 Hari
+                      </button>
+                      <button
+                        onClick={() => setRangeInstant(7)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        7 Hari
+                      </button>
+                      <button
+                        onClick={() => setRangeInstant(30)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        30 Hari
+                      </button>
+                      <button
+                        onClick={() => setRangeInstant(90)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        90 Hari
+                      </button>
+                    </>
+                  )}
+                  {period === "monthly" && (
+                    <>
+                      <button
+                        onClick={() => setRangeInstant(6)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        6 Bulan
+                      </button>
+                      <button
+                        onClick={() => setRangeInstant(12)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        12 Bulan
+                      </button>
+                    </>
+                  )}
+                  {period === "yearly" && (
+                    <>
+                      <button
+                        onClick={() => setRangeInstant(3)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        3 Tahun
+                      </button>
+                      <button
+                        onClick={() => setRangeInstant(5)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        5 Tahun
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* Quick Filters */}
-            <div className="w-full lg:w-auto">
-              <label className="text-sm font-bold text-gray-700 mb-3 block">
-                Quick Filter
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {period === "daily" && (
-                  <>
-                    <button
-                      onClick={() => setRange(1)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      1 Hari
-                    </button>
-                    <button
-                      onClick={() => setRangeInstant(7)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      7 Hari
-                    </button>
-                    <button
-                      onClick={() => setRangeInstant(30)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      30 Hari
-                    </button>
-                    <button
-                      onClick={() => setRangeInstant(90)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      90 Hari
-                    </button>
-                  </>
-                )}
-                {period === "monthly" && (
-                  <>
-                    <button
-                      onClick={() => setRangeInstant(6)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      6 Bulan
-                    </button>
-                    <button
-                      onClick={() => setRangeInstant(12)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      12 Bulan
-                    </button>
-                  </>
-                )}
-                {period === "yearly" && (
-                  <>
-                    <button
-                      onClick={() => setRangeInstant(3)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      3 Tahun
-                    </button>
-                    <button
-                      onClick={() => setRangeInstant(5)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-xl text-sm font-semibold transition-all"
-                    >
-                      5 Tahun
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
           </div>
-        </div>
+        )}
 
-        {/* ✅ UPDATED: STATS CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* STATS CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+          <StatCard
+            title="Total Transaksi"
+            value={
+              loadingStats ? "..." : formatNumber(approvalStats.totalNominal)
+            }
+            subtitle={
+              loadingStats ? "" : formatRupiah(approvalStats.totalNominal)
+            }
+            icon={ShoppingCart}
+            gradient="bg-gradient-to-br from-purple-500 to-indigo-600"
+            delay={0}
+          />
+
+          <StatCard
+            title="Setoran"
+            value={
+              loadingStats ? "..." : formatNumber(approvalStats.totalSetoran)
+            }
+            subtitle={
+              loadingStats ? "" : formatRupiah(approvalStats.totalSetoran)
+            }
+            icon={Banknote}
+            gradient="bg-gradient-to-br from-cyan-500 to-teal-600"
+            delay={75}
+          />
+
           <StatCard
             title="Disetujui"
             value={loadingStats ? "..." : formatNumber(approvalStats.approved)}
@@ -605,16 +720,16 @@ const Penjualan30HariPage = () => {
             icon={CheckCircle}
             gradient="bg-gradient-to-br from-emerald-500 to-green-600"
             trend={loadingStats ? undefined : trendPercentage}
-            delay={0}
+            delay={150}
           />
 
           <StatCard
             title="Menunggu"
             value={loadingStats ? "..." : formatNumber(approvalStats.pending)}
-            subtitle="Menunggu approval"
+            subtitle="Menunggu disetujui"
             icon={Clock}
             gradient="bg-gradient-to-br from-amber-500 to-orange-600"
-            delay={25}
+            delay={225}
           />
 
           <StatCard
@@ -623,7 +738,7 @@ const Penjualan30HariPage = () => {
             subtitle="Order ditolak"
             icon={XCircle}
             gradient="bg-gradient-to-br from-red-500 to-rose-600"
-            delay={50}
+            delay={300}
           />
         </div>
 
