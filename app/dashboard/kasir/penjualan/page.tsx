@@ -1079,7 +1079,11 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setSearchCustomer("");
     if (editPenjualanId) {
       setEditPenjualanId(null);
-      router.replace("/dashboard/admin/penjualan");
+      router.replace(
+        isAdmin
+          ? "/dashboard/admin/penjualan/riwayat"
+          : "/dashboard/kasir/penjualan/riwayat"
+      );
     }
     setExpandCustomerSearch(false);
     const today = new Date().toISOString().split("T")[0];
@@ -1216,7 +1220,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
             </div>
             <div className="flex gap-2">
               <Link
-                href="/dashboard/admin/penjualan/riwayat"
+                href={isAdmin ? "/dashboard/admin/penjualan/riwayat" : "/dashboard/kasir/penjualan/riwayat"}
                 className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-semibold shadow-lg text-sm"
               >
                 <Receipt className="w-4 h-4" />

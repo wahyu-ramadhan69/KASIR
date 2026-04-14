@@ -18,6 +18,7 @@ import {
   Loader2,
   Clock,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -798,13 +799,22 @@ const RiwayatPenjualanPage = () => {
                                 <Eye className="w-4 h-4" />
                               </button>
                               {pj.statusTransaksi === "SELESAI" && (
-                                <button
-                                  onClick={() => handleOpenDeleteModal(pj)}
-                                  className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
-                                  title="Hapus Penjualan"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleOpenDeleteModal(pj)}
+                                    className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
+                                    title="Hapus Penjualan"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                  <Link
+                                    href={`/dashboard/kasir/penjualan-sales?editId=${pj.id}`}
+                                    className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                    title="Edit Penjualan"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Link>
+                                </>
                               )}
                             </div>
                           </td>

@@ -383,7 +383,7 @@ const PenjualanPage = () => {
       if (penjualan.statusTransaksi !== "SELESAI") {
         toast.error("Hanya penjualan selesai yang bisa diedit");
         setEditPenjualanId(null);
-        router.replace("/dashboard/admin/penjualan-sales");
+        router.replace("/dashboard/kasir/penjualan-sales/riwayat");
         return;
       }
 
@@ -1379,7 +1379,7 @@ const PenjualanPage = () => {
     setCustomerHutangInfo(null);
     if (editPenjualanId) {
       setEditPenjualanId(null);
-      router.replace("/dashboard/admin/penjualan-sales");
+      router.replace("/dashboard/kasir/penjualan-sales/riwayat");
     }
   };
 
@@ -1498,7 +1498,7 @@ const PenjualanPage = () => {
             </div>
             <div className="flex gap-2">
               <Link
-                href="/dashboard/admin/penjualan/riwayat"
+                href="/dashboard/kasir/penjualan-sales/riwayat"
                 className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-semibold shadow-lg text-sm"
               >
                 <Receipt className="w-4 h-4" />

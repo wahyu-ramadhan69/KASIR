@@ -800,6 +800,13 @@ const RiwayatPenjualanPage = () => {
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
+                                  <Link
+                                    href={`/dashboard/kasir/penjualan?editId=${pj.id}`}
+                                    className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                    title="Edit Penjualan"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Link>
                                 </>
                               )}
                             </div>

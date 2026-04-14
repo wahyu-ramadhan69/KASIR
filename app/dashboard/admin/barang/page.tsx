@@ -430,7 +430,11 @@ const DataBarangPage = () => {
             ? `${barang.namaBarang} ditampilkan di halaman utama`
             : `${barang.namaBarang} disembunyikan dari halaman utama`
         );
-        fetchBarang();
+        setBarangList((prev) =>
+          prev.map((b) =>
+            b.id === barang.id ? { ...b, tampilDiHalaman: !barang.tampilDiHalaman } : b
+          )
+        );
       } else {
         toast.error(data.error || "Gagal mengubah status tampil");
       }

@@ -152,6 +152,8 @@ const ApprovalPage = () => {
   );
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [metodePembayaran, setMetodePembayaran] = useState<
     "CASH" | "TRANSFER" | "CASH_TRANSFER"
   >("CASH");
@@ -252,6 +254,31 @@ const ApprovalPage = () => {
       toast.error("Terjadi kesalahan saat approve order");
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    try {
+      setRejecting(true);
+      const res = await fetch("/api/sales/approval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ penjualanId: id, action: "REJECT" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Order berhasil ditolak");
+        setShowRejectConfirm(false);
+        setShowDetailModal(false);
+        setSelectedOrder(null);
+        fetchOrders();
+      } else {
+        toast.error(data.error || "Gagal menolak order");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan saat menolak order");
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -1152,12 +1179,16 @@ const ApprovalPage = () => {
               </div>
 
               <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setShowDetailModal(false)}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-lg font-semibold"
-                >
-                  Tutup
-                </button>
+                {selectedOrder.statusApproval === "PENDING" && (
+                  <button
+                    onClick={() => setShowRejectConfirm(true)}
+                    disabled={rejecting || approving}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <X className="w-5 h-5" />
+                    Tolak Order
+                  </button>
+                )}
                 <button
                   onClick={() => handleApprove(selectedOrder.id, editableItems)}
                   disabled={
@@ -1183,6 +1214,44 @@ const ApprovalPage = () => {
                   )}
                 </button>
               </div>
+
+              {/* Konfirmasi Reject */}
+              {showRejectConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                  <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-red-100 rounded-full">
+                        <AlertTriangle className="w-6 h-6 text-red-600" />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-800">Tolak Order?</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-6">
+                      Order <span className="font-semibold text-gray-800">{selectedOrder.kodePenjualan}</span> akan ditolak dan tidak dapat diproses kembali.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowRejectConfirm(false)}
+                        disabled={rejecting}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-semibold"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        onClick={() => handleReject(selectedOrder.id)}
+                        disabled={rejecting}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {rejecting ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <X className="w-4 h-4" />
+                        )}
+                        {rejecting ? "Memproses..." : "Ya, Tolak"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
