@@ -193,6 +193,7 @@ model PenjualanHeader {
   approvedAt      DateTime?
   approvedById    Int?
   approvedBy      User?   @relation("PenjualanDisetujui", fields: [approvedById], references: [id])
+  catatanApproval String?
 
   createdById     Int?
   createdBy       User?   @relation("PenjualanDibuat", fields: [createdById], references: [id])

@@ -68,6 +68,7 @@ interface PenjualanHeader {
   items: PenjualanItem[];
   createdBy?: UserInfo | null;
   approvedBy?: UserInfo | null;
+  catatanApproval?: string | null;
 }
 
 interface EditableItem {
@@ -154,6 +155,7 @@ const ApprovalPage = () => {
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+  const [catatanApproval, setCatatanApproval] = useState("");
   const [metodePembayaran, setMetodePembayaran] = useState<
     "CASH" | "TRANSFER" | "CASH_TRANSFER"
   >("CASH");
@@ -220,6 +222,7 @@ const ApprovalPage = () => {
       const { cash, transfer } = getPembayaranBreakdown();
       payload.totalCash = cash;
       payload.totalTransfer = transfer;
+      if (catatanApproval.trim()) payload.catatan = catatanApproval.trim();
 
       const res = await fetch("/api/sales/approval", {
         method: "POST",
@@ -236,6 +239,7 @@ const ApprovalPage = () => {
         setJumlahDibayar("");
         setJumlahCash("");
         setJumlahTransfer("");
+        setCatatanApproval("");
         if (selectedOrder?.id === id) {
           setSelectedOrder((prev) =>
             prev
@@ -263,7 +267,7 @@ const ApprovalPage = () => {
       const res = await fetch("/api/sales/approval", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ penjualanId: id, action: "REJECT" }),
+        body: JSON.stringify({ penjualanId: id, action: "REJECT", catatan: catatanApproval.trim() || undefined }),
       });
       const data = await res.json();
       if (data.success) {
@@ -271,6 +275,7 @@ const ApprovalPage = () => {
         setShowRejectConfirm(false);
         setShowDetailModal(false);
         setSelectedOrder(null);
+        setCatatanApproval("");
         fetchOrders();
       } else {
         toast.error(data.error || "Gagal menolak order");
@@ -1178,7 +1183,35 @@ const ApprovalPage = () => {
                 })()}
               </div>
 
-              <div className="flex gap-3 mt-6">
+              {selectedOrder.statusApproval !== "PENDING" && selectedOrder.catatanApproval && (
+                <div className={`mt-4 px-3 py-2 rounded-lg border text-sm ${
+                  selectedOrder.statusApproval === "APPROVED"
+                    ? "bg-green-50 border-green-200"
+                    : "bg-red-50 border-red-200"
+                }`}>
+                  <p className={`text-xs font-semibold mb-0.5 ${
+                    selectedOrder.statusApproval === "APPROVED" ? "text-green-600" : "text-red-600"
+                  }`}>Catatan dari Admin:</p>
+                  <p className="text-slate-700">{selectedOrder.catatanApproval}</p>
+                </div>
+              )}
+
+              {selectedOrder.statusApproval === "PENDING" && (
+                <div className="mt-4">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">
+                    Catatan <span className="text-slate-400 font-normal">(opsional)</span>
+                  </label>
+                  <textarea
+                    value={catatanApproval}
+                    onChange={(e) => setCatatanApproval(e.target.value)}
+                    placeholder="Tambahkan catatan untuk sales..."
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-4">
                 {selectedOrder.statusApproval === "PENDING" && (
                   <button
                     onClick={() => setShowRejectConfirm(true)}
@@ -1225,9 +1258,15 @@ const ApprovalPage = () => {
                       </div>
                       <h3 className="text-lg font-bold text-gray-800">Tolak Order?</h3>
                     </div>
-                    <p className="text-sm text-gray-600 mb-6">
+                    <p className="text-sm text-gray-600 mb-3">
                       Order <span className="font-semibold text-gray-800">{selectedOrder.kodePenjualan}</span> akan ditolak dan tidak dapat diproses kembali.
                     </p>
+                    {catatanApproval.trim() && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+                        <p className="text-xs font-semibold text-red-600 mb-0.5">Catatan:</p>
+                        <p className="text-sm text-red-800">{catatanApproval.trim()}</p>
+                      </div>
+                    )}
                     <div className="flex gap-3">
                       <button
                         onClick={() => setShowRejectConfirm(false)}

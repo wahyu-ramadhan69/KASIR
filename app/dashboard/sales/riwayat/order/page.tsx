@@ -61,6 +61,7 @@ interface PenjualanHeader {
   items: PenjualanItem[];
   createdBy?: UserInfo | null;
   approvedBy?: UserInfo | null;
+  catatanApproval?: string | null;
 }
 
 const formatRupiah = (number: number): string =>
@@ -609,7 +610,22 @@ const ApprovalPage = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              {selectedOrder.catatanApproval && (
+                <div className={`mt-4 px-3 py-2 rounded-lg border text-sm ${
+                  selectedOrder.statusApproval === "APPROVED"
+                    ? "bg-green-50 border-green-200"
+                    : "bg-red-50 border-red-200"
+                }`}>
+                  <p className={`text-xs font-semibold mb-0.5 ${
+                    selectedOrder.statusApproval === "APPROVED" ? "text-green-600" : "text-red-600"
+                  }`}>
+                    Catatan dari Admin:
+                  </p>
+                  <p className="text-slate-700">{selectedOrder.catatanApproval}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end mt-4">
                 <button
                   onClick={() => setShowDetailModal(false)}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-semibold"

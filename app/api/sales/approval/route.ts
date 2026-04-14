@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
       totalCash,
       totalTransfer,
       action,
+      catatan,
     } = body;
 
     if (!penjualanId) {
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
             statusTransaksi: "DIBATALKAN",
             approvedAt: new Date(),
             approvedById: userId,
+            catatanApproval: catatan || null,
           },
         });
         return updatedHeader;
@@ -278,6 +280,7 @@ export async function POST(request: NextRequest) {
           statusTransaksi: "SELESAI",
           approvedAt: new Date(),
           approvedById: userId,
+          catatanApproval: catatan || null,
           tanggalTransaksi: new Date(),
           metodePembayaran: finalMetodePembayaran,
           statusPembayaran: statusPembayaranFinal,
@@ -467,6 +470,7 @@ export async function GET(request: NextRequest) {
       tanggalTransaksi: true,
       createdAt: true,
       customerId: true,
+      catatanApproval: true,
       customer: {
         select: {
           id: true,
