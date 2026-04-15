@@ -245,17 +245,27 @@ const RiwayatPenjualanPage = () => {
     fetchStats();
   }, [filterStatus, filterPembayaran, startDate, endDate, debouncedSearch]);
 
-  // Setup intersection observer for infinite scroll
+  // Refs to hold latest state for observer callback (avoids stale closure)
+  const paginationRef = useRef(pagination);
+  const loadingMoreRef = useRef(loadingMore);
+  const loadingRef = useRef(loading);
+  useEffect(() => { paginationRef.current = pagination; }, [pagination]);
+  useEffect(() => { loadingMoreRef.current = loadingMore; }, [loadingMore]);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+
+  // Setup intersection observer for infinite scroll (created once, uses refs)
   useEffect(() => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         if (
           entries[0].isIntersecting &&
-          pagination?.hasMore &&
-          !loadingMore &&
-          !loading
+          paginationRef.current?.hasMore &&
+          !loadingMoreRef.current &&
+          !loadingRef.current
         ) {
-          loadMore();
+          if (paginationRef.current) {
+            fetchPenjualan(paginationRef.current.page + 1, false);
+          }
         }
       },
       { threshold: 0.1 },
@@ -270,7 +280,7 @@ const RiwayatPenjualanPage = () => {
         observerRef.current.disconnect();
       }
     };
-  }, [pagination, loadingMore, loading]);
+  }, []);
 
   const buildQueryParams = (page: number) => {
     const params = new URLSearchParams();
@@ -287,6 +297,7 @@ const RiwayatPenjualanPage = () => {
 
     // Selalu hanya piutang tanpa perjalanan sales
     params.append("tipePenjualan", "toko");
+    params.append("excludeDeleted", "1");
 
     if (debouncedSearch) {
       params.append("search", debouncedSearch);
@@ -305,8 +316,6 @@ const RiwayatPenjualanPage = () => {
 
   const buildStatsQueryParams = () => {
     const params = new URLSearchParams();
-    params.append("page", "1");
-    params.append("limit", "1000");
 
     if (filterStatus !== "all") {
       params.append("status", filterStatus);
@@ -317,6 +326,7 @@ const RiwayatPenjualanPage = () => {
     }
 
     params.append("tipePenjualan", "toko");
+    params.append("summary", "1");
 
     if (debouncedSearch) {
       params.append("search", debouncedSearch);
@@ -346,28 +356,10 @@ const RiwayatPenjualanPage = () => {
       const data = await res.json();
 
       if (data.success) {
-        let filtered = data.data;
-
-        // Filter out KERANJANG since this is riwayat page
-        if (filterStatus === "all") {
-          filtered = data.data.filter(
-            (p: PenjualanHeader) =>
-              p.statusTransaksi === "SELESAI" ||
-              p.statusTransaksi === "DIBATALKAN",
-          );
-        }
-
-        filtered = filtered.filter((p: PenjualanHeader) => !p.isDeleted);
-
-        // Pastikan hanya transaksi tanpa perjalanan sales
-        filtered = filtered.filter(
-          (p: PenjualanHeader) => p.perjalananSalesId === null,
-        );
-
         if (reset) {
-          setPenjualanList(filtered);
+          setPenjualanList(data.data);
         } else {
-          setPenjualanList((prev) => [...prev, ...filtered]);
+          setPenjualanList((prev) => [...prev, ...data.data]);
         }
         setPagination(data.pagination);
       }
@@ -386,55 +378,14 @@ const RiwayatPenjualanPage = () => {
       const res = await fetch(`/api/penjualan?${queryParams}`);
       const data = await res.json();
 
-      if (data.success) {
-        let filtered = data.data as PenjualanHeader[];
-
-        if (filterStatus === "all") {
-          filtered = filtered.filter(
-            (p) =>
-              p.statusTransaksi === "SELESAI" ||
-              p.statusTransaksi === "DIBATALKAN",
-          );
-        }
-
-        filtered = filtered.filter((p) => !p.isDeleted);
-        filtered = filtered.filter((p) => p.perjalananSalesId === null);
-
-        const hutangList = filtered.filter(
-          (p) => p.statusPembayaran === "HUTANG",
-        );
-
-        const totalHutang = hutangList.reduce(
-          (sum, p) => sum + (p.totalHarga - p.jumlahDibayar),
-          0,
-        );
-
-        const totalPendapatan = filtered.reduce(
-          (sum, p) => sum + p.jumlahDibayar,
-          0,
-        );
-
-        // Hitung hutang yang akan jatuh tempo dalam 7 hari
-        const now = new Date();
-        const hutangJatuhTempo = hutangList.filter((p) => {
-          if (!p.tanggalJatuhTempo) return false;
-          const jatuhTempo = new Date(p.tanggalJatuhTempo);
-          const diffTime = jatuhTempo.getTime() - now.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          return diffDays <= 7;
-        }).length;
-
-        const totalLunas = filtered.filter(
-          (p) => p.statusPembayaran === "LUNAS",
-        ).length;
-
+      if (data.success && data.summary) {
         setStats({
-          totalTransaksi: filtered.length,
-          totalPendapatan,
-          totalHutang,
-          totalHutangTransaksi: hutangList.length,
-          totalLunas,
-          hutangJatuhTempo,
+          totalTransaksi: data.summary.totalTransaksi,
+          totalPendapatan: data.summary.totalPemasukan,
+          totalHutang: data.summary.totalHutang,
+          totalHutangTransaksi: data.summary.totalHutangTransaksi,
+          totalLunas: data.summary.totalLunas,
+          hutangJatuhTempo: data.summary.hutangJatuhTempo,
         });
       }
     } catch (error) {
@@ -442,11 +393,6 @@ const RiwayatPenjualanPage = () => {
     }
   };
 
-  const loadMore = () => {
-    if (pagination && pagination.hasMore && !loadingMore) {
-      fetchPenjualan(pagination.page + 1, false);
-    }
-  };
 
   const handleRefresh = () => {
     fetchPenjualan(1, true);

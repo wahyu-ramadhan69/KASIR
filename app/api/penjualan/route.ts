@@ -133,6 +133,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const summary = searchParams.get("summary") === "1";
+    const excludeDeleted = searchParams.get("excludeDeleted") === "1";
 
     const baseWhere: any = {
       karyawanId: null, // hanya penjualan header tanpa karyawan
@@ -186,7 +187,7 @@ export async function GET(request: NextRequest) {
     }
 
     const listWhere: any = { ...baseWhere };
-    if (!isAdmin) {
+    if (!isAdmin || excludeDeleted) {
       listWhere.isDeleted = false;
       if (authData?.userId) {
         listWhere.userId = parseInt(authData.userId, 10);
