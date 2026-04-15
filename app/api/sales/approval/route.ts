@@ -191,13 +191,25 @@ export async function POST(request: NextRequest) {
           const beratPerItem = toNumber(existing.barang?.berat || 0);
           const berat = beratPerItem > 0 ? beratPerItem * totalPcs : 0;
 
+          const hargaBeliBarang = toNumber(existing.barang?.hargaBeli || 0);
+          const hargaJualFinal = toNumber(rawItem.hargaJual);
+          const diskonPerItem = toNumber(rawItem.diskonPerItem || 0);
+          const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(totalPcs, jumlahPerKemasan);
+          const hargaBeliPerPcs = jumlahPerKemasan > 0 ? Math.round(hargaBeliBarang / jumlahPerKemasan) : 0;
+          const hargaJualPerPcs = jumlahPerKemasan > 0 ? Math.round(hargaJualFinal / jumlahPerKemasan) : 0;
+          const labaFromDus = (hargaJualFinal - diskonPerItem - hargaBeliBarang) * jumlahDus;
+          const labaFromPcs = (hargaJualPerPcs - hargaBeliPerPcs) * jumlahPcs;
+          const totalLaba = labaFromDus + labaFromPcs;
+
           const updated = await tx.penjualanItem.update({
             where: { id: existing.id },
             data: {
               totalItem: totalPcs,
-              hargaJual: toNumber(rawItem.hargaJual),
-              diskonPerItem: toNumber(rawItem.diskonPerItem || 0),
+              hargaJual: hargaJualFinal,
+              hargaBeli: existing.barang?.hargaBeli,
+              diskonPerItem,
               berat,
+              laba: BigInt(totalLaba),
             },
             include: { barang: true },
           });
@@ -236,6 +248,26 @@ export async function POST(request: NextRequest) {
         if (toNumber(item.barang.stok) < totalPcs) {
           throw new Error(`Stok ${item.barang.namaBarang} tidak mencukupi`);
         }
+
+        // Pastikan hargaBeli dan laba selalu terisi saat approve
+        const jumlahPerKemasan = toNumber(item.barang?.jumlahPerKemasan || 1);
+        const hargaBeliBarang = toNumber(item.barang?.hargaBeli || 0);
+        const hargaJualItem = toNumber(item.hargaJual);
+        const diskonItem = toNumber(item.diskonPerItem);
+        const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(totalPcs, jumlahPerKemasan);
+        const hargaBeliPerPcs = jumlahPerKemasan > 0 ? Math.round(hargaBeliBarang / jumlahPerKemasan) : 0;
+        const hargaJualPerPcs = jumlahPerKemasan > 0 ? Math.round(hargaJualItem / jumlahPerKemasan) : 0;
+        const labaFromDus = (hargaJualItem - diskonItem - hargaBeliBarang) * jumlahDus;
+        const labaFromPcs = (hargaJualPerPcs - hargaBeliPerPcs) * jumlahPcs;
+        const totalLaba = labaFromDus + labaFromPcs;
+
+        await tx.penjualanItem.update({
+          where: { id: item.id },
+          data: {
+            hargaBeli: item.barang?.hargaBeli,
+            laba: BigInt(totalLaba),
+          },
+        });
       }
 
       const finalMetodePembayaran =
