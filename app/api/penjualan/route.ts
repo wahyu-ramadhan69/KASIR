@@ -189,9 +189,9 @@ export async function GET(request: NextRequest) {
     const listWhere: any = { ...baseWhere };
     if (!isAdmin || excludeDeleted) {
       listWhere.isDeleted = false;
-      if (authData?.userId) {
-        listWhere.userId = parseInt(authData.userId, 10);
-      }
+    }
+    if (!isAdmin && authData?.userId) {
+      listWhere.userId = parseInt(authData.userId, 10);
     }
 
     const summaryWhere: any = { ...baseWhere, isDeleted: false };
