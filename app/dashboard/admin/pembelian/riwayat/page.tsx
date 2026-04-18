@@ -14,6 +14,7 @@ import {
   Clock,
   AlertTriangle,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -149,6 +150,13 @@ const RiwayatPembelianPage = () => {
   const [selectedPembelian, setSelectedPembelian] =
     useState<PembelianHeader | null>(null);
 
+  // Rollback state
+  const [showRollbackModal, setShowRollbackModal] = useState<boolean>(false);
+  const [rollbackTarget, setRollbackTarget] = useState<PembelianHeader | null>(
+    null,
+  );
+  const [loadingRollback, setLoadingRollback] = useState<boolean>(false);
+
   // Statistik
   const [stats, setStats] = useState({
     totalTransaksi: 0,
@@ -193,7 +201,7 @@ const RiwayatPembelianPage = () => {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (loadMoreRef.current) {
@@ -265,7 +273,7 @@ const RiwayatPembelianPage = () => {
         const filtered = data.data.filter(
           (p: PembelianHeader) =>
             p.statusTransaksi === "SELESAI" ||
-            p.statusTransaksi === "DIBATALKAN"
+            p.statusTransaksi === "DIBATALKAN",
         );
 
         if (reset) {
@@ -288,13 +296,13 @@ const RiwayatPembelianPage = () => {
     try {
       // Fetch stats for SELESAI transactions
       const selesaiRes = await fetch(
-        `/api/pembelian?${buildStatsQueryParams("SELESAI")}`
+        `/api/pembelian?${buildStatsQueryParams("SELESAI")}`,
       );
       const selesaiData = await selesaiRes.json();
 
       // Fetch stats for DIBATALKAN transactions
       const dibatalkanRes = await fetch(
-        `/api/pembelian?${buildStatsQueryParams("DIBATALKAN")}`
+        `/api/pembelian?${buildStatsQueryParams("DIBATALKAN")}`,
       );
       const dibatalkanData = await dibatalkanRes.json();
 
@@ -303,12 +311,12 @@ const RiwayatPembelianPage = () => {
         const dibatalkanList = dibatalkanData.data as PembelianHeader[];
 
         const hutangList = selesaiList.filter(
-          (p) => p.statusPembayaran === "HUTANG"
+          (p) => p.statusPembayaran === "HUTANG",
         );
 
         const totalHutang = hutangList.reduce(
           (sum, p) => sum + (p.totalHarga - p.jumlahDibayar),
-          0
+          0,
         );
 
         // Hitung hutang yang akan jatuh tempo dalam 7 hari
@@ -321,7 +329,7 @@ const RiwayatPembelianPage = () => {
         }).length;
 
         const totalLunas = selesaiList.filter(
-          (p) => p.statusPembayaran === "LUNAS"
+          (p) => p.statusPembayaran === "LUNAS",
         ).length;
 
         setStats({
@@ -358,6 +366,30 @@ const RiwayatPembelianPage = () => {
   const handleViewDetail = (pembelian: PembelianHeader) => {
     setSelectedPembelian(pembelian);
     setShowDetailModal(true);
+  };
+
+  const handleRollback = async () => {
+    if (!rollbackTarget) return;
+    setLoadingRollback(true);
+    try {
+      const res = await fetch(`/api/pembelian/${rollbackTarget.id}/rollback`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message);
+        setShowRollbackModal(false);
+        setRollbackTarget(null);
+        fetchPembelian(1, true);
+        fetchStats();
+      } else {
+        toast.error(data.error || "Gagal melakukan rollback");
+      }
+    } catch (error) {
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setLoadingRollback(false);
+    }
   };
 
   const formatRupiah = (number: number): string => {
@@ -570,7 +602,6 @@ const RiwayatPembelianPage = () => {
               </button>
             )}
           </div>
-
         </div>
       </div>
 
@@ -666,10 +697,14 @@ const RiwayatPembelianPage = () => {
                           {formatShortRupiah(pb.totalHarga)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex gap-1">
-                            {pb.statusTransaksi === "SELESAI" && (
+                          <div className="flex flex-col gap-1">
+                            {pb.statusTransaksi === "DIBATALKAN" ? (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600 w-fit">
+                                DIBATALKAN
+                              </span>
+                            ) : (
                               <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${
+                                className={`px-2 py-1 rounded text-xs font-medium w-fit ${
                                   pb.statusPembayaran === "LUNAS"
                                     ? "bg-green-100 text-green-700"
                                     : "bg-yellow-100 text-yellow-700"
@@ -697,6 +732,18 @@ const RiwayatPembelianPage = () => {
                               >
                                 <Pencil className="w-4 h-4" />
                               </Link>
+                            )}
+                            {pb.statusTransaksi === "SELESAI" && (
+                              <button
+                                onClick={() => {
+                                  setRollbackTarget(pb);
+                                  setShowRollbackModal(true);
+                                }}
+                                className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
+                                title="Rollback Pembelian"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             )}
                           </div>
                         </td>
@@ -732,6 +779,99 @@ const RiwayatPembelianPage = () => {
         )}
       </div>
 
+      {/* Modal Konfirmasi Rollback */}
+      {showRollbackModal && rollbackTarget && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => !loadingRollback && setShowRollbackModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-red-600 to-red-700 p-5 flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Hapus Pembelian</h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-gray-700 mb-4">
+                Apakah Anda yakin ingin menghapus pembelian ini? Tindakan ini
+                akan:
+              </p>
+              <ul className="space-y-2 mb-5 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 font-bold mt-0.5">•</span>
+                  Mengembalikan stok barang yang sudah bertambah
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 font-bold mt-0.5">•</span>
+                  Mengubah status transaksi menjadi <strong>DIBATALKAN</strong>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 font-bold mt-0.5">•</span>
+                  Menyesuaikan kembali hutang supplier
+                </li>
+              </ul>
+
+              <div className="bg-gray-50 rounded-lg p-3 mb-5 border border-gray-200 text-sm">
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-500">Kode</span>
+                  <span className="font-semibold">
+                    {rollbackTarget.kodePembelian}
+                  </span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-500">Supplier</span>
+                  <span className="font-semibold">
+                    {rollbackTarget.supplier?.namaSupplier}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Total</span>
+                  <span className="font-semibold">
+                    {formatRupiah(rollbackTarget.totalHarga)}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-red-600 font-medium mb-5">
+                ⚠️ Tindakan ini tidak dapat dibatalkan.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowRollbackModal(false)}
+                  disabled={loadingRollback}
+                  className="flex-1 bg-white hover:bg-gray-100 text-gray-700 px-4 py-3 rounded-lg transition-all font-semibold border-2 border-gray-300 disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleRollback}
+                  disabled={loadingRollback}
+                  className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-3 rounded-lg transition-all font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loadingRollback ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Memproses...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Ya, Hapus
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Detail */}
       {showDetailModal && selectedPembelian && (
         <div
@@ -766,7 +906,7 @@ const RiwayatPembelianPage = () => {
                     <p className="text-sm text-gray-500">Tanggal</p>
                     <p className="font-semibold">
                       {new Date(selectedPembelian.createdAt).toLocaleString(
-                        "id-ID"
+                        "id-ID",
                       )}
                     </p>
                   </div>
@@ -814,7 +954,7 @@ const RiwayatPembelianPage = () => {
                           </p>
                           {(() => {
                             const status = getJatuhTempoStatus(
-                              selectedPembelian.tanggalJatuhTempo
+                              selectedPembelian.tanggalJatuhTempo,
                             );
                             return (
                               <span
@@ -859,14 +999,14 @@ const RiwayatPembelianPage = () => {
                         <td className="px-3 py-2 text-right text-red-500">
                           {item.diskonPerItem > 0
                             ? `-${formatRupiah(
-                                item.diskonPerItem * item.jumlahDus
+                                item.diskonPerItem * item.jumlahDus,
                               )}`
                             : "-"}
                         </td>
                         <td className="px-3 py-2 text-right font-medium">
                           {formatRupiah(
                             item.hargaPokok * item.jumlahDus -
-                              item.diskonPerItem * item.jumlahDus
+                              item.diskonPerItem * item.jumlahDus,
                           )}
                         </td>
                       </tr>
