@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           jumlahBayar: BigInt(bayar),
           tanggalBayar: tanggalBayar ? new Date(tanggalBayar) : new Date(),
           keterangan: keterangan || null,
-          userId: userData?.id ?? null,
+          userId: userData?.userId ? parseInt(userData.userId) : null,
         },
       }),
       prisma.hutangLain.update({
