@@ -213,6 +213,21 @@ export async function GET(request: NextRequest) {
     // ====================================
     await generateLaporanLabaBarang(workbook, dateFilter, startDate, endDate);
 
+    // ====================================
+    // SHEET 8: STOK BARANG
+    // ====================================
+    await generateLaporanStokBarang(workbook, dateFilter, startDate, endDate);
+
+    // ====================================
+    // SHEET 9: PIUTANG CUSTOMER
+    // ====================================
+    await generateLaporanPiutangCustomer(workbook, dateFilter, startDate, endDate);
+
+    // ====================================
+    // SHEET 10: HUTANG PEMBELIAN
+    // ====================================
+    await generateLaporanHutangPembelian(workbook, dateFilter, startDate, endDate);
+
     const buffer = await workbook.xlsx.writeBuffer();
     const dateRange = formatDateRange(
       startDate || undefined,
@@ -2264,4 +2279,591 @@ async function generateLaporanLabaBarang(
     cell.alignment = { horizontal: "right", vertical: "middle" };
     cell.numFmt = key === "I" ? "0.00" : "#,##0";
   });
+}
+
+// ====================================
+// STOK BARANG
+// ====================================
+async function generateLaporanStokBarang(
+  workbook: ExcelJS.Workbook,
+  dateFilter: any,
+  startDate: string | null,
+  endDate: string | null
+) {
+  const worksheet = workbook.addWorksheet("Stok Barang");
+
+  // --- Query semua barang aktif beserta stok saat ini ---
+  const semuaBarang = await prisma.barang.findMany({
+    where: { isActive: true },
+    orderBy: { namaBarang: "asc" },
+    select: {
+      id: true,
+      namaBarang: true,
+      stok: true,
+      jenisKemasan: true,
+      jumlahPerKemasan: true,
+      supplier: { select: { namaSupplier: true } },
+    },
+  });
+
+  const barangIds = semuaBarang.map((b) => b.id);
+
+  // --- Query barang masuk (dari PembelianItem, filter createdAt header) ---
+  const wherePembelian: any = {
+    barangId: { in: barangIds },
+    pembelian: { statusTransaksi: "SELESAI" },
+  };
+  if (Object.keys(dateFilter).length > 0) {
+    wherePembelian.pembelian.createdAt = dateFilter;
+  }
+
+  const pembelianItems = await prisma.pembelianItem.findMany({
+    where: wherePembelian,
+    select: { barangId: true, totalItem: true },
+  });
+
+  // --- Query barang keluar (dari PenjualanItem, filter tanggalTransaksi header) ---
+  const wherePenjualan: any = {
+    barangId: { in: barangIds },
+    penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
+  };
+  if (Object.keys(dateFilter).length > 0) {
+    wherePenjualan.penjualan.tanggalTransaksi = dateFilter;
+  }
+
+  const penjualanItems = await prisma.penjualanItem.findMany({
+    where: wherePenjualan,
+    select: { barangId: true, totalItem: true },
+  });
+
+  // --- Aggregate per barang ---
+  const masukMap = new Map<number, number>();
+  for (const item of pembelianItems) {
+    masukMap.set(
+      item.barangId,
+      (masukMap.get(item.barangId) ?? 0) + toNumber(item.totalItem)
+    );
+  }
+
+  const keluarMap = new Map<number, number>();
+  for (const item of penjualanItems) {
+    keluarMap.set(
+      item.barangId,
+      (keluarMap.get(item.barangId) ?? 0) + toNumber(item.totalItem)
+    );
+  }
+
+  // --- Header worksheet ---
+  const colCount = 10;
+
+  worksheet.mergeCells(`A1:J1`);
+  const titleCell = worksheet.getCell("A1");
+  titleCell.value = "STOK BARANG";
+  titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF2196F3" },
+  };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 30;
+
+  worksheet.mergeCells("A2:J2");
+  const periodeCell = worksheet.getCell("A2");
+  periodeCell.value = `Periode: ${formatDateRange(
+    startDate || undefined,
+    endDate || undefined
+  )}`;
+  periodeCell.font = { italic: true, size: 11 };
+  periodeCell.alignment = { horizontal: "center" };
+
+  worksheet.mergeCells("A3:J3");
+  const noteCell = worksheet.getCell("A3");
+  noteCell.value =
+    "Stok Saat Ini = stok barang pada saat laporan diunduh. Masuk & Keluar = transaksi dalam rentang periode.";
+  noteCell.font = { italic: true, size: 10, color: { argb: "FF757575" } };
+  noteCell.alignment = { horizontal: "center" };
+
+  worksheet.getRow(4).height = 5;
+
+  const headers = [
+    "No",
+    "Nama Barang",
+    "Kemasan",
+    "Supplier",
+    "Stok Saat Ini (Pcs)",
+    "Stok Saat Ini (Kemasan)",
+    "Barang Masuk (Pcs)",
+    "Barang Masuk (Kemasan)",
+    "Barang Keluar (Pcs)",
+    "Barang Keluar (Kemasan)",
+  ];
+  const headerRow = worksheet.getRow(5);
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF424242" },
+    };
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    cell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+  });
+  headerRow.height = 30;
+
+  worksheet.getColumn(1).width = 5;
+  worksheet.getColumn(2).width = 30;
+  worksheet.getColumn(3).width = 18;
+  worksheet.getColumn(4).width = 22;
+  worksheet.getColumn(5).width = 18;
+  worksheet.getColumn(6).width = 20;
+  worksheet.getColumn(7).width = 18;
+  worksheet.getColumn(8).width = 20;
+  worksheet.getColumn(9).width = 18;
+  worksheet.getColumn(10).width = 20;
+
+  // --- Data rows ---
+  let currentRow = 6;
+  let totalStokPcs = 0;
+  let totalMasukPcs = 0;
+  let totalKeluarPcs = 0;
+
+  semuaBarang.forEach((barang, index) => {
+    const perKemasan = Math.max(1, toNumber(barang.jumlahPerKemasan));
+    const stokPcs = toNumber(barang.stok);
+    const masukPcs = masukMap.get(barang.id) ?? 0;
+    const keluarPcs = keluarMap.get(barang.id) ?? 0;
+
+    totalStokPcs += stokPcs;
+    totalMasukPcs += masukPcs;
+    totalKeluarPcs += keluarPcs;
+
+    const row = worksheet.getRow(currentRow);
+    row.getCell(1).value = index + 1;
+    row.getCell(2).value = barang.namaBarang;
+    row.getCell(3).value = `${perKemasan} item/${barang.jenisKemasan}`;
+    row.getCell(4).value = barang.supplier?.namaSupplier ?? "-";
+    row.getCell(5).value = stokPcs;
+    row.getCell(6).value = stokPcs / perKemasan;
+    row.getCell(7).value = masukPcs;
+    row.getCell(8).value = masukPcs / perKemasan;
+    row.getCell(9).value = keluarPcs;
+    row.getCell(10).value = keluarPcs / perKemasan;
+
+    for (let i = 5; i <= 10; i++) {
+      row.getCell(i).numFmt = "#,##0";
+      row.getCell(i).alignment = { horizontal: "right" };
+    }
+
+    // Warna kuning jika tidak ada aktivitas sama sekali di periode
+    if (masukPcs === 0 && keluarPcs === 0) {
+      for (let i = 7; i <= 10; i++) {
+        row.getCell(i).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFF9C4" },
+        };
+      }
+    }
+
+    for (let i = 1; i <= colCount; i++) {
+      row.getCell(i).border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    }
+
+    currentRow++;
+  });
+
+  // --- Grand total row ---
+  const totalRow = worksheet.getRow(currentRow);
+  worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+  totalRow.getCell(1).value = "TOTAL";
+  totalRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+  totalRow.getCell(5).value = totalStokPcs;
+  totalRow.getCell(6).value = "-";
+  totalRow.getCell(7).value = totalMasukPcs;
+  totalRow.getCell(8).value = "-";
+  totalRow.getCell(9).value = totalKeluarPcs;
+  totalRow.getCell(10).value = "-";
+
+  totalRow.getCell(5).numFmt = "#,##0";
+  totalRow.getCell(7).numFmt = "#,##0";
+  totalRow.getCell(9).numFmt = "#,##0";
+
+  totalRow.height = 25;
+
+  for (let i = 1; i <= colCount; i++) {
+    const cell = totalRow.getCell(i);
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF388E3C" },
+    };
+    cell.border = {
+      top: { style: "medium" },
+      left: { style: "thin" },
+      bottom: { style: "medium" },
+      right: { style: "thin" },
+    };
+  }
+
+  for (let i = 5; i <= 10; i++) {
+    totalRow.getCell(i).alignment = { horizontal: "right", vertical: "middle" };
+  }
+
+  // Clear formatting beyond kolom J
+  for (let i = colCount + 1; i <= 50; i++) {
+    totalRow.getCell(i).style = {};
+  }
+}
+
+// ====================================
+// PIUTANG CUSTOMER
+// ====================================
+async function generateLaporanPiutangCustomer(
+  workbook: ExcelJS.Workbook,
+  dateFilter: any,
+  startDate: string | null,
+  endDate: string | null
+) {
+  const worksheet = workbook.addWorksheet("Piutang Customer");
+
+  const where: any = {
+    statusTransaksi: "SELESAI",
+    statusPembayaran: "HUTANG",
+    isDeleted: false,
+  };
+  if (Object.keys(dateFilter).length > 0) {
+    where.tanggalTransaksi = dateFilter;
+  }
+
+  const penjualanList = await prisma.penjualanHeader.findMany({
+    where,
+    orderBy: { tanggalTransaksi: "asc" },
+    include: {
+      customer: { select: { nama: true, namaToko: true } },
+    },
+  });
+
+  const colCount = 9;
+
+  // Title
+  worksheet.mergeCells("A1:I1");
+  const titleCell = worksheet.getCell("A1");
+  titleCell.value = "PIUTANG CUSTOMER";
+  titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE53935" } };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 30;
+
+  worksheet.mergeCells("A2:I2");
+  const periodeCell = worksheet.getCell("A2");
+  periodeCell.value = `Periode: ${formatDateRange(startDate || undefined, endDate || undefined)}`;
+  periodeCell.font = { italic: true, size: 11 };
+  periodeCell.alignment = { horizontal: "center" };
+
+  worksheet.getRow(3).height = 5;
+
+  const headers = [
+    "No",
+    "Kode Penjualan",
+    "Tanggal Transaksi",
+    "Customer",
+    "Total Tagihan",
+    "Sudah Dibayar",
+    "Sisa Piutang",
+    "Jatuh Tempo",
+    "Status",
+  ];
+  const headerRow = worksheet.getRow(4);
+  headers.forEach((h, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = h;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF424242" } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+  });
+  headerRow.height = 20;
+
+  worksheet.getColumn(1).width = 5;
+  worksheet.getColumn(2).width = 20;
+  worksheet.getColumn(3).width = 18;
+  worksheet.getColumn(4).width = 25;
+  worksheet.getColumn(5).width = 18;
+  worksheet.getColumn(6).width = 18;
+  worksheet.getColumn(7).width = 18;
+  worksheet.getColumn(8).width = 16;
+  worksheet.getColumn(9).width = 16;
+
+  let currentRow = 5;
+  let grandTotalTagihan = 0;
+  let grandTotalDibayar = 0;
+  let grandTotalSisa = 0;
+
+  const now = new Date();
+
+  penjualanList.forEach((pj, index) => {
+    const totalHarga = toNumber(pj.totalHarga);
+    const jumlahDibayar = toNumber(pj.jumlahDibayar);
+    const sisa = Math.max(0, totalHarga - jumlahDibayar);
+
+    grandTotalTagihan += totalHarga;
+    grandTotalDibayar += jumlahDibayar;
+    grandTotalSisa += sisa;
+
+    let statusLabel = "-";
+    let statusColor: string | null = null;
+    if (pj.tanggalJatuhTempo) {
+      const jatuhTempo = new Date(pj.tanggalJatuhTempo);
+      const diffDays = Math.ceil((jatuhTempo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) {
+        statusLabel = `Terlambat ${Math.abs(diffDays)} hari`;
+        statusColor = "FFFFCDD2"; // merah muda
+      } else if (diffDays <= 7) {
+        statusLabel = diffDays === 0 ? "Hari ini" : `${diffDays} hari lagi`;
+        statusColor = "FFFFCDD2";
+      } else if (diffDays <= 30) {
+        statusLabel = `${diffDays} hari lagi`;
+        statusColor = "FFFFF9C4"; // kuning muda
+      } else {
+        statusLabel = `${diffDays} hari lagi`;
+        statusColor = "FFC8E6C9"; // hijau muda
+      }
+    }
+
+    const customerName = pj.customer?.nama || pj.namaCustomer || "-";
+
+    const row = worksheet.getRow(currentRow);
+    row.getCell(1).value = index + 1;
+    row.getCell(2).value = pj.kodePenjualan;
+    row.getCell(3).value = new Date(pj.tanggalTransaksi).toLocaleDateString("id-ID");
+    row.getCell(4).value = customerName;
+    row.getCell(5).value = totalHarga;
+    row.getCell(6).value = jumlahDibayar;
+    row.getCell(7).value = sisa;
+    row.getCell(8).value = pj.tanggalJatuhTempo
+      ? new Date(pj.tanggalJatuhTempo).toLocaleDateString("id-ID")
+      : "-";
+    row.getCell(9).value = statusLabel;
+
+    row.getCell(5).numFmt = "#,##0";
+    row.getCell(6).numFmt = "#,##0";
+    row.getCell(7).numFmt = "#,##0";
+
+    for (let i = 5; i <= 7; i++) row.getCell(i).alignment = { horizontal: "right" };
+    row.getCell(8).alignment = { horizontal: "center" };
+    row.getCell(9).alignment = { horizontal: "center" };
+
+    if (statusColor) {
+      row.getCell(9).fill = { type: "pattern", pattern: "solid", fgColor: { argb: statusColor } };
+    }
+
+    for (let i = 1; i <= colCount; i++) {
+      row.getCell(i).border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+    }
+
+    currentRow++;
+  });
+
+  const totalRow = worksheet.getRow(currentRow);
+  worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+  totalRow.getCell(1).value = "TOTAL";
+  totalRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+  totalRow.getCell(5).value = grandTotalTagihan;
+  totalRow.getCell(6).value = grandTotalDibayar;
+  totalRow.getCell(7).value = grandTotalSisa;
+  totalRow.getCell(5).numFmt = "#,##0";
+  totalRow.getCell(6).numFmt = "#,##0";
+  totalRow.getCell(7).numFmt = "#,##0";
+  totalRow.height = 25;
+
+  for (let i = 1; i <= colCount; i++) {
+    const cell = totalRow.getCell(i);
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE53935" } };
+    cell.border = { top: { style: "medium" }, left: { style: "thin" }, bottom: { style: "medium" }, right: { style: "thin" } };
+  }
+  for (let i = 5; i <= 7; i++) totalRow.getCell(i).alignment = { horizontal: "right", vertical: "middle" };
+  for (let i = colCount + 1; i <= 50; i++) totalRow.getCell(i).style = {};
+}
+
+// ====================================
+// HUTANG PEMBELIAN
+// ====================================
+async function generateLaporanHutangPembelian(
+  workbook: ExcelJS.Workbook,
+  dateFilter: any,
+  startDate: string | null,
+  endDate: string | null
+) {
+  const worksheet = workbook.addWorksheet("Hutang Pembelian");
+
+  const where: any = {
+    statusTransaksi: "SELESAI",
+    statusPembayaran: "HUTANG",
+  };
+  if (Object.keys(dateFilter).length > 0) {
+    where.createdAt = dateFilter;
+  }
+
+  const pembelianList = await prisma.pembelianHeader.findMany({
+    where,
+    orderBy: { createdAt: "asc" },
+    include: {
+      supplier: { select: { namaSupplier: true } },
+    },
+  });
+
+  const colCount = 9;
+
+  // Title
+  worksheet.mergeCells("A1:I1");
+  const titleCell = worksheet.getCell("A1");
+  titleCell.value = "HUTANG PEMBELIAN";
+  titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE65100" } };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 30;
+
+  worksheet.mergeCells("A2:I2");
+  const periodeCell = worksheet.getCell("A2");
+  periodeCell.value = `Periode: ${formatDateRange(startDate || undefined, endDate || undefined)}`;
+  periodeCell.font = { italic: true, size: 11 };
+  periodeCell.alignment = { horizontal: "center" };
+
+  worksheet.getRow(3).height = 5;
+
+  const headers = [
+    "No",
+    "Kode Pembelian",
+    "Tanggal Pembelian",
+    "Supplier",
+    "Total Tagihan",
+    "Sudah Dibayar",
+    "Sisa Hutang",
+    "Jatuh Tempo",
+    "Status",
+  ];
+  const headerRow = worksheet.getRow(4);
+  headers.forEach((h, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = h;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF424242" } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+  });
+  headerRow.height = 20;
+
+  worksheet.getColumn(1).width = 5;
+  worksheet.getColumn(2).width = 20;
+  worksheet.getColumn(3).width = 18;
+  worksheet.getColumn(4).width = 25;
+  worksheet.getColumn(5).width = 18;
+  worksheet.getColumn(6).width = 18;
+  worksheet.getColumn(7).width = 18;
+  worksheet.getColumn(8).width = 16;
+  worksheet.getColumn(9).width = 16;
+
+  let currentRow = 5;
+  let grandTotalTagihan = 0;
+  let grandTotalDibayar = 0;
+  let grandTotalSisa = 0;
+
+  const now = new Date();
+
+  pembelianList.forEach((pb, index) => {
+    const totalHarga = toNumber(pb.totalHarga);
+    const jumlahDibayar = toNumber(pb.jumlahDibayar);
+    const sisa = Math.max(0, totalHarga - jumlahDibayar);
+
+    grandTotalTagihan += totalHarga;
+    grandTotalDibayar += jumlahDibayar;
+    grandTotalSisa += sisa;
+
+    let statusLabel = "-";
+    let statusColor: string | null = null;
+    if (pb.tanggalJatuhTempo) {
+      const jatuhTempo = new Date(pb.tanggalJatuhTempo);
+      const diffDays = Math.ceil((jatuhTempo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) {
+        statusLabel = `Terlambat ${Math.abs(diffDays)} hari`;
+        statusColor = "FFFFCDD2";
+      } else if (diffDays <= 7) {
+        statusLabel = diffDays === 0 ? "Hari ini" : `${diffDays} hari lagi`;
+        statusColor = "FFFFCDD2";
+      } else if (diffDays <= 30) {
+        statusLabel = `${diffDays} hari lagi`;
+        statusColor = "FFFFF9C4";
+      } else {
+        statusLabel = `${diffDays} hari lagi`;
+        statusColor = "FFC8E6C9";
+      }
+    }
+
+    const row = worksheet.getRow(currentRow);
+    row.getCell(1).value = index + 1;
+    row.getCell(2).value = pb.kodePembelian;
+    row.getCell(3).value = new Date(pb.createdAt).toLocaleDateString("id-ID");
+    row.getCell(4).value = pb.supplier?.namaSupplier || "-";
+    row.getCell(5).value = totalHarga;
+    row.getCell(6).value = jumlahDibayar;
+    row.getCell(7).value = sisa;
+    row.getCell(8).value = pb.tanggalJatuhTempo
+      ? new Date(pb.tanggalJatuhTempo).toLocaleDateString("id-ID")
+      : "-";
+    row.getCell(9).value = statusLabel;
+
+    row.getCell(5).numFmt = "#,##0";
+    row.getCell(6).numFmt = "#,##0";
+    row.getCell(7).numFmt = "#,##0";
+
+    for (let i = 5; i <= 7; i++) row.getCell(i).alignment = { horizontal: "right" };
+    row.getCell(8).alignment = { horizontal: "center" };
+    row.getCell(9).alignment = { horizontal: "center" };
+
+    if (statusColor) {
+      row.getCell(9).fill = { type: "pattern", pattern: "solid", fgColor: { argb: statusColor } };
+    }
+
+    for (let i = 1; i <= colCount; i++) {
+      row.getCell(i).border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+    }
+
+    currentRow++;
+  });
+
+  const totalRow = worksheet.getRow(currentRow);
+  worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+  totalRow.getCell(1).value = "TOTAL";
+  totalRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+  totalRow.getCell(5).value = grandTotalTagihan;
+  totalRow.getCell(6).value = grandTotalDibayar;
+  totalRow.getCell(7).value = grandTotalSisa;
+  totalRow.getCell(5).numFmt = "#,##0";
+  totalRow.getCell(6).numFmt = "#,##0";
+  totalRow.getCell(7).numFmt = "#,##0";
+  totalRow.height = 25;
+
+  for (let i = 1; i <= colCount; i++) {
+    const cell = totalRow.getCell(i);
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE65100" } };
+    cell.border = { top: { style: "medium" }, left: { style: "thin" }, bottom: { style: "medium" }, right: { style: "thin" } };
+  }
+  for (let i = 5; i <= 7; i++) totalRow.getCell(i).alignment = { horizontal: "right", vertical: "middle" };
+  for (let i = colCount + 1; i <= 50; i++) totalRow.getCell(i).style = {};
 }

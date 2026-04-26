@@ -441,6 +441,51 @@ enum StatusApproval {
   REJECTED
 }
 
+enum JenisHutangLain {
+  KENDARAAN
+  BANK
+  PERALATAN
+  BANGUNAN
+  LAINNYA
+}
+
+enum StatusHutangLain {
+  AKTIF
+  LUNAS
+}
+
+model HutangLain {
+  id                Int                    @id @default(autoincrement())
+  namaHutang        String
+  jenisHutang       JenisHutangLain
+  kreditur          String
+  jumlahPokok       BigInt
+  jumlahDibayar     BigInt                 @default(0)
+  tanggalMulai      DateTime               @db.Date
+  tanggalJatuhTempo DateTime?              @db.Date
+  keterangan        String?
+  status            StatusHutangLain       @default(AKTIF)
+  pembayaran        HutangLainPembayaran[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([status])
+  @@index([jenisHutang])
+}
+
+model HutangLainPembayaran {
+  id           Int        @id @default(autoincrement())
+  hutangLain   HutangLain @relation(fields: [hutangLainId], references: [id], onDelete: Cascade)
+  hutangLainId Int
+  jumlahBayar  BigInt
+  tanggalBayar DateTime   @default(now())
+  keterangan   String?
+  userId       Int?
+  createdAt    DateTime   @default(now())
+
+  @@index([hutangLainId])
+}
+
 model KonfigurasiGaji {
   id                  Int      @id @default(autoincrement())
   jamMasukBatas       String   @default("08:10") // Format HH:mm

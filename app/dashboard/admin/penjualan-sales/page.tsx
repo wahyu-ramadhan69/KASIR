@@ -2500,12 +2500,14 @@ const PenjualanPage = () => {
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center font-bold text-base border-t-2 border-gray-200 pt-2 mt-2">
-                      <span className="text-gray-900">TOTAL</span>
-                      <span className="text-blue-600 text-lg">
-                        {formatRupiah(currentPenjualan.totalHarga)}
-                      </span>
-                    </div>
+                  </div>
+
+                  {/* Total Besar */}
+                  <div className="mt-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl px-4 py-4 flex items-center justify-between shadow-lg">
+                    <span className="text-white font-bold text-lg uppercase tracking-wide">TOTAL</span>
+                    <span className="text-white font-extrabold text-4xl">
+                      {formatRupiah(currentPenjualan.totalHarga)}
+                    </span>
                   </div>
 
                   <button
