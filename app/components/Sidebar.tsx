@@ -216,6 +216,11 @@ const adminTransactionLinks: NavLinkWithSub[] = [
         href: "/dashboard/admin/hutang-piutang/hutang-lain",
         icon: <Wallet className="w-4 h-4" />,
       },
+      {
+        label: "Riwayat Bayar Hutang Lain",
+        href: "/dashboard/admin/hutang-piutang/hutang-lain/riwayat-pembayaran",
+        icon: <ReceiptText className="w-4 h-4" />,
+      },
     ],
   },
   {
