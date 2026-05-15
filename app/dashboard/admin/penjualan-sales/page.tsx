@@ -1906,9 +1906,16 @@ const PenjualanPage = () => {
                     const todaySold = getTodaySold(barang.id);
                     const totalPcsInCart = getCartPcsForBarang(barang.id);
                     const totalDipakai = todaySold + totalPcsInCart;
+                    const perKemasan =
+                      Number(barang.jumlahPerKemasan) || 1;
+                    const totalDusDipakai = Math.floor(
+                      totalDipakai / perKemasan
+                    );
                     const remainingLimit = hasLimit
                       ? Math.max(0, barang.limitPenjualan - totalDipakai)
                       : Infinity;
+                    const sisa = hasLimit ? remainingLimit : 0;
+                    const sisaDus = Math.floor(sisa / perKemasan);
                     const isLimitReached = hasLimit && remainingLimit <= 0;
                     const isNearLimit =
                       hasLimit &&
@@ -2026,50 +2033,31 @@ const PenjualanPage = () => {
                                 </div>
                               )}
 
-                              {/* Limit Penjualan Info */}
-                              {hasLimit && (
-                                <div
-                                  className={`flex items-center gap-1 mt-1 ${
-                                    isLimitReached
-                                      ? "text-red-600 animate-pulse"
-                                      : isNearLimit
-                                      ? "text-orange-600"
-                                      : "text-blue-600"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 rounded-lg border border-current/20 text-[10px] font-bold">
-                                    <Percent className="w-3 h-3" />
-                                    <span className="flex flex-wrap items-center gap-1">
-                                      {(() => {
-                                        const perDus =
-                                          Number(barang.jumlahPerKemasan) || 1;
-                                        const totalDipakai =
-                                          todaySold + totalPcsInCart;
-                                        const totalDusDipakai = Math.floor(
-                                          totalDipakai / perDus
-                                        );
-                                        const sisa = Math.max(
-                                          0,
-                                          remainingLimit === Infinity
-                                            ? 0
-                                            : remainingLimit
-                                        );
-                                        const sisaDus = Math.floor(
-                                          sisa / perDus
-                                        );
-                                        return (
-                                          <>
-                                            Terjual: {totalDipakai} item /{" "}
-                                            {totalDusDipakai}
-                                            Dus • Sisa limit {sisa} item /{" "}
-                                            {sisaDus} Dus
-                                          </>
-                                        );
-                                      })()}
-                                    </span>
-                                  </div>
+                              {/* Info Penjualan Hari Ini */}
+                              <div
+                                className={`flex items-center gap-1 mt-1 ${
+                                  isLimitReached
+                                    ? "text-red-600 animate-pulse"
+                                    : isNearLimit
+                                    ? "text-orange-600"
+                                    : "text-blue-600"
+                                }`}
+                              >
+                                <div className="flex items-center gap-1 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 rounded-lg border border-current/20 text-[10px] font-bold">
+                                  <Percent className="w-3 h-3" />
+                                  <span className="flex flex-wrap items-center gap-1">
+                                    Terjual: {totalDipakai} item /{" "}
+                                    {totalDusDipakai} {barang.jenisKemasan}
+                                    {hasLimit && (
+                                      <>
+                                        {" "}
+                                        • Sisa limit {sisa} item / {sisaDus}{" "}
+                                        {barang.jenisKemasan}
+                                      </>
+                                    )}
+                                  </span>
                                 </div>
-                              )}
+                              </div>
 
                               {/* Limit Reached Warning */}
                               {isLimitReached && (

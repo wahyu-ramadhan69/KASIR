@@ -1602,35 +1602,38 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                 </span>
                               </div>
 
-                              {limitHariIni > 0 && (
+                              <div
+                                className={`flex items-center gap-1 mt-1 ${
+                                  isLimitReached
+                                    ? "text-red-600 animate-pulse"
+                                    : isNearLimit
+                                    ? "text-orange-600"
+                                    : "text-blue-600"
+                                }`}
+                              >
                                 <div
-                                  className={`flex items-center gap-1 mt-1 ${
+                                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg border text-[10px] font-bold backdrop-blur-sm ${
                                     isLimitReached
-                                      ? "text-red-600 animate-pulse"
+                                      ? "bg-red-50 border-red-200"
                                       : isNearLimit
-                                      ? "text-orange-600"
-                                      : "text-blue-600"
+                                      ? "bg-orange-50 border-orange-200"
+                                      : "bg-blue-50 border-blue-200"
                                   }`}
                                 >
-                                  <div
-                                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg border text-[10px] font-bold backdrop-blur-sm ${
-                                      isLimitReached
-                                        ? "bg-red-50 border-red-200"
-                                        : isNearLimit
-                                        ? "bg-orange-50 border-orange-200"
-                                        : "bg-blue-50 border-blue-200"
-                                    }`}
-                                  >
-                                    <AlertCircle className="w-3 h-3" />
-                                    <span className="flex flex-wrap items-center gap-1">
-                                      Terjual: {totalDipakai} item /{" "}
-                                      {totalDusDipakai} {barang.jenisKemasan} •
-                                      Sisa limit {sisa} item / {sisaDus}{" "}
-                                      {barang.jenisKemasan}
-                                    </span>
-                                  </div>
+                                  <AlertCircle className="w-3 h-3" />
+                                  <span className="flex flex-wrap items-center gap-1">
+                                    Terjual: {totalDipakai} item /{" "}
+                                    {totalDusDipakai} {barang.jenisKemasan}
+                                    {limitHariIni > 0 && (
+                                      <>
+                                        {" "}
+                                        • Sisa limit {sisa} item / {sisaDus}{" "}
+                                        {barang.jenisKemasan}
+                                      </>
+                                    )}
+                                  </span>
                                 </div>
-                              )}
+                              </div>
 
                               {isLimitReached && (
                                 <div className="flex items-center gap-1.5 text-red-600 animate-in slide-in-from-left duration-300">

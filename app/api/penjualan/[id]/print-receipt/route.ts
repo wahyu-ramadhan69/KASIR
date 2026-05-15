@@ -13,7 +13,7 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const auth = await isAuthenticated();
@@ -29,6 +29,11 @@ export async function GET(
       include: {
         customer: true,
         karyawan: true,
+        createdBy: {
+          include: {
+            karyawan: true, // ← nama karyawan dari user
+          },
+        },
         pembayaran: {
           orderBy: { tanggalBayar: "desc" },
         },
@@ -40,10 +45,16 @@ export async function GET(
       },
     });
 
+    const userKaryawan = penjualan?.userId
+      ? await prisma.user.findUnique({
+          where: { id: penjualan.userId },
+        })
+      : null;
+
     if (!penjualan) {
       return NextResponse.json(
         { success: false, error: "Penjualan tidak ditemukan" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -99,14 +110,14 @@ export async function GET(
       penjualan.statusPembayaran === "LUNAS"
         ? pembayaranList.reduce(
             (sum, pembayaran) => sum + Number(pembayaran.totalCash || 0),
-            0
+            0,
           )
         : Number(latestPembayaran?.totalCash || 0);
     const totalTransfer =
       penjualan.statusPembayaran === "LUNAS"
         ? pembayaranList.reduce(
             (sum, pembayaran) => sum + Number(pembayaran.totalTransfer || 0),
-            0
+            0,
           )
         : Number(latestPembayaran?.totalTransfer || 0);
 
@@ -140,7 +151,7 @@ export async function GET(
 
     body {
       font-family: 'Roboto Mono', monospace;
-      font-size: 10px;
+      font-size: 14px; /* 10 → 14 */
       line-height: 1.4;
       font-weight: 600;
       padding: 2mm;
@@ -156,19 +167,19 @@ export async function GET(
     }
 
     .header h1 {
-      font-size: 11px;
+      font-size: 15px; /* 11 → 15 */
       font-weight: 800;
       margin-bottom: 3px;
     }
 
     .header p {
-      font-size: 9px;
+      font-size: 13px; /* 9 → 13 */
       margin: 2px 0;
     }
 
     .info-section {
       margin: 8px 0;
-      font-size: 10px;
+      font-size: 14px; /* 10 → 14 */
     }
 
     .info-row {
@@ -190,7 +201,7 @@ export async function GET(
     .items-table {
       width: 100%;
       margin: 8px 0;
-      font-size: 10px;
+      font-size: 14px; /* 10 → 14 */
     }
 
     .items-header {
@@ -217,12 +228,12 @@ export async function GET(
       display: grid;
       grid-template-columns: 2.2fr 0.8fr;
       gap: 4px;
-      font-size: 10px;
+      font-size: 14px; /* 10 → 14 */
     }
 
     .item-discount {
       color: #dc2626;
-      font-size: 12px;
+      font-size: 16px; /* 12 → 16 */
       margin-top: 2px;
       padding-left: 8px;
     }
@@ -237,12 +248,12 @@ export async function GET(
       display: flex;
       justify-content: space-between;
       margin: 4px 0;
-      font-size: 10px;
+      font-size: 14px; /* 10 → 14 */
     }
 
     .summary-row.total {
       font-weight: 800;
-      font-size: 10px;
+      font-size: 14px; /* 10 → 14 */
       border-top: 1px solid #000;
       border-bottom: 1px solid #000;
       padding: 6px 0;
@@ -255,7 +266,7 @@ export async function GET(
     }
 
     .summary-row.payment {
-      font-size: 9px;
+      font-size: 13px; /* 9 → 13 */
     }
 
     .summary-row.discount {
@@ -267,7 +278,7 @@ export async function GET(
       text-align: center;
       border-top: 1px dashed #000;
       padding-top: 8px;
-      font-size: 8px;
+      font-size: 12px; /* 8 → 12 */
     }
 
     .footer p {
@@ -325,8 +336,8 @@ export async function GET(
       <span>${penjualan.customer?.nama || penjualan.namaCustomer || "-"}</span>
     </div>
     <div class="info-row">
-      <span class="info-label">Sales:</span>
-      <span>${penjualan.karyawan?.nama || "-"}</span>
+      <span class="info-label">Operator:</span>
+      <span>${userKaryawan?.username || "-"}</span>
     </div>
     <div class="info-row">
       <span class="info-label">Metode:</span>
@@ -352,7 +363,7 @@ export async function GET(
         const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
         const jumlahPcs = jumlahTotal % jumlahPerKemasan;
         const hargaSatuan = Number(
-          item.hargaJual ?? item.barang?.hargaJual ?? 0
+          item.hargaJual ?? item.barang?.hargaJual ?? 0,
         );
         const hargaTotal = hargaSatuan * jumlahDus;
         const hargaPcs =
@@ -375,13 +386,13 @@ export async function GET(
       <div class="item-details">
         <span>${hargaLine}</span>
         <span style="text-align: right;">${formatRupiah(
-          totalSetelahDiskon
+          totalSetelahDiskon,
         )}</span>
       </div>
       ${
         diskonTotal > 0
           ? `<div class="item-discount">Diskon: -${formatRupiah(
-              diskonTotal
+              diskonTotal,
             )}</div>`
           : ""
       }
@@ -461,7 +472,7 @@ export async function GET(
     console.error("Error generating receipt:", error);
     return NextResponse.json(
       { success: false, error: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
