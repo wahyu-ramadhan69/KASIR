@@ -31,7 +31,7 @@ export async function GET(
         karyawan: true,
         createdBy: {
           include: {
-            karyawan: true, // ← nama karyawan dari user
+            karyawan: true,
           },
         },
         pembayaran: {
@@ -48,6 +48,9 @@ export async function GET(
     const userKaryawan = penjualan?.userId
       ? await prisma.user.findUnique({
           where: { id: penjualan.userId },
+          include: {
+            karyawan: true,
+          },
         })
       : null;
 
@@ -58,26 +61,22 @@ export async function GET(
       );
     }
 
-    // Format rupiah
+    // Format rupiah — tanpa simbol "Rp", pakai titik sebagai pemisah ribuan
     const formatRupiah = (amount: number | bigint): string => {
       return new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }).format(Number(amount));
     };
 
-    // Format tanggal
+    // Format tanggal — DD/MM/YYYY HH:MM:SS (gaya struk thermal)
     const formatDate = (dateString: string | Date): string => {
       const date = new Date(dateString);
-      return new Intl.DateTimeFormat("id-ID", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(date);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return (
+        `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ` +
+        `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+      );
     };
 
     const formatBeratKg = (grams: number | bigint): string => {
@@ -100,7 +99,6 @@ export async function GET(
         jumlahPcs > 0
           ? Math.round((beratPerKemasan / jumlahPerKemasan) * jumlahPcs)
           : 0;
-
       return sum + beratDus + beratPcs;
     }, 0);
 
@@ -108,252 +106,51 @@ export async function GET(
     const latestPembayaran = pembayaranList[0];
     const totalCash =
       penjualan.statusPembayaran === "LUNAS"
-        ? pembayaranList.reduce(
-            (sum, pembayaran) => sum + Number(pembayaran.totalCash || 0),
-            0,
-          )
+        ? pembayaranList.reduce((sum, p) => sum + Number(p.totalCash || 0), 0)
         : Number(latestPembayaran?.totalCash || 0);
     const totalTransfer =
       penjualan.statusPembayaran === "LUNAS"
         ? pembayaranList.reduce(
-            (sum, pembayaran) => sum + Number(pembayaran.totalTransfer || 0),
+            (sum, p) => sum + Number(p.totalTransfer || 0),
             0,
-          )
+        )
         : Number(latestPembayaran?.totalTransfer || 0);
+    const employeeName =
+      penjualan.createdBy?.karyawan?.nama?.trim() ||
+      userKaryawan?.karyawan?.nama?.trim();
+    const username = penjualan.createdBy?.username || userKaryawan?.username;
+    const operatorLabel = employeeName ? "Sales" : "Operator";
+    const operatorName = employeeName || username || "-";
 
-    // Generate HTML untuk nota
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nota ${penjualan.kodePenjualan}</title>
-  <style>
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
+    // ─── Helper: pad kanan & kiri untuk baris dua kolom ──────────────────────
+    // Courier New 17px pada 78mm ≈ 24 karakter per baris
+    const COL_WIDTH = 24;
 
-    @font-face {
-      font-family: 'Roboto Mono';
-      font-style: normal;
-      font-weight: 700;
-      font-display: swap;
-      src: url('/fonts/RobotoMono-Bold.ttf') format('truetype');
-    }
+    // Rata kanan: isi kiri + spasi + nilai rata kanan
+    const padLine = (
+      left: string,
+      right: string,
+      width = COL_WIDTH,
+    ): string => {
+      const spaces = width - left.length - right.length;
+      return left + " ".repeat(Math.max(spaces, 1)) + right;
+    };
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    // Rata kanan saja (tanpa label kiri)
+    const rightAlign = (text: string, width = COL_WIDTH): string => {
+      const spaces = width - text.length;
+      return " ".repeat(Math.max(spaces, 0)) + text;
+    };
 
-    body {
-      font-family: 'Roboto Mono', monospace;
-      font-size: 14px; /* 10 → 14 */
-      line-height: 1.4;
-      font-weight: 600;
-      padding: 2mm;
-      width: 78mm;
-      background: white;
-    }
+    const centerText = (text: string, width = COL_WIDTH): string => {
+      const pad = Math.max(0, Math.floor((width - text.length) / 2));
+      return " ".repeat(pad) + text;
+    };
 
-    .header {
-      text-align: center;
-      margin-bottom: 10px;
-      border-bottom: 1px dashed #000;
-      padding-bottom: 8px;
-    }
+    const line = (char = "-", width = COL_WIDTH): string => char.repeat(width);
 
-    .header h1 {
-      font-size: 15px; /* 11 → 15 */
-      font-weight: 800;
-      margin-bottom: 3px;
-    }
-
-    .header p {
-      font-size: 13px; /* 9 → 13 */
-      margin: 2px 0;
-    }
-
-    .info-section {
-      margin: 8px 0;
-      font-size: 14px; /* 10 → 14 */
-    }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      margin: 3px 0;
-    }
-
-    .info-label {
-      font-weight: 800;
-      width: 68px;
-    }
-
-    .divider {
-      border-top: 1px dashed #000;
-      margin: 8px 0;
-    }
-
-    .items-table {
-      width: 100%;
-      margin: 8px 0;
-      font-size: 14px; /* 10 → 14 */
-    }
-
-    .items-header {
-      font-weight: 800;
-      border-bottom: 1px solid #000;
-      padding-bottom: 4px;
-      margin-bottom: 4px;
-      display: grid;
-      grid-template-columns: 2.2fr 0.8fr;
-      gap: 4px;
-    }
-
-    .item-row {
-      padding: 4px 0;
-      border-bottom: 1px dotted #ccc;
-    }
-
-    .item-name {
-      font-weight: 800;
-      margin-bottom: 2px;
-    }
-
-    .item-details {
-      display: grid;
-      grid-template-columns: 2.2fr 0.8fr;
-      gap: 4px;
-      font-size: 14px; /* 10 → 14 */
-    }
-
-    .item-discount {
-      color: #dc2626;
-      font-size: 16px; /* 12 → 16 */
-      margin-top: 2px;
-      padding-left: 8px;
-    }
-
-    .summary {
-      margin-top: 10px;
-      border-top: 1px solid #000;
-      padding-top: 8px;
-    }
-
-    .summary-row {
-      display: flex;
-      justify-content: space-between;
-      margin: 4px 0;
-      font-size: 14px; /* 10 → 14 */
-    }
-
-    .summary-row.total {
-      font-weight: 800;
-      font-size: 14px; /* 10 → 14 */
-      border-top: 1px solid #000;
-      border-bottom: 1px solid #000;
-      padding: 6px 0;
-      margin: 6px 0;
-    }
-
-    .summary-row.change {
-      color: #059669;
-      font-weight: 800;
-    }
-
-    .summary-row.payment {
-      font-size: 13px; /* 9 → 13 */
-    }
-
-    .summary-row.discount {
-      color: #dc2626;
-    }
-
-    .footer {
-      margin-top: 15px;
-      text-align: center;
-      border-top: 1px dashed #000;
-      padding-top: 8px;
-      font-size: 12px; /* 8 → 12 */
-    }
-
-    .footer p {
-      margin: 3px 0;
-    }
-
-    .signature-section {
-      margin-top: 16px;
-      display: flex;
-      justify-content: flex-end;
-    }
-
-    .signature-box {
-      text-align: center;
-      width: 150px;
-    }
-
-    .signature-line {
-      border-top: 1px solid #000;
-      margin: 38px auto 0;
-      width: 120px;
-      height: 1px;
-    }
-
-    @media print {
-      body {
-        padding: 2mm;
-        width: 78mm;
-      }
-
-      .no-print {
-        display: none;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>AW Sembako Sarolangun</h1>
-    <p>Jln Simpang Raya, Aur Gading, Sarolangun</p>
-    <p>Telp: 081278054340</p>
-  </div>
-
-  <div class="info-section">
-    <div class="info-row">
-      <span class="info-label">No Nota:</span>
-      <span>${penjualan.kodePenjualan}</span>
-    </div>
-    <div class="info-row">
-      <span class="info-label">Tanggal:</span>
-      <span>${formatDate(penjualan.tanggalTransaksi ?? penjualan.createdAt)}</span>
-    </div>
-    <div class="info-row">
-      <span class="info-label">Customer:</span>
-      <span>${penjualan.customer?.nama || penjualan.namaCustomer || "-"}</span>
-    </div>
-    <div class="info-row">
-      <span class="info-label">Operator:</span>
-      <span>${userKaryawan?.username || "-"}</span>
-    </div>
-    <div class="info-row">
-      <span class="info-label">Metode:</span>
-      <span>${penjualan.metodePembayaran}</span>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="items-table">
-    <div class="items-header">
-      <span>Item</span>
-      <span style="text-align: right;">Total</span>
-    </div>
-
-    ${penjualan.items
+    // ─── Render setiap item ───────────────────────────────────────────────────
+    const itemLines = penjualan.items
       .map((item) => {
         const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan) || 1;
         const jumlahTotal =
@@ -378,90 +175,124 @@ export async function GET(
           jumlahPcs > 0
             ? `${jumlahDus} ${labelKemasan} + ${jumlahPcs} pcs`
             : `${jumlahDus} ${labelKemasan}`;
-        const hargaLine = `${formatRupiah(hargaSatuan)} x ${qtyLabel}`;
 
-        return `
-    <div class="item-row">
-      <div class="item-name">${item.barang.namaBarang}</div>
-      <div class="item-details">
-        <span>${hargaLine}</span>
-        <span style="text-align: right;">${formatRupiah(
-          totalSetelahDiskon,
-        )}</span>
-      </div>
-      ${
-        diskonTotal > 0
-          ? `<div class="item-discount">Diskon: -${formatRupiah(
-              diskonTotal,
-            )}</div>`
-          : ""
-      }
-    </div>`;
+        // Baris 1: nama barang
+        const namaLine = item.barang.namaBarang;
+        // Baris 2: qty  harga_satuan (rata kiri) | total (rata kanan)
+        // Format: "5 Sak  235.000      1.175.000"
+        const qtyHarga = `${qtyLabel}  ${formatRupiah(hargaSatuan)}`;
+        const totalStr = formatRupiah(totalSetelahDiskon);
+        const detailLine = padLine(qtyHarga, totalStr);
+        // Baris 3 (opsional): diskon
+        const diskonLine =
+          diskonTotal > 0
+            ? rightAlign(`Diskon: -${formatRupiah(diskonTotal)}`)
+            : null;
+
+        return [namaLine, detailLine, diskonLine].filter(Boolean).join("\n");
       })
-      .join("")}
-  </div>
+      .join("\n" + line(".") + "\n");
 
-  <div class="summary">
-    <div class="summary-row">
-      <span>Subtotal:</span>
-      <span>${formatRupiah(penjualan.subtotal)}</span>
-    </div>
-    <div class="summary-row">
-      <span>Total Berat:</span>
-      <span>${formatBeratKg(totalBerat)} kg</span>
-    </div>
-    ${
+    // ─── Generate HTML ────────────────────────────────────────────────────────
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nota ${penjualan.kodePenjualan}</title>
+  <style>
+    @page {
+      size: 80mm auto;
+      margin: 2mm 1mm;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      /* Courier New adalah font paling mendekati thermal printer */
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 17px;
+      line-height: 1.55;
+      font-weight: normal;
+      width: 78mm;
+      background: #fff;
+      color: #000;
+      padding: 3mm 2mm;
+    }
+
+    /* ── Seluruh konten adalah blok <pre>-like: spasi penting ── */
+    .receipt {
+      white-space: pre;
+      word-break: break-all;
+    }
+
+    /* Header nama toko: italic, sedikit lebih besar */
+    .store-name {
+      font-style: italic;
+      font-size: 19px;
+      font-weight: bold;
+      white-space: pre;
+    }
+
+    /* Baris total & grand total: bold */
+    .bold {
+      font-weight: bold;
+    }
+
+    /* Kembalian: bold */
+    .kembalian {
+      font-weight: bold;
+    }
+
+    @media print {
+      body { padding: 2mm 1mm; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="store-name">${centerText("AW Sembako Sarolangun")}</div>
+<div class="receipt">${centerText("Jln Simpang Raya, Aur Gading")}
+${centerText("Sarolangun")}
+${centerText("Tlp: 081278054340")}
+${line("-")}
+No Trans : ${penjualan.kodePenjualan}
+Pelanggan: ${penjualan.customer?.nama || penjualan.namaCustomer || "UMUM"}
+${operatorLabel.padEnd(8, " ")}: ${operatorName}
+Tanggal  : ${formatDate(penjualan.tanggalTransaksi ?? penjualan.createdAt)}
+${line("-")}
+${itemLines}
+${line("-")}
+${padLine("Subtotal", formatRupiah(penjualan.subtotal))}
+${padLine("Total Berat", formatBeratKg(totalBerat) + " kg")}${
       Number(penjualan.diskonNota) > 0
-        ? `
-    <div class="summary-row discount">
-      <span>Diskon Nota:</span>
-      <span>-${formatRupiah(penjualan.diskonNota)}</span>
-    </div>`
+        ? "\n" +
+          padLine("Diskon Nota", "-" + formatRupiah(penjualan.diskonNota))
         : ""
     }
-    <div class="summary-row total">
-      <span>TOTAL:</span>
-      <span>${formatRupiah(penjualan.totalHarga)}</span>
-    </div>
-    <div class="summary-row payment">
-      <span>Cash:</span>
-      <span>${formatRupiah(totalCash)}</span>
-    </div>
-    <div class="summary-row payment">
-      <span>Transfer:</span>
-      <span>${formatRupiah(totalTransfer)}</span>
-    </div>
-    <div class="summary-row payment">
-      <span>Dibayar:</span>
-      <span>${formatRupiah(penjualan.jumlahDibayar)}</span>
-    </div>
-    <div class="summary-row change payment">
-      <span>Kembalian:</span>
-      <span>${formatRupiah(penjualan.kembalian)}</span>
-    </div>
-  </div>
+</div><div class="receipt bold">${padLine("Total", formatRupiah(penjualan.totalHarga))}</div><div class="receipt">
+${line("-")}
+${padLine("Cash", formatRupiah(totalCash))}
+${padLine("Transfer", formatRupiah(totalTransfer))}
+${padLine("Di bayar", formatRupiah(penjualan.jumlahDibayar))}</div>
+<div class="receipt kembalian">${padLine("Kembalian", formatRupiah(penjualan.kembalian))}</div>
+<div class="receipt">
+${line("-")}
+${centerText("Terimakasih sudah berbelanja")}
+${centerText("Barang yg sudah di beli")}
+${centerText("tidak bisa dikembalikan")}
+</div>
 
-  <div class="footer">
-    <p><strong>Terima kasih atas pembelian Anda!</strong></p>
-    <p>Barang yang sudah dibeli tidak dapat dikembalikan</p>
-  </div>
-
-  <div class="signature-section">
-    <div class="signature-box">
-      <p style="font-size: 8px; margin-bottom: 4px;">Tanda Terima,</p>
-      <div class="signature-line"></div>
-    </div>
-  </div>
-
-  <script>
-    // Auto print when page loads
-    window.onload = function() {
-      window.print();
-    };
-  </script>
+<script>
+  window.onload = function () { window.print(); };
+</script>
 </body>
-</html>
-    `;
+</html>`;
 
     return new NextResponse(html, {
       headers: {
