@@ -48,9 +48,6 @@ export async function GET(
     const userKaryawan = penjualan?.userId
       ? await prisma.user.findUnique({
           where: { id: penjualan.userId },
-          include: {
-            karyawan: true,
-          },
         })
       : null;
 
@@ -113,14 +110,8 @@ export async function GET(
         ? pembayaranList.reduce(
             (sum, p) => sum + Number(p.totalTransfer || 0),
             0,
-        )
+          )
         : Number(latestPembayaran?.totalTransfer || 0);
-    const employeeName =
-      penjualan.createdBy?.karyawan?.nama?.trim() ||
-      userKaryawan?.karyawan?.nama?.trim();
-    const username = penjualan.createdBy?.username || userKaryawan?.username;
-    const operatorLabel = employeeName ? "Sales" : "Operator";
-    const operatorName = employeeName || username || "-";
 
     // ─── Helper: pad kanan & kiri untuk baris dua kolom ──────────────────────
     // Courier New 17px pada 78mm ≈ 24 karakter per baris
@@ -191,15 +182,58 @@ export async function GET(
 
         return [namaLine, detailLine, diskonLine].filter(Boolean).join("\n");
       })
-      .join("\n" + line(".") + "\n");
+      .join("\n"); // tidak ada garis antar item, langsung lanjut
 
     // ─── Generate HTML ────────────────────────────────────────────────────────
+
+    // Susun semua konten sebagai plain text untuk konsistensi alignment
+    const diskonNotaLine =
+      Number(penjualan.diskonNota) > 0
+        ? "\n" +
+          padLine("Diskon Nota", "-" + formatRupiah(penjualan.diskonNota))
+        : "";
+
+    // Gunakan <b> tag inline untuk bold agar tidak merusak pre block
+    const allLines = [
+      `<i><b>${centerText("AW Sembako Sarolangun")}</b></i>`,
+      centerText("Jln Simpang Raya, Aur Gading"),
+      centerText("Sarolangun"),
+      centerText("Tlp: 081278054340"),
+      // ── garis 1: bawah header info customer ──
+      line("-"),
+      `No Trans : ${penjualan.kodePenjualan}`,
+      `Pelanggan: ${penjualan.customer?.nama || penjualan.namaCustomer || "UMUM"}`,
+      `Operator : ${userKaryawan?.username || "-"}`,
+      `Tanggal  : ${formatDate(penjualan.tanggalTransaksi ?? penjualan.createdAt)}`,
+      // ── garis 2: bawah info customer / atas list barang ──
+      line("-"),
+      itemLines,
+      // ── garis 3: bawah list barang / atas total ──
+      line("-"),
+      padLine("Subtotal", formatRupiah(penjualan.subtotal)),
+      padLine("Total Berat", formatBeratKg(totalBerat) + " kg") +
+        diskonNotaLine,
+      `<b>${padLine("Total", formatRupiah(penjualan.totalHarga))}</b>`,
+      padLine("Cash", formatRupiah(totalCash)),
+      padLine("Transfer", formatRupiah(totalTransfer)),
+      padLine("Di bayar", formatRupiah(penjualan.jumlahDibayar)),
+      `<b>${padLine("Kembalian", formatRupiah(penjualan.kembalian))}</b>`,
+      // ── garis 4: bawah pembayaran / atas footer ──
+      line("-"),
+      centerText("Barang yg sudah di beli tidak bisa"),
+      centerText("di tukar kecuali barang tertentu"),
+      centerText("Terima Kasih Atas Kunjungannya"),
+    ].join("\n");
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nota ${penjualan.kodePenjualan}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
     @page {
       size: 80mm auto;
@@ -213,9 +247,8 @@ export async function GET(
     }
 
     body {
-      /* Courier New adalah font paling mendekati thermal printer */
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 17px;
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      font-size: 12px;
       line-height: 1.55;
       font-weight: normal;
       width: 78mm;
@@ -224,28 +257,49 @@ export async function GET(
       padding: 3mm 2mm;
     }
 
-    /* ── Seluruh konten adalah blok <pre>-like: spasi penting ── */
-    .receipt {
+    /* Satu pre block untuk seluruh konten — spasi konsisten */
+    pre {
+      font-family: inherit;
+      font-size: inherit;
+      line-height: inherit;
+      font-weight: inherit;
       white-space: pre;
-      word-break: break-all;
+      margin: 0;
+      padding: 0;
+      word-break: normal;
+      overflow-wrap: normal;
     }
 
-    /* Header nama toko: italic, sedikit lebih besar */
-    .store-name {
+    pre b {
+      font-weight: 700;
+    }
+
+    pre i {
       font-style: italic;
-      font-size: 19px;
-      font-weight: bold;
-      white-space: pre;
     }
 
-    /* Baris total & grand total: bold */
-    .bold {
-      font-weight: bold;
+    /* Tanda tangan */
+    .signature-section {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      padding-right: 4mm;
     }
 
-    /* Kembalian: bold */
-    .kembalian {
-      font-weight: bold;
+    .signature-box {
+      text-align: center;
+      width: 120px;
+    }
+
+    .signature-box p {
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .signature-line {
+      border-top: 1px solid #000;
+      margin: 36px auto 0;
+      width: 100px;
     }
 
     @media print {
@@ -256,36 +310,13 @@ export async function GET(
 </head>
 <body>
 
-<div class="store-name">${centerText("AW Sembako Sarolangun")}</div>
-<div class="receipt">${centerText("Jln Simpang Raya, Aur Gading")}
-${centerText("Sarolangun")}
-${centerText("Tlp: 081278054340")}
-${line("-")}
-No Trans : ${penjualan.kodePenjualan}
-Pelanggan: ${penjualan.customer?.nama || penjualan.namaCustomer || "UMUM"}
-${operatorLabel.padEnd(8, " ")}: ${operatorName}
-Tanggal  : ${formatDate(penjualan.tanggalTransaksi ?? penjualan.createdAt)}
-${line("-")}
-${itemLines}
-${line("-")}
-${padLine("Subtotal", formatRupiah(penjualan.subtotal))}
-${padLine("Total Berat", formatBeratKg(totalBerat) + " kg")}${
-      Number(penjualan.diskonNota) > 0
-        ? "\n" +
-          padLine("Diskon Nota", "-" + formatRupiah(penjualan.diskonNota))
-        : ""
-    }
-</div><div class="receipt bold">${padLine("Total", formatRupiah(penjualan.totalHarga))}</div><div class="receipt">
-${line("-")}
-${padLine("Cash", formatRupiah(totalCash))}
-${padLine("Transfer", formatRupiah(totalTransfer))}
-${padLine("Di bayar", formatRupiah(penjualan.jumlahDibayar))}</div>
-<div class="receipt kembalian">${padLine("Kembalian", formatRupiah(penjualan.kembalian))}</div>
-<div class="receipt">
-${line("-")}
-${centerText("Terimakasih sudah berbelanja")}
-${centerText("Barang yg sudah di beli")}
-${centerText("tidak bisa dikembalikan")}
+<pre>${allLines}</pre>
+
+<div class="signature-section">
+  <div class="signature-box">
+    <p>Tanda Terima,</p>
+    <div class="signature-line"></div>
+  </div>
 </div>
 
 <script>
