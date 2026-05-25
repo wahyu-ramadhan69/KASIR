@@ -195,9 +195,9 @@ export async function GET(
 
     // Gunakan <b> tag inline untuk bold agar tidak merusak pre block
     const allLines = [
-      `<i><b>${centerText("AW Sembako Sarolangun")}</b></i>`,
+      `<i><b><span style="font-size:13px">${centerText("AW Sembako Sarolangun")}</span></b></i>`,
       centerText("Jln Simpang Raya, Aur Gading"),
-      centerText("Sarolangun"),
+      centerText("Sarolangun - Jambi"),
       centerText("Tlp: 081278054340"),
       // ── garis 1: bawah header info customer ──
       line("-"),
@@ -213,15 +213,15 @@ export async function GET(
       padLine("Subtotal", formatRupiah(penjualan.subtotal)),
       padLine("Total Berat", formatBeratKg(totalBerat) + " kg") +
         diskonNotaLine,
-      `<b>${padLine("Total", formatRupiah(penjualan.totalHarga))}</b>`,
+      `<b><span style="font-size:13px">${padLine("Total", formatRupiah(penjualan.totalHarga))}</span></b>`,
       padLine("Cash", formatRupiah(totalCash)),
       padLine("Transfer", formatRupiah(totalTransfer)),
       padLine("Di bayar", formatRupiah(penjualan.jumlahDibayar)),
-      `<b>${padLine("Kembalian", formatRupiah(penjualan.kembalian))}</b>`,
+      `<b><span style="font-size:13px">${padLine("Kembalian", formatRupiah(penjualan.kembalian))}</span></b>`,
       // ── garis 4: bawah pembayaran / atas footer ──
       line("-"),
-      centerText("Barang yg sudah di beli tidak bisa"),
-      centerText("di tukar kecuali barang tertentu"),
+      centerText("Barang yg sudah di beli"),
+      centerText("tidak bisa dikembalikan"),
       centerText("Terima Kasih Atas Kunjungannya"),
     ].join("\n");
 
