@@ -169,11 +169,15 @@ export async function GET(
 
         // Baris 1: nama barang
         const namaLine = item.barang.namaBarang;
-        // Baris 2: qty  harga_satuan (rata kiri) | total (rata kanan)
-        // Format: "5 Sak  235.000      1.175.000"
-        const qtyHarga = `${qtyLabel}  ${formatRupiah(hargaSatuan)}`;
-        const totalStr = formatRupiah(totalSetelahDiskon);
-        const detailLine = padLine(qtyHarga, totalStr);
+
+        // Baris 2: format seperti struk referensi
+        // "1 Dus  157.000  157.000"
+        // kolom: qty(8) + hargaSatuan(8) + total(8) = 24
+        const qtyStr = qtyLabel.padEnd(8);
+        const hargaStr = formatRupiah(hargaSatuan).padStart(8);
+        const totalStr = formatRupiah(totalSetelahDiskon).padStart(8);
+        const detailLine = `${qtyStr}${hargaStr}${totalStr}`;
+
         // Baris 3 (opsional): diskon
         const diskonLine =
           diskonTotal > 0
@@ -195,9 +199,9 @@ export async function GET(
 
     // Gunakan <b> tag inline untuk bold agar tidak merusak pre block
     const allLines = [
-      `<i><b><span style="font-size:13px">${centerText("AW Sembako Sarolangun")}</span></b></i>`,
+      `<i><b><span style="font-size:14px">${centerText("AW Sembako Sarolangun")}</span></b></i>`,
       centerText("Jln Simpang Raya, Aur Gading"),
-      centerText("Sarolangun - Jambi"),
+      centerText("Sarolangun"),
       centerText("Tlp: 081278054340"),
       // ── garis 1: bawah header info customer ──
       line("-"),
@@ -213,15 +217,15 @@ export async function GET(
       padLine("Subtotal", formatRupiah(penjualan.subtotal)),
       padLine("Total Berat", formatBeratKg(totalBerat) + " kg") +
         diskonNotaLine,
-      `<b><span style="font-size:13px">${padLine("Total", formatRupiah(penjualan.totalHarga))}</span></b>`,
+      `<b><span style="font-size:14px">${padLine("Total", formatRupiah(penjualan.totalHarga))}</span></b>`,
       padLine("Cash", formatRupiah(totalCash)),
       padLine("Transfer", formatRupiah(totalTransfer)),
       padLine("Di bayar", formatRupiah(penjualan.jumlahDibayar)),
-      `<b><span style="font-size:13px">${padLine("Kembalian", formatRupiah(penjualan.kembalian))}</span></b>`,
+      `<b><span style="font-size:14px">${padLine("Kembalian", formatRupiah(penjualan.kembalian))}</span></b>`,
       // ── garis 4: bawah pembayaran / atas footer ──
       line("-"),
-      centerText("Barang yg sudah di beli"),
-      centerText("tidak bisa dikembalikan"),
+      centerText("Barang yg sudah di beli tidak bisa"),
+      centerText("di tukar kecuali barang tertentu"),
       centerText("Terima Kasih Atas Kunjungannya"),
     ].join("\n");
 
@@ -237,7 +241,7 @@ export async function GET(
   <style>
     @page {
       size: 80mm auto;
-      margin: 2mm 1mm;
+      margin: 0;
     }
 
     * {
@@ -254,7 +258,7 @@ export async function GET(
       width: 78mm;
       background: #fff;
       color: #000;
-      padding: 3mm 2mm;
+      padding: 2mm 2mm 0 2mm;
     }
 
     /* Satu pre block untuk seluruh konten — spasi konsisten */
@@ -280,10 +284,11 @@ export async function GET(
 
     /* Tanda tangan */
     .signature-section {
-      margin-top: 20px;
+      margin-top: 8px;
       display: flex;
       justify-content: flex-end;
       padding-right: 4mm;
+      padding-bottom: 2mm;
     }
 
     .signature-box {
@@ -293,17 +298,17 @@ export async function GET(
 
     .signature-box p {
       font-size: 11px;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .signature-line {
       border-top: 1px solid #000;
-      margin: 36px auto 0;
+      margin: 28px auto 0;
       width: 100px;
     }
 
     @media print {
-      body { padding: 2mm 1mm; }
+      body { padding: 2mm 2mm 0 2mm; }
       .no-print { display: none; }
     }
   </style>
