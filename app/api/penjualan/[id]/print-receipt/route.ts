@@ -201,8 +201,8 @@ export async function GET(
     const allLines = [
       `<i><b><span style="font-size:14px">${centerText("AW Sembako Sarolangun")}</span></b></i>`,
       centerText("Jln Simpang Raya, Aur Gading"),
-      centerText("Sarolangun"),
-      centerText("Tlp: 081278054340"),
+      centerText("Sarolangun Tlp: 081278054340"),
+      // centerText("Tlp: 081278054340"),
       // ── garis 1: bawah header info customer ──
       line("-"),
       `No Trans : ${penjualan.kodePenjualan}`,
