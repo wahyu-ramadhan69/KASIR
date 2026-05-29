@@ -246,7 +246,7 @@ export async function GET(
 
   <div class="center bold" style="font-size:14px"><i>AW Sembako Sarolangun</i></div>
   <div class="center">Jln GOR Sarolangun (Depan Gor Sarolangun)</div>
-  <div class="center">Sarolangun Tlp: 081278054340</div>
+  <div class="center"> Tlp: 081278054340</div>
 
   <hr>
 
@@ -267,14 +267,14 @@ export async function GET(
   <hr>
 
   <table>
-    <tr><td>Subtotal</td><td class="right">${formatRupiah(penjualan.subtotal)}</td></tr>
+    <tr><td>Subtotal</td><td class="right">Rp. ${formatRupiah(penjualan.subtotal)}</td></tr>
     <tr><td>Total Berat</td><td class="right">${formatBeratKg(totalBerat)} kg</td></tr>
     ${diskonNotaRow}
-    <tr><td class="big">Total</td><td class="right big">${formatRupiah(penjualan.totalHarga)}</td></tr>
-    <tr><td>Cash</td><td class="right">${formatRupiah(totalCash)}</td></tr>
-    <tr><td>Transfer</td><td class="right">${formatRupiah(totalTransfer)}</td></tr>
-    <tr><td>Di bayar</td><td class="right">${formatRupiah(penjualan.jumlahDibayar)}</td></tr>
-    <tr><td class="big">Kembalian</td><td class="right big">${formatRupiah(penjualan.kembalian)}</td></tr>
+    <tr><td class="big">Total</td><td class="right big">Rp. ${formatRupiah(penjualan.totalHarga)}</td></tr>
+    <tr><td>Cash</td><td class="right">Rp. ${formatRupiah(totalCash)}</td></tr>
+    <tr><td>Transfer</td><td class="right">Rp. ${formatRupiah(totalTransfer)}</td></tr>
+    <tr><td>Di bayar</td><td class="right">Rp. ${formatRupiah(penjualan.jumlahDibayar)}</td></tr>
+    <tr><td class="big">Kembalian</td><td class="right big">Rp. ${formatRupiah(penjualan.kembalian)}</td></tr>
   </table>
 
   <hr>
