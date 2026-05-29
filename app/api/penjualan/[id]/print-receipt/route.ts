@@ -141,13 +141,10 @@ export async function GET(
     const line = (char = "-", width = COL_WIDTH): string => char.repeat(width);
 
     // ─── Render setiap item ───────────────────────────────────────────────────
-    const itemLines = penjualan.items
+    const itemRows = penjualan.items
       .map((item) => {
         const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan) || 1;
-        const jumlahTotal =
-          item.totalItem !== undefined && item.totalItem !== null
-            ? Number(item.totalItem)
-            : 0;
+        const jumlahTotal = Number(item.totalItem ?? 0);
         const jumlahDus = Math.floor(jumlahTotal / jumlahPerKemasan);
         const jumlahPcs = jumlahTotal % jumlahPerKemasan;
         const hargaSatuan = Number(
@@ -158,131 +155,77 @@ export async function GET(
           jumlahPcs > 0
             ? Math.round((hargaSatuan / jumlahPerKemasan) * jumlahPcs)
             : 0;
-        const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
+        const totalSebelumDiskon = hargaTotal + hargaPcs;
         const diskonTotal = Number(item.diskonPerItem) * jumlahDus;
-        const totalSetelahDiskon = totalHargaSebelumDiskon - diskonTotal;
+        const totalSetelahDiskon = totalSebelumDiskon - diskonTotal;
         const labelKemasan = item.barang?.jenisKemasan || "dus";
         const qtyLabel =
           jumlahPcs > 0
             ? `${jumlahDus} ${labelKemasan} + ${jumlahPcs} pcs`
             : `${jumlahDus} ${labelKemasan}`;
 
-        // Baris 1: nama barang
-        const namaLine = item.barang.namaBarang;
-
-        // Baris 2: format seperti struk referensi
-        // "1 Dus  157.000  157.000"
-        // kolom: qty(8) + hargaSatuan(8) + total(8) = 24
-        const qtyStr = qtyLabel.padEnd(8);
-        const hargaStr = formatRupiah(hargaSatuan).padStart(8);
-        const totalStr = formatRupiah(totalSetelahDiskon).padStart(8);
-        const detailLine = `${qtyStr}${hargaStr}${totalStr}`;
-
-        // Baris 3 (opsional): diskon
-        const diskonLine =
-          diskonTotal > 0
-            ? rightAlign(`Diskon: -${formatRupiah(diskonTotal)}`)
-            : null;
-
-        return [namaLine, detailLine, diskonLine].filter(Boolean).join("\n");
+        return `
+    <tr>
+      <td colspan="3" style="font-weight:700;padding-top:3px">
+        ${item.barang.namaBarang}
+      </td>
+    </tr>
+    <tr>
+      <td style="text-align:left">${qtyLabel}</td>
+      <td style="text-align:right">${formatRupiah(hargaSatuan)}</td>
+      <td style="text-align:right">${formatRupiah(totalSetelahDiskon)}</td>
+    </tr>
+    ${
+      diskonTotal > 0
+        ? `
+    <tr>
+      <td colspan="3" style="text-align:right;font-size:11px">
+        Diskon: -${formatRupiah(diskonTotal)}
+      </td>
+    </tr>`
+        : ""
+    }
+  `;
       })
-      .join("\n"); // tidak ada garis antar item, langsung lanjut
+      .join("");
 
-    // ─── Generate HTML ────────────────────────────────────────────────────────
-
-    // Susun semua konten sebagai plain text untuk konsistensi alignment
-    const diskonNotaLine =
+    const diskonNotaRow =
       Number(penjualan.diskonNota) > 0
-        ? "\n" +
-          padLine("Diskon Nota", "-" + formatRupiah(penjualan.diskonNota))
+        ? `
+  <tr>
+    <td>Diskon Nota</td>
+    <td style="text-align:right">-${formatRupiah(penjualan.diskonNota)}</td>
+  </tr>`
         : "";
-
-    // Gunakan <b> tag inline untuk bold agar tidak merusak pre block
-    const allLines = [
-      `<i><b><span style="font-size:14px">${centerText("AW Sembako Sarolangun")}</span></b></i>`,
-      centerText("Jln Simpang Raya, Aur Gading"),
-      centerText("Sarolangun Tlp: 081278054340"),
-      // centerText("Tlp: 081278054340"),
-      // ── garis 1: bawah header info customer ──
-      line("-"),
-      `No Trans : ${penjualan.kodePenjualan}`,
-      `Pelanggan: ${penjualan.customer?.nama || penjualan.namaCustomer || "UMUM"}`,
-      `Operator : ${userKaryawan?.username || "-"}`,
-      `Tanggal  : ${formatDate(penjualan.tanggalTransaksi ?? penjualan.createdAt)}`,
-      // ── garis 2: bawah info customer / atas list barang ──
-      line("-"),
-      itemLines,
-      // ── garis 3: bawah list barang / atas total ──
-      line("-"),
-      padLine("Subtotal", formatRupiah(penjualan.subtotal)),
-      padLine("Total Berat", formatBeratKg(totalBerat) + " kg") +
-        diskonNotaLine,
-      `<b><span style="font-size:14px">${padLine("Total", formatRupiah(penjualan.totalHarga))}</span></b>`,
-      padLine("Cash", formatRupiah(totalCash)),
-      padLine("Transfer", formatRupiah(totalTransfer)),
-      padLine("Di bayar", formatRupiah(penjualan.jumlahDibayar)),
-      `<b><span style="font-size:14px">${padLine("Kembalian", formatRupiah(penjualan.kembalian))}</span></b>`,
-      // ── garis 4: bawah pembayaran / atas footer ──
-      line("-"),
-      centerText("Barang yg sudah di beli tidak bisa"),
-      centerText("di tukar kecuali barang tertentu"),
-      centerText("Terima Kasih Atas Kunjungannya"),
-    ].join("\n");
 
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nota ${penjualan.kodePenjualan}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    @page { size: 80mm auto; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Share Tech Mono', 'Courier New', monospace;
       font-size: 12px;
       line-height: 1.55;
-      font-weight: normal;
       width: 78mm;
       background: #fff;
       color: #000;
-      padding: 2mm 2mm 0 2mm;
+      padding: 2mm 3mm 0 3mm;
     }
-
-    /* Satu pre block untuk seluruh konten — spasi konsisten */
-    pre {
-      font-family: inherit;
-      font-size: inherit;
-      line-height: inherit;
-      font-weight: inherit;
-      white-space: pre;
-      margin: 0;
-      padding: 0;
-      word-break: normal;
-      overflow-wrap: normal;
-    }
-
-    pre b {
-      font-weight: 700;
-    }
-
-    pre i {
-      font-style: italic;
-    }
-
-    /* Tanda tangan */
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 0 0 1px 0; vertical-align: top; }
+    .center { text-align: center; }
+    .right { text-align: right; }
+    .bold { font-weight: 700; }
+    .big { font-size: 14px; font-weight: 700; }
+    hr { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+    .items-table colgroup col:nth-child(1) { width: 50%; }
+    .items-table colgroup col:nth-child(2) { width: 22%; }
+    .items-table colgroup col:nth-child(3) { width: 28%; }
     .signature-section {
       margin-top: 8px;
       display: flex;
@@ -290,43 +233,64 @@ export async function GET(
       padding-right: 4mm;
       padding-bottom: 2mm;
     }
-
-    .signature-box {
-      text-align: center;
-      width: 120px;
-    }
-
-    .signature-box p {
-      font-size: 11px;
-      margin-bottom: 2px;
-    }
-
+    .signature-box { text-align: center; width: 120px; font-size: 11px; }
     .signature-line {
       border-top: 1px solid #000;
       margin: 28px auto 0;
       width: 100px;
     }
-
-    @media print {
-      body { padding: 2mm 2mm 0 2mm; }
-      .no-print { display: none; }
-    }
+    @media print { body { padding: 2mm 3mm 0 3mm; } }
   </style>
 </head>
 <body>
 
-<pre>${allLines}</pre>
+  <div class="center bold" style="font-size:14px"><i>AW Sembako Sarolangun</i></div>
+  <div class="center">Jln GOR Sarolangun (Depan Gor Sarolangun)</div>
+  <div class="center">Sarolangun Tlp: 081278054340</div>
 
-<div class="signature-section">
-  <div class="signature-box">
-    <p>Tanda Terima,</p>
-    <div class="signature-line"></div>
+  <hr>
+
+  <table>
+    <tr><td>No Trans</td><td class="right">${penjualan.kodePenjualan}</td></tr>
+    <tr><td>Pelanggan</td><td class="right">${penjualan.customer?.nama || penjualan.namaCustomer || "UMUM"}</td></tr>
+    <tr><td>Operator</td><td class="right">${userKaryawan?.username || "-"}</td></tr>
+    <tr><td>Tanggal</td><td class="right">${formatDate(penjualan.tanggalTransaksi ?? penjualan.createdAt)}</td></tr>
+  </table>
+
+  <hr>
+
+  <table class="items-table">
+    <colgroup><col><col><col></colgroup>
+    ${itemRows}
+  </table>
+
+  <hr>
+
+  <table>
+    <tr><td>Subtotal</td><td class="right">${formatRupiah(penjualan.subtotal)}</td></tr>
+    <tr><td>Total Berat</td><td class="right">${formatBeratKg(totalBerat)} kg</td></tr>
+    ${diskonNotaRow}
+    <tr><td class="big">Total</td><td class="right big">${formatRupiah(penjualan.totalHarga)}</td></tr>
+    <tr><td>Cash</td><td class="right">${formatRupiah(totalCash)}</td></tr>
+    <tr><td>Transfer</td><td class="right">${formatRupiah(totalTransfer)}</td></tr>
+    <tr><td>Di bayar</td><td class="right">${formatRupiah(penjualan.jumlahDibayar)}</td></tr>
+    <tr><td class="big">Kembalian</td><td class="right big">${formatRupiah(penjualan.kembalian)}</td></tr>
+  </table>
+
+  <hr>
+
+  <div class="center">Barang yg sudah di beli tidak bisa</div>
+  <div class="center">di tukar kecuali barang tertentu</div>
+  <div class="center">Terima Kasih Atas Kunjungannya</div>
+
+  <div class="signature-section">
+    <div class="signature-box">
+      <p>Tanda Terima,</p>
+      <div class="signature-line"></div>
+    </div>
   </div>
-</div>
 
-<script>
-  window.onload = function () { window.print(); };
-</script>
+<script>window.onload = function() { window.print(); };</script>
 </body>
 </html>`;
 
