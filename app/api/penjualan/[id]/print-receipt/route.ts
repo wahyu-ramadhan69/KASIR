@@ -203,13 +203,13 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <title>Nota ${penjualan.kodePenjualan}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
   <style>
     @page { size: 80mm auto; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Share Tech Mono', 'Courier New', monospace;
-      font-size: 12px;
+      font-family: 'Courier Prime', 'Courier New', monospace;
+      font-size: 14px;
       line-height: 1.55;
       width: 78mm;
       background: #fff;
@@ -245,7 +245,7 @@ export async function GET(
 <body>
 
   <div class="center bold" style="font-size:14px"><i>AW Sembako Sarolangun</i></div>
-  <div class="center">Jln GOR Sarolangun (Depan Gor Sarolangun)</div>
+  <div class="center">Jln GOR Sarolangun (Depan Gor)</div>
   <div class="center"> Tlp: 081278054340</div>
 
   <hr>
@@ -279,9 +279,8 @@ export async function GET(
 
   <hr>
 
-  <div class="center">Barang yg sudah di beli tidak bisa</div>
-  <div class="center">di tukar kecuali barang tertentu</div>
-  <div class="center">Terima Kasih Atas Kunjungannya</div>
+  <div class="center" style="font-size:12px">Barang yang sudah dibeli tidak bisa ditukar, untuk pengaduan silahkan hubungi nomer yang tertera</div>
+  <div class="center" style="font-size:12px">Terima Kasih Atas Kunjungannya</div>
 
   <div class="signature-section">
     <div class="signature-box">
