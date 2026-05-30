@@ -170,11 +170,14 @@ export async function GET(
         ${item.barang.namaBarang}
       </td>
     </tr>
-    <tr>
-      <td style="text-align:left">${qtyLabel}</td>
-      <td style="text-align:right">${formatRupiah(hargaSatuan)}</td>
-      <td style="text-align:right">${formatRupiah(totalSetelahDiskon)}</td>
-    </tr>
+<tr>
+  <td style="text-align:left">${qtyLabel}</td>
+  <td colspan="2" style="text-align:right">${formatRupiah(hargaSatuan)}/dus</td>
+</tr>
+<tr>
+  <td></td>
+  <td colspan="2" style="text-align:right;font-weight:700">${formatRupiah(totalSetelahDiskon)}</td>
+</tr>
     ${
       diskonTotal > 0
         ? `
