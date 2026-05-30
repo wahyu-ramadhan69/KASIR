@@ -172,7 +172,7 @@ export async function GET(
     </tr>
 <tr>
   <td style="text-align:left">${qtyLabel}</td>
-  <td colspan="2" style="text-align:right">${formatRupiah(hargaSatuan)}/dus</td>
+  <td colspan="2" style="text-align:right">${formatRupiah(hargaSatuan)}/${labelKemasan}</td>
 </tr>
 <tr>
   <td></td>
