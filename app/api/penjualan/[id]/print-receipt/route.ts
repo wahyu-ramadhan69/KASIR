@@ -166,7 +166,7 @@ export async function GET(
 
         return `
     <tr>
-      <td colspan="3" style="font-weight:700;padding-top:3px">
+      <td colspan="3" style="padding-top:3px">
         ${item.barang.namaBarang}
       </td>
     </tr>
