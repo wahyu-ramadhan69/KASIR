@@ -170,14 +170,11 @@ export async function GET(
         ${item.barang.namaBarang}
       </td>
     </tr>
-<tr>
-  <td style="text-align:left">${qtyLabel}</td>
-  <td colspan="2" style="text-align:right">${formatRupiah(hargaSatuan)}/${labelKemasan}</td>
-</tr>
-<tr>
-  <td></td>
-  <td colspan="2" style="text-align:right;font-weight:700">${formatRupiah(totalSetelahDiskon)}</td>
-</tr>
+    <tr>
+      <td style="text-align:left;font-size:12px">${qtyLabel}</td>
+      <td style="text-align:right;font-size:12px">${formatRupiah(hargaSatuan)}</td>
+      <td style="text-align:right;font-size:12px">${formatRupiah(totalSetelahDiskon)}</td>
+    </tr>
     ${
       diskonTotal > 0
         ? `
@@ -226,9 +223,9 @@ export async function GET(
     .bold { font-weight: 700; }
     .big { font-size: 14px; font-weight: 700; }
     hr { border: none; border-top: 1px dashed #000; margin: 4px 0; }
-    .items-table colgroup col:nth-child(1) { width: 50%; }
-    .items-table colgroup col:nth-child(2) { width: 22%; }
-    .items-table colgroup col:nth-child(3) { width: 28%; }
+    .items-table colgroup col:nth-child(1) { width: 35%; }
+    .items-table colgroup col:nth-child(2) { width: 30%; }
+    .items-table colgroup col:nth-child(3) { width: 35%; }
     .signature-section {
       margin-top: 8px;
       display: flex;
