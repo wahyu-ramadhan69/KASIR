@@ -80,6 +80,7 @@ interface PenjualanItem {
   totalItem?: number;
   hargaJual: number;
   hargaJualPerDus?: number;
+  hargaBeliPerDus?: number;
   hargaBeli: number;
   diskonPerItem: number;
   laba: number;
@@ -171,6 +172,9 @@ const PenjualanPage = () => {
   const [itemHargaValues, setItemHargaValues] = useState<{
     [key: number]: string;
   }>({});
+  const [itemHargaBeliValues, setItemHargaBeliValues] = useState<{
+    [key: number]: string;
+  }>({});
 
   const [diskonNota, setDiskonNota] = useState("0");
   const [diskonNotaType, setDiskonNotaType] = useState<"rupiah" | "persen">(
@@ -211,6 +215,9 @@ const PenjualanPage = () => {
 
   const getHargaJualPerDus = (item: PenjualanItem): number =>
     item.hargaJualPerDus ?? item.barang.hargaJual;
+
+  const getHargaBeliPerDus = (item: PenjualanItem): number =>
+    item.hargaBeliPerDus ?? item.barang.hargaBeli;
 
   const deriveDusPcsFromTotal = (
     totalItem: number,
@@ -398,6 +405,7 @@ const PenjualanPage = () => {
       const originalQtyMap: { [key: number]: number } = {};
       const hydratedItems: PenjualanItem[] = penjualan.items.map((item) => {
         const hargaJualPerDus = Number(item.hargaJual);
+        const hargaBeliPerDus = Number(item.hargaBeli);
         const totalPcs =
           item.totalItem !== undefined && item.totalItem !== null
             ? Number(item.totalItem)
@@ -411,8 +419,7 @@ const PenjualanPage = () => {
         const hargaJualPerPcs =
           hargaJualPerDus / Number(item.barang.jumlahPerKemasan);
         const hargaBeliPerPcs =
-          Number(item.barang.hargaBeli) /
-          Number(item.barang.jumlahPerKemasan);
+          hargaBeliPerDus / Number(item.barang.jumlahPerKemasan);
         const hargaJualTotal = hargaJualPerPcs * totalPcs;
         const diskonTotal = Number(item.diskonPerItem) * jumlahDus;
         const hargaBeliTotal = hargaBeliPerPcs * totalPcs;
@@ -424,6 +431,7 @@ const PenjualanPage = () => {
           jumlahPcs,
           totalItem: totalPcs,
           hargaJualPerDus,
+          hargaBeliPerDus,
           hargaJual: totalHarga,
           hargaBeli: hargaBeliTotal,
           laba: totalHarga - hargaBeliTotal,
@@ -438,6 +446,7 @@ const PenjualanPage = () => {
       const diskonTypes: { [key: number]: "rupiah" | "persen" } = {};
       const diskonValues: { [key: number]: string } = {};
       const hargaValues: { [key: number]: string } = {};
+      const hargaBeliValues: { [key: number]: string } = {};
 
       hydratedItems.forEach((item, index) => {
         diskonTypes[index] = "rupiah";
@@ -445,11 +454,15 @@ const PenjualanPage = () => {
         hargaValues[index] = Number(
           item.hargaJualPerDus ?? item.barang.hargaJual
         ).toLocaleString("id-ID");
+        hargaBeliValues[index] = Number(
+          item.hargaBeliPerDus ?? item.barang.hargaBeli
+        ).toLocaleString("id-ID");
       });
 
       setItemDiskonTypes(diskonTypes);
       setItemDiskonValues(diskonValues);
       setItemHargaValues(hargaValues);
+      setItemHargaBeliValues(hargaBeliValues);
       setOriginalQtyByBarangId(originalQtyMap);
       setSelectedCustomer(penjualan.customer || null);
       setSelectedKaryawan(penjualan.karyawan || null);
@@ -756,6 +769,7 @@ const PenjualanPage = () => {
           totalItem: jumlahPerKemasan > 1 ? jumlahPerKemasan : 1,
           hargaJual: barang.hargaJual,
           hargaJualPerDus: barang.hargaJual,
+          hargaBeliPerDus: barang.hargaBeli,
           hargaBeli: barang.hargaBeli,
           diskonPerItem: 0,
           laba: 0,
@@ -770,6 +784,10 @@ const PenjualanPage = () => {
         setItemHargaValues((prev) => ({
           ...prev,
           [newIndex]: formatRupiahInput(String(newItem.hargaJualPerDus ?? 0)),
+        }));
+        setItemHargaBeliValues((prev) => ({
+          ...prev,
+          [newIndex]: formatRupiahInput(String(newItem.hargaBeliPerDus ?? 0)),
         }));
 
         updateItemCalculation(updatedItems, newIndex);
@@ -795,7 +813,7 @@ const PenjualanPage = () => {
     const hargaJualPerPcs =
       getHargaJualPerDus(item) / item.barang.jumlahPerKemasan;
     const hargaBeliPerPcs =
-      item.barang.hargaBeli / item.barang.jumlahPerKemasan;
+      getHargaBeliPerDus(item) / item.barang.jumlahPerKemasan;
 
     const hargaJualTotal = hargaJualPerPcs * totalPcs;
     const diskonTotal = item.diskonPerItem * jumlahDus;
@@ -1055,6 +1073,30 @@ const PenjualanPage = () => {
     return getHargaJualPerDus(item).toLocaleString("id-ID");
   };
 
+  const handleItemHargaBeliChange = (index: number, value: string) => {
+    const displayValue = value === "" ? "" : formatRupiahInput(value);
+    const hargaBeliPerDus = parseRupiahToNumber(value);
+
+    setItemHargaBeliValues((prev) => ({
+      ...prev,
+      [index]: displayValue,
+    }));
+
+    const updatedItems = [...currentPenjualan.items];
+    updatedItems[index].hargaBeliPerDus = hargaBeliPerDus;
+    updateItemCalculation(updatedItems, index);
+  };
+
+  const getItemHargaBeliDisplayValue = (index: number): string => {
+    const storedValue = itemHargaBeliValues[index];
+    if (storedValue !== undefined) {
+      return storedValue;
+    }
+
+    const item = currentPenjualan.items[index];
+    return getHargaBeliPerDus(item).toLocaleString("id-ID");
+  };
+
   const toggleItemDiskonType = (index: number) => {
     const currentType = itemDiskonTypes[index] || "rupiah";
     const newType = currentType === "rupiah" ? "persen" : "rupiah";
@@ -1106,13 +1148,16 @@ const PenjualanPage = () => {
     const newDiskonTypes = { ...itemDiskonTypes };
     const newDiskonValues = { ...itemDiskonValues };
     const newHargaValues = { ...itemHargaValues };
+    const newHargaBeliValues = { ...itemHargaBeliValues };
     delete newDiskonTypes[index];
     delete newDiskonValues[index];
     delete newHargaValues[index];
+    delete newHargaBeliValues[index];
 
     const reindexedTypes: { [key: number]: "rupiah" | "persen" } = {};
     const reindexedValues: { [key: number]: string } = {};
     const reindexedHargaValues: { [key: number]: string } = {};
+    const reindexedHargaBeliValues: { [key: number]: string } = {};
 
     Object.keys(newDiskonTypes).forEach((key) => {
       const oldIndex = parseInt(key);
@@ -1127,9 +1172,16 @@ const PenjualanPage = () => {
       reindexedHargaValues[newIndex] = newHargaValues[oldIndex];
     });
 
+    Object.keys(newHargaBeliValues).forEach((key) => {
+      const oldIndex = parseInt(key);
+      const newIndex = oldIndex > index ? oldIndex - 1 : oldIndex;
+      reindexedHargaBeliValues[newIndex] = newHargaBeliValues[oldIndex];
+    });
+
     setItemDiskonTypes(reindexedTypes);
     setItemDiskonValues(reindexedValues);
     setItemHargaValues(reindexedHargaValues);
+    setItemHargaBeliValues(reindexedHargaBeliValues);
 
     recalculateTotal(updatedItems);
     toast.success("Item dihapus");
@@ -1219,6 +1271,7 @@ const PenjualanPage = () => {
             jumlahPcs: item.jumlahPcs,
             totalItem: getTotalItemPcs(item),
             hargaJual: getHargaJualPerDus(item),
+            hargaBeli: getHargaBeliPerDus(item),
             diskonPerItem: item.diskonPerItem,
             berat: getItemBeratGrams(item),
           })),
@@ -1386,6 +1439,7 @@ const PenjualanPage = () => {
     setItemDiskonTypes({});
     setItemDiskonValues({});
     setItemHargaValues({});
+    setItemHargaBeliValues({});
     setSearchCustomer("");
     setSearchKaryawan("");
     setCustomerList([]);
@@ -2219,6 +2273,41 @@ const PenjualanPage = () => {
                             </p>
                           )}
                         </div>
+
+                        {editPenjualanId && (
+                          <div className="my-2 space-y-1">
+                            <div className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 p-2 rounded-xl border border-amber-200">
+                              <span className="text-xs font-bold text-gray-700 uppercase">
+                                Harga Beli:
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-extrabold text-amber-700">
+                                  Rp
+                                </span>
+                                <input
+                                  type="text"
+                                  value={getItemHargaBeliDisplayValue(index)}
+                                  onChange={(e) =>
+                                    handleItemHargaBeliChange(
+                                      index,
+                                      e.target.value
+                                    )
+                                  }
+                                  className="w-24 text-right text-xs border-2 border-amber-300 rounded-lg px-2 py-1 font-bold bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                                  placeholder={formatRupiahInput(
+                                    String(item.barang.hargaBeli)
+                                  )}
+                                />
+                              </div>
+                            </div>
+                            {getHargaBeliPerDus(item) !==
+                              item.barang.hargaBeli && (
+                              <p className="text-xs text-amber-700 font-semibold">
+                                Harga beli transaksi berbeda dari master barang.
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                         {/* Quantity Controls - Enhanced */}
                         <div className="space-y-2">

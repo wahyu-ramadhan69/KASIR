@@ -388,6 +388,10 @@ export async function POST(
         const itemId = item.id ? Number(item.id) : null;
         const barangId = Number(item.barangId);
         const hargaJual = toNumber(item.hargaJual);
+        const hargaBeliPayload =
+          item.hargaBeli !== undefined && item.hargaBeli !== null
+            ? toNumber(item.hargaBeli)
+            : null;
         const diskonPerItem = toNumber(item.diskonPerItem);
 
         const barang = barangById.get(barangId)!;
@@ -410,7 +414,10 @@ export async function POST(
           }
           keptItemIds.add(itemId);
 
-          const hargaBeli = toNumber(existingItem.hargaBeli);
+          const hargaBeli =
+            hargaBeliPayload !== null
+              ? hargaBeliPayload
+              : toNumber(existingItem.hargaBeli);
           const hargaBeliPerPcs = Math.round(hargaBeli / jumlahPerKemasan);
           const hargaJualPerPcs = Math.round(hargaJual / jumlahPerKemasan);
 
@@ -428,12 +435,16 @@ export async function POST(
               totalItem: BigInt(totalPcs),
               berat: BigInt(beratItem),
               hargaJual: BigInt(hargaJual),
+              hargaBeli: BigInt(hargaBeli),
               diskonPerItem: BigInt(diskonPerItem),
               laba: BigInt(totalLaba),
             },
           });
         } else {
-          const hargaBeli = toNumber(barang.hargaBeli);
+          const hargaBeli =
+            hargaBeliPayload !== null
+              ? hargaBeliPayload
+              : toNumber(barang.hargaBeli);
           const hargaBeliPerPcs = Math.round(hargaBeli / jumlahPerKemasan);
           const hargaJualPerPcs = Math.round(hargaJual / jumlahPerKemasan);
 

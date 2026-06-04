@@ -69,6 +69,7 @@ interface CartItem {
   jumlahDus: number;
   jumlahPcs: number;
   hargaJual: number;
+  hargaBeli: number;
   diskonPerItem: number;
   barang: Barang;
 }
@@ -80,6 +81,7 @@ interface PenjualanItem {
   jumlahPcs?: number;
   totalItem?: number;
   hargaJual: number;
+  hargaBeli: number;
   diskonPerItem: number;
   berat?: number;
   barang: Barang;
@@ -221,6 +223,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const [itemHargaValues, setItemHargaValues] = useState<{
     [key: string]: string;
   }>({});
+  const [itemHargaBeliValues, setItemHargaBeliValues] = useState<{
+    [key: string]: string;
+  }>({});
 
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -327,6 +332,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           jumlahDus,
           jumlahPcs,
           hargaJual: Number(item.hargaJual),
+          hargaBeli: Number(item.hargaBeli),
           diskonPerItem: Number(item.diskonPerItem),
           barang: item.barang,
         };
@@ -335,6 +341,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       const diskonTypes: { [key: string]: "rupiah" | "persen" } = {};
       const diskonValues: { [key: string]: string } = {};
       const hargaValues: { [key: string]: string } = {};
+      const hargaBeliValues: { [key: string]: string } = {};
       newCartItems.forEach((item) => {
         diskonTypes[item.tempId] = "rupiah";
         diskonValues[item.tempId] = Number(item.diskonPerItem).toLocaleString(
@@ -343,12 +350,16 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         hargaValues[item.tempId] = Number(item.hargaJual).toLocaleString(
           "id-ID"
         );
+        hargaBeliValues[item.tempId] = Number(item.hargaBeli).toLocaleString(
+          "id-ID"
+        );
       });
 
       setCartItems(newCartItems);
       setItemDiskonTypes(diskonTypes);
       setItemDiskonValues(diskonValues);
       setItemHargaValues(hargaValues);
+      setItemHargaBeliValues(hargaBeliValues);
       setOriginalQtyByBarangId(originalQtyMap);
 
       if (penjualan.customer) {
@@ -542,6 +553,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       jumlahDus: jumlahPerKemasan > 1 ? 1 : 0,
       jumlahPcs: jumlahPerKemasan > 1 ? 0 : 1,
       hargaJual: barang.hargaJual,
+      hargaBeli: barang.hargaBeli,
       diskonPerItem: 0,
       barang: barang,
     };
@@ -554,6 +566,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setItemHargaValues((prev) => ({
       ...prev,
       [newItem.tempId]: formatRupiahInput(String(newItem.hargaJual)),
+    }));
+    setItemHargaBeliValues((prev) => ({
+      ...prev,
+      [newItem.tempId]: formatRupiahInput(String(newItem.hargaBeli)),
     }));
     toast.success(`${barang.namaBarang} ditambahkan ke item dijual`);
   };
@@ -744,6 +760,32 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     return item.hargaJual.toLocaleString("id-ID");
   };
 
+  const handleItemHargaBeliChange = (item: CartItem, value: string) => {
+    const displayValue = value === "" ? "" : formatRupiahInput(value);
+    const hargaBeli = parseRupiahToNumber(value);
+
+    setItemHargaBeliValues((prev) => ({
+      ...prev,
+      [item.tempId]: displayValue,
+    }));
+
+    setCartItems((prevItems) =>
+      prevItems.map((cartItem) =>
+        cartItem.tempId === item.tempId ? { ...cartItem, hargaBeli } : cartItem
+      )
+    );
+  };
+
+  const getItemHargaBeliDisplayValue = (item: CartItem): string => {
+    const storedValue = itemHargaBeliValues[item.tempId];
+
+    if (storedValue !== undefined) {
+      return storedValue;
+    }
+
+    return item.hargaBeli.toLocaleString("id-ID");
+  };
+
   const getItemBeratGrams = (item: CartItem): number => {
     const totalPcs = getTotalItemPcs(item);
     return calculateBeratGramsFromBarang(item.barang, totalPcs);
@@ -766,6 +808,11 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       return newValues;
     });
     setItemHargaValues((prev) => {
+      const newValues = { ...prev };
+      delete newValues[tempId];
+      return newValues;
+    });
+    setItemHargaBeliValues((prev) => {
       const newValues = { ...prev };
       delete newValues[tempId];
       return newValues;
@@ -927,6 +974,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
             jumlahPcs: item.jumlahPcs,
             totalItem: getTotalItemPcs(item),
             hargaJual: item.hargaJual,
+            hargaBeli: item.hargaBeli,
             diskonPerItem: item.diskonPerItem,
             berat: getItemBeratGrams(item),
           })),
@@ -1799,6 +1847,40 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                           </p>
                         )}
                       </div>
+
+                      {editPenjualanId && (
+                        <div className="my-2 space-y-1">
+                          <div className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 p-2 rounded-xl border border-amber-200">
+                            <span className="text-xs font-bold text-gray-700 uppercase">
+                              Harga Beli:
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-extrabold text-amber-700">
+                                Rp
+                              </span>
+                              <input
+                                type="text"
+                                value={getItemHargaBeliDisplayValue(item)}
+                                onChange={(e) =>
+                                  handleItemHargaBeliChange(
+                                    item,
+                                    e.target.value
+                                  )
+                                }
+                                className="w-24 text-right text-xs border-2 border-amber-300 rounded-lg px-2 py-1 font-bold bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                                placeholder={formatRupiahInput(
+                                  String(item.barang.hargaBeli)
+                                )}
+                              />
+                            </div>
+                          </div>
+                          {item.hargaBeli !== item.barang.hargaBeli && (
+                            <p className="text-xs text-amber-700 font-semibold">
+                              Harga beli transaksi berbeda dari master barang.
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Quantity Controls - Enhanced */}
                       <div className="space-y-2">
