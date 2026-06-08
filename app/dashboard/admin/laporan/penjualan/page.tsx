@@ -12,7 +12,6 @@ import {
   Loader2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
-import Link from "next/link";
 
 interface Barang {
   id: number;
@@ -96,10 +95,10 @@ const LaporanPenjualanPage = () => {
 
   // Filter state
   const [startDate, setStartDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [endDate, setEndDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -140,7 +139,7 @@ const LaporanPenjualanPage = () => {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (observerTarget.current) {
@@ -227,7 +226,7 @@ const LaporanPenjualanPage = () => {
 
   const handleExport = async (
     format: "excel" | "pdf",
-    exportType: "current" | "summary" | "detail" = "detail"
+    exportType: "current" | "summary" | "detail" = "detail",
   ) => {
     if (exportType === "summary") {
       setExportingSummary(true);
@@ -369,7 +368,7 @@ const LaporanPenjualanPage = () => {
 
   const deriveDusPcsFromTotal = (
     totalItem: number,
-    jumlahPerKemasan: number
+    jumlahPerKemasan: number,
   ) => {
     const perKemasan = Math.max(1, jumlahPerKemasan || 1);
     const jumlahDus = Math.floor(totalItem / perKemasan);
@@ -633,7 +632,7 @@ const LaporanPenjualanPage = () => {
                     const totalDibayar = pj.jumlahDibayar;
                     const sisaHutang = Math.max(
                       0,
-                      pj.subtotal - pj.jumlahDibayar
+                      pj.subtotal - pj.jumlahDibayar,
                     );
                     const margin =
                       pj.totalHarga > 0 ? (totalLaba / pj.totalHarga) * 100 : 0;
@@ -687,10 +686,10 @@ const LaporanPenjualanPage = () => {
                               margin >= 30
                                 ? "bg-green-100 text-green-700"
                                 : margin >= 20
-                                ? "bg-blue-100 text-blue-700"
-                                : margin >= 10
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-red-100 text-red-700"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : margin >= 10
+                                    ? "bg-yellow-100 text-yellow-700"
+                                    : "bg-red-100 text-red-700"
                             }`}
                           >
                             {margin.toFixed(1)}%
@@ -817,14 +816,14 @@ const LaporanPenjualanPage = () => {
                       const totalItem = getTotalItemPcs(item);
                       const { jumlahDus, jumlahPcs } = deriveDusPcsFromTotal(
                         totalItem,
-                        item.barang.jumlahPerKemasan
+                        item.barang.jumlahPerKemasan,
                       );
                       const modalDus = item.hargaBeli * jumlahDus;
                       const modalPcs =
                         jumlahPcs > 0
                           ? Math.round(
                               (item.hargaBeli / item.barang.jumlahPerKemasan) *
-                                jumlahPcs
+                                jumlahPcs,
                             )
                           : 0;
                       const totalModal = modalDus + modalPcs;
@@ -837,9 +836,7 @@ const LaporanPenjualanPage = () => {
                             </p>
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {jumlahDus > 0 && (
-                              <span>{jumlahDus} kemasan</span>
-                            )}
+                            {jumlahDus > 0 && <span>{jumlahDus} kemasan</span>}
                             {jumlahPcs > 0 && (
                               <span className="text-gray-500">
                                 {" "}
@@ -883,8 +880,8 @@ const LaporanPenjualanPage = () => {
                       Math.max(
                         0,
                         selectedPenjualan.subtotal -
-                          selectedPenjualan.jumlahDibayar
-                      )
+                          selectedPenjualan.jumlahDibayar,
+                      ),
                     )}
                   </span>
                 </div>

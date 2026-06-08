@@ -271,6 +271,11 @@ const adminTransactionLinks: NavLinkWithSub[] = [
         icon: <FileText className="w-4 h-4" />,
       },
       {
+        label: "Laporan stok Barang",
+        href: "/dashboard/admin/laporan/stok_barang",
+        icon: <FileText className="w-4 h-4" />,
+      },
+      {
         label: "Semua Laporan",
         href: "/dashboard/admin/laporan/all",
         icon: <FileText className="w-4 h-4" />,
