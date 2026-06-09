@@ -692,7 +692,7 @@ const PenjualanPage = () => {
           toast.error(
             `Limit penjualan harian tercapai!\nLimit: ${limitPenjualan} pcs\nTerjual hari ini: ${todaySold} pcs\nDi keranjang: ${totalDiKeranjang} pcs`
           );
-          return;
+          // return; // limit tidak memblokir penjualan
         }
 
         if (jumlahPerKemasan > remainingLimit) {
@@ -700,7 +700,7 @@ const PenjualanPage = () => {
           toast.error(
             `Limit penjualan harian telah tercapai!\nSisa limit: ${remainingLimit} item / ${sisaDus} Dus`
           );
-          return;
+          // return; // limit tidak memblokir penjualan
         }
       }
 
@@ -942,29 +942,22 @@ const PenjualanPage = () => {
         const totalIfUpdated = effectiveSold + newTotalPcs;
 
         if (totalIfUpdated > barang.limitPenjualan) {
-          const maxAllowed = Math.max(
-            0,
-            Math.min(barang.limitPenjualan - effectiveSold, stokTersedia)
-          );
-          let clampedDus = newJumlahDus;
-          let clampedPcs = newJumlahPcs;
-
-          if (jumlahPerKemasan <= 1 || field === "jumlahPcs") {
-            clampedPcs = Math.min(Math.max(0, maxAllowed), newJumlahPcs);
-          } else if (field === "jumlahDus") {
-            const maxDus = Math.max(
-              0,
-              Math.floor((maxAllowed - clampedPcs) / jumlahPerKemasan)
-            );
-            clampedDus = Math.min(newJumlahDus, maxDus);
-          } else {
-            clampedDus = Math.floor(maxAllowed / jumlahPerKemasan);
-            clampedPcs = maxAllowed % jumlahPerKemasan;
-          }
-
-          newJumlahDus = clampedDus;
-          newJumlahPcs = clampedPcs;
-          totalSetelahUpdate = newJumlahDus * jumlahPerKemasan + newJumlahPcs;
+          // Limit hanya peringatan, tidak memblokir perubahan jumlah
+          // const maxAllowed = Math.max(0, Math.min(barang.limitPenjualan - effectiveSold, stokTersedia));
+          // let clampedDus = newJumlahDus;
+          // let clampedPcs = newJumlahPcs;
+          // if (jumlahPerKemasan <= 1 || field === "jumlahPcs") {
+          //   clampedPcs = Math.min(Math.max(0, maxAllowed), newJumlahPcs);
+          // } else if (field === "jumlahDus") {
+          //   const maxDus = Math.max(0, Math.floor((maxAllowed - clampedPcs) / jumlahPerKemasan));
+          //   clampedDus = Math.min(newJumlahDus, maxDus);
+          // } else {
+          //   clampedDus = Math.floor(maxAllowed / jumlahPerKemasan);
+          //   clampedPcs = maxAllowed % jumlahPerKemasan;
+          // }
+          // newJumlahDus = clampedDus;
+          // newJumlahPcs = clampedPcs;
+          // totalSetelahUpdate = newJumlahDus * jumlahPerKemasan + newJumlahPcs;
           warningMessage = `Limit penjualan harian telah tercapai !`;
         }
       }
@@ -1911,7 +1904,7 @@ const PenjualanPage = () => {
                     const isStokHabis = sisaStok < barang.jumlahPerKemasan;
 
                     // Disable button jika stok tidak cukup untuk 1 kemasan ATAU limit tercapai
-                    const isDisabled = isStokHabis || isLimitReached;
+                    const isDisabled = isStokHabis /* || isLimitReached */;
 
                     return (
                       <div

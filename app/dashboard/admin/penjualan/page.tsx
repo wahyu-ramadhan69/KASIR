@@ -160,7 +160,7 @@ const deriveDusPcsFromTotal = (totalItem: number, jumlahPerKemasan: number) => {
 
 const calculateBeratGramsFromBarang = (
   barang: Barang,
-  totalPcs: number
+  totalPcs: number,
 ): number => {
   const beratPerItem = Number(barang.berat || 0);
   if (beratPerItem <= 0 || totalPcs <= 0) return 0;
@@ -168,7 +168,7 @@ const calculateBeratGramsFromBarang = (
 };
 
 const formatMetodePembayaranLabel = (
-  metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+  metode: "CASH" | "TRANSFER" | "CASH_TRANSFER",
 ) => {
   return metode === "CASH_TRANSFER" ? "CASH + TRANSFER" : metode;
 };
@@ -186,7 +186,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const [searchCustomer, setSearchCustomer] = useState<string>("");
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
+    null,
   );
   const [customerHutangInfo, setCustomerHutangInfo] =
     useState<CustomerHutangInfo | null>(null);
@@ -197,13 +197,13 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [todaySales, setTodaySales] = useState<{ [barangId: number]: number }>(
-    {}
+    {},
   );
 
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
   const [diskonNota, setDiskonNota] = useState<string>("0");
   const [diskonNotaType, setDiskonNotaType] = useState<"rupiah" | "persen">(
-    "rupiah"
+    "rupiah",
   );
   const [jumlahDibayar, setJumlahDibayar] = useState<string>("");
   const [jumlahCash, setJumlahCash] = useState<string>("");
@@ -308,19 +308,19 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
               Number(item.jumlahPcs || 0);
         const derived = deriveDusPcsFromTotal(
           fallbackTotalItem,
-          jumlahPerKemasan
+          jumlahPerKemasan,
         );
         const useSingleItemMode = jumlahPerKemasan <= 1;
         const jumlahDus = useSingleItemMode
           ? 0
           : item.jumlahDus !== undefined
-          ? Number(item.jumlahDus)
-          : derived.jumlahDus;
+            ? Number(item.jumlahDus)
+            : derived.jumlahDus;
         const jumlahPcs = useSingleItemMode
           ? fallbackTotalItem
           : item.jumlahPcs !== undefined
-          ? Number(item.jumlahPcs)
-          : derived.jumlahPcs;
+            ? Number(item.jumlahPcs)
+            : derived.jumlahPcs;
 
         originalQtyMap[item.barangId] =
           (originalQtyMap[item.barangId] || 0) + fallbackTotalItem;
@@ -345,13 +345,13 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       newCartItems.forEach((item) => {
         diskonTypes[item.tempId] = "rupiah";
         diskonValues[item.tempId] = Number(item.diskonPerItem).toLocaleString(
-          "id-ID"
+          "id-ID",
         );
         hargaValues[item.tempId] = Number(item.hargaJual).toLocaleString(
-          "id-ID"
+          "id-ID",
         );
         hargaBeliValues[item.tempId] = Number(item.hargaBeli).toLocaleString(
-          "id-ID"
+          "id-ID",
         );
       });
 
@@ -379,7 +379,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       const latestCash = Number(latestPembayaran?.totalCash || 0);
       const latestTransfer = Number(latestPembayaran?.totalTransfer || 0);
       const penjualanDibayar = Number(penjualan.jumlahDibayar).toLocaleString(
-        "id-ID"
+        "id-ID",
       );
       setDiskonNota(Number(penjualan.diskonNota).toLocaleString("id-ID"));
       setJumlahDibayar(penjualanDibayar);
@@ -448,7 +448,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setSearchingCustomer(true);
     try {
       const res = await fetch(
-        `/api/customer/search/${encodeURIComponent(keyword)}?limit=5`
+        `/api/customer/search/${encodeURIComponent(keyword)}?limit=5`,
       );
       const data = await res.json();
       if (data.success) {
@@ -504,7 +504,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     const addPcs = jumlahPerKemasan > 1 ? jumlahPerKemasan : 1;
     if (sisaStok < addPcs) {
       toast.error(
-        `Stok tidak mencukupi! Stok tersedia: ${stokTersedia} pcs, sudah di item dijual: ${inCartPcs} pcs, sisa: ${sisaStok} pcs`
+        `Stok tidak mencukupi! Stok tersedia: ${stokTersedia} pcs, sudah di item dijual: ${inCartPcs} pcs, sisa: ${sisaStok} pcs`,
       );
       return;
     }
@@ -518,14 +518,14 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       const remainingLimit = limitPenjualan - effectiveSold - inCartPcs;
       if (remainingLimit <= 0) {
         toast.error(
-          `Limit harian untuk ${barang.namaBarang} sudah tercapai (${limitPenjualan} pcs)`
+          `Limit harian untuk ${barang.namaBarang} sudah tercapai (${limitPenjualan} pcs)`,
         );
-        return;
+        // return; // limit tidak memblokir penjualan
       }
 
       if (addPcs > remainingLimit) {
         toast.error(`Limit penjualan harian telah tercapai !`);
-        return;
+        // return; // limit tidak memblokir penjualan
       }
     }
 
@@ -537,11 +537,11 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
             ? jumlahPerKemasan > 1
               ? { ...item, jumlahDus: item.jumlahDus + 1 }
               : { ...item, jumlahPcs: item.jumlahPcs + 1 }
-            : item
-        )
+            : item,
+        ),
       );
       toast.success(
-        `${barang.namaBarang} +1 ${jumlahPerKemasan > 1 ? "dus" : "pcs"}`
+        `${barang.namaBarang} +1 ${jumlahPerKemasan > 1 ? "dus" : "pcs"}`,
       );
       return;
     }
@@ -592,7 +592,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           : 0;
         const stokTersedia = Math.max(
           0,
-          Number(item.barang.stok || 0) + originalQty
+          Number(item.barang.stok || 0) + originalQty,
         );
         const todaySold = getTodaySold(item.barangId);
 
@@ -600,7 +600,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           limitPenjualan > 0
             ? Math.max(0, limitPenjualan - Math.max(0, todaySold - originalQty))
             : Number.POSITIVE_INFINITY;
-        const maxAllowed = Math.min(stokTersedia, allowedByLimit);
+        // const maxAllowed = Math.min(stokTersedia, allowedByLimit); // limit tidak memblokir
+        const maxAllowed = stokTersedia;
 
         if (totalPcs > maxAllowed) {
           let clampedDus = updatedItem.jumlahDus;
@@ -609,13 +610,13 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           if (field === "jumlahDus") {
             const maxDus = Math.max(
               0,
-              Math.floor((maxAllowed - clampedPcs) / jumlahPerKemasan)
+              Math.floor((maxAllowed - clampedPcs) / jumlahPerKemasan),
             );
             clampedDus = Math.min(clampedDus, maxDus);
           } else if (field === "jumlahPcs") {
             const maxPcs = Math.max(
               0,
-              maxAllowed - clampedDus * jumlahPerKemasan
+              maxAllowed - clampedDus * jumlahPerKemasan,
             );
             clampedPcs = Math.min(clampedPcs, maxPcs);
           } else {
@@ -626,7 +627,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
           if (limitPenjualan > 0 && allowedByLimit <= stokTersedia) {
             reasons.push(
-              `Sisa limit harian: ${allowedByLimit} pcs (limit ${limitPenjualan} pcs, terjual hari ini ${todaySold} pcs)`
+              `Sisa limit harian: ${allowedByLimit} pcs (limit ${limitPenjualan} pcs, terjual hari ini ${todaySold} pcs)`,
             );
           }
 
@@ -661,7 +662,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const handleItemDiskonChange = (
     item: CartItem,
     value: string,
-    type: "rupiah" | "persen"
+    type: "rupiah" | "persen",
   ) => {
     let diskonRupiah: number;
     let displayValue: string;
@@ -684,8 +685,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       prevItems.map((cartItem) =>
         cartItem.tempId === item.tempId
           ? { ...cartItem, diskonPerItem: diskonRupiah }
-          : cartItem
-      )
+          : cartItem,
+      ),
     );
   };
 
@@ -745,8 +746,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
     setCartItems((prevItems) =>
       prevItems.map((cartItem) =>
-        cartItem.tempId === item.tempId ? { ...cartItem, hargaJual } : cartItem
-      )
+        cartItem.tempId === item.tempId ? { ...cartItem, hargaJual } : cartItem,
+      ),
     );
   };
 
@@ -771,8 +772,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
     setCartItems((prevItems) =>
       prevItems.map((cartItem) =>
-        cartItem.tempId === item.tempId ? { ...cartItem, hargaBeli } : cartItem
-      )
+        cartItem.tempId === item.tempId ? { ...cartItem, hargaBeli } : cartItem,
+      ),
     );
   };
 
@@ -793,7 +794,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
   const handleDeleteItem = (tempId: string) => {
     setCartItems((prevItems) =>
-      prevItems.filter((item) => item.tempId !== tempId)
+      prevItems.filter((item) => item.tempId !== tempId),
     );
 
     // Hapus juga diskon state
@@ -830,7 +831,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       const hargaPcs =
         item.jumlahPcs > 0
           ? Math.round(
-              (item.hargaJual / item.barang.jumlahPerKemasan) * item.jumlahPcs
+              (item.hargaJual / item.barang.jumlahPerKemasan) * item.jumlahPcs,
             )
           : 0;
       const totalHargaSebelumDiskon = hargaTotal + hargaPcs;
@@ -884,7 +885,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     } else {
       const currentPersen = parseInt(diskonNota) || 0;
       const rupiah = Math.round(
-        (subtotalAfterItemDiskon * currentPersen) / 100
+        (subtotalAfterItemDiskon * currentPersen) / 100,
       );
       setDiskonNota(rupiah.toLocaleString("id-ID"));
     }
@@ -897,8 +898,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const getEffectiveJumlahDibayar = (): number => {
     if (metodePembayaran === "CASH_TRANSFER") {
       return (
-        parseRupiahToNumber(jumlahCash) +
-        parseRupiahToNumber(jumlahTransfer)
+        parseRupiahToNumber(jumlahCash) + parseRupiahToNumber(jumlahTransfer)
       );
     }
     return parseRupiahToNumber(jumlahDibayar);
@@ -920,7 +920,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   };
 
   const handleMetodePembayaranChange = (
-    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER"
+    metode: "CASH" | "TRANSFER" | "CASH_TRANSFER",
   ) => {
     if (metode === "CASH_TRANSFER") {
       if (jumlahDibayar) {
@@ -931,8 +931,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       }
     } else if (metodePembayaran === "CASH_TRANSFER") {
       const total =
-        parseRupiahToNumber(jumlahCash) +
-        parseRupiahToNumber(jumlahTransfer);
+        parseRupiahToNumber(jumlahCash) + parseRupiahToNumber(jumlahTransfer);
       setJumlahDibayar(total ? total.toLocaleString("id-ID") : "");
       setJumlahCash("");
       setJumlahTransfer("");
@@ -943,7 +942,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
   const setJumlahByNumber = (
     setter: (value: string) => void,
-    value: number
+    value: number,
   ) => {
     setter(value ? value.toLocaleString("id-ID") : "");
   };
@@ -1000,7 +999,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(updatePayload),
-          }
+          },
         );
 
         const updateResult = await updateRes.json();
@@ -1141,7 +1140,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   };
 
   const filteredBarang = barangList.filter((b) =>
-    b.namaBarang.toLowerCase().includes(searchBarang.toLowerCase())
+    b.namaBarang.toLowerCase().includes(searchBarang.toLowerCase()),
   );
 
   // Kalkulasi dari cart lokal
@@ -1152,7 +1151,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     calculateDiskonNotaRupiah();
 
   const hasZeroQtyItem = cartItems.some(
-    (item) => item.jumlahDus === 0 && item.jumlahPcs === 0
+    (item) => item.jumlahDus === 0 && item.jumlahPcs === 0,
   );
 
   const getPaymentStatus = () => {
@@ -1188,7 +1187,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           sisaHutang,
           canCheckout: true,
           message: `Piutang melebihi limit! Sisa limit: ${formatRupiah(
-            sisaLimit
+            sisaLimit,
           )}`,
         };
       }
@@ -1535,7 +1534,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                       barang.stok >= barang.jumlahPerKemasan &&
                       barang.stok < barang.jumlahPerKemasan * 5;
                     const isInCart = cartItems.some(
-                      (item) => item.barangId === barang.id
+                      (item) => item.barangId === barang.id,
                     );
                     const limitHariIni = Number(barang.limitPenjualan || 0);
                     const soldToday = getTodaySold(barang.id);
@@ -1559,7 +1558,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
 
                     // Hitung stok dalam kardus dan pcs
                     const stokDus = Math.floor(
-                      Number(barang.stok) / Number(barang.jumlahPerKemasan)
+                      Number(barang.stok) / Number(barang.jumlahPerKemasan),
                     );
                     const stokPcs =
                       Number(barang.stok) % Number(barang.jumlahPerKemasan);
@@ -1571,10 +1570,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                           isLimitReached
                             ? "border-red-300 bg-gradient-to-br from-red-50 to-red-100/60 shadow-md"
                             : isNearLimit
-                            ? "border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100/60 shadow-md"
-                            : isLowStock
-                            ? "border-red-300 bg-gradient-to-br from-red-50 to-red-100/50 shadow-md"
-                            : "border-gray-200 bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-100/50"
+                              ? "border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100/60 shadow-md"
+                              : isLowStock
+                                ? "border-red-300 bg-gradient-to-br from-red-50 to-red-100/50 shadow-md"
+                                : "border-gray-200 bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-100/50"
                         }`}
                       >
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
@@ -1631,8 +1630,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     isLowStock
                                       ? "bg-red-500 text-white animate-pulse"
                                       : isMediumStock
-                                      ? "bg-yellow-400 text-yellow-900"
-                                      : "bg-green-500 text-white"
+                                        ? "bg-yellow-400 text-yellow-900"
+                                        : "bg-green-500 text-white"
                                   }`}
                                 >
                                   <div
@@ -1640,13 +1639,12 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                       isLowStock
                                         ? "bg-white"
                                         : isMediumStock
-                                        ? "bg-yellow-900"
-                                        : "bg-white"
+                                          ? "bg-yellow-900"
+                                          : "bg-white"
                                     }`}
                                   ></div>
                                   Stok: {stokDus}/{barang.jenisKemasan}
-                                  {stokPcs > 0 &&
-                                    ` ${stokPcs}/pcs`}
+                                  {stokPcs > 0 && ` ${stokPcs}/pcs`}
                                 </span>
                               </div>
 
@@ -1655,8 +1653,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   isLimitReached
                                     ? "text-red-600 animate-pulse"
                                     : isNearLimit
-                                    ? "text-orange-600"
-                                    : "text-blue-600"
+                                      ? "text-orange-600"
+                                      : "text-blue-600"
                                 }`}
                               >
                                 <div
@@ -1664,8 +1662,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     isLimitReached
                                       ? "bg-red-50 border-red-200"
                                       : isNearLimit
-                                      ? "bg-orange-50 border-orange-200"
-                                      : "bg-blue-50 border-blue-200"
+                                        ? "bg-orange-50 border-orange-200"
+                                        : "bg-blue-50 border-blue-200"
                                   }`}
                                 >
                                   <AlertCircle className="w-3 h-3" />
@@ -1717,20 +1715,22 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                           <div className="flex-shrink-0">
                             <button
                               onClick={() => handleQuickAddItem(barang)}
-                              disabled={loading || isLowStock || isLimitReached}
+                              disabled={
+                                loading || isLowStock /* || isLimitReached */
+                              }
                               className={`relative overflow-hidden p-2 rounded-xl transition-all duration-300 transform ${
-                                isLowStock || isLimitReached
+                                isLowStock /* || isLimitReached */
                                   ? "bg-gray-300 cursor-not-allowed opacity-50"
                                   : "bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl active:scale-95 group-hover:scale-110"
                               }`}
                             >
-                              {!isLowStock && !isLimitReached && (
+                              {!isLowStock /* && !isLimitReached */ && (
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
                               )}
 
                               <Plus
                                 className={`w-6 h-6 relative z-10 ${
-                                  isLowStock || isLimitReached
+                                  isLowStock /* || isLimitReached */
                                     ? "text-gray-500"
                                     : "text-white"
                                 }`}
@@ -1835,7 +1835,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                               }
                               className="w-24 text-right text-xs border-2 border-blue-300 rounded-lg px-2 py-1 font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                               placeholder={formatRupiahInput(
-                                String(item.barang.hargaJual)
+                                String(item.barang.hargaJual),
                               )}
                             />
                           </div>
@@ -1864,12 +1864,12 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                 onChange={(e) =>
                                   handleItemHargaBeliChange(
                                     item,
-                                    e.target.value
+                                    e.target.value,
                                   )
                                 }
                                 className="w-24 text-right text-xs border-2 border-amber-300 rounded-lg px-2 py-1 font-bold bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                 placeholder={formatRupiahInput(
-                                  String(item.barang.hargaBeli)
+                                  String(item.barang.hargaBeli),
                                 )}
                               />
                             </div>
@@ -1898,7 +1898,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     handleUpdateItem(
                                       item.tempId,
                                       "jumlahDus",
-                                      Math.max(0, item.jumlahDus - 1)
+                                      Math.max(0, item.jumlahDus - 1),
                                     )
                                   }
                                   className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
@@ -1915,7 +1915,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     handleUpdateItem(
                                       item.tempId,
                                       "jumlahDus",
-                                      Math.max(0, parseInt(e.target.value) || 0)
+                                      Math.max(
+                                        0,
+                                        parseInt(e.target.value) || 0,
+                                      ),
                                     )
                                   }
                                   onWheel={(e) =>
@@ -1929,7 +1932,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     handleUpdateItem(
                                       item.tempId,
                                       "jumlahDus",
-                                      item.jumlahDus + 1
+                                      item.jumlahDus + 1,
                                     )
                                   }
                                   className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
@@ -1953,7 +1956,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     handleUpdateItem(
                                       item.tempId,
                                       "jumlahPcs",
-                                      Math.max(0, item.jumlahPcs - 1)
+                                      Math.max(0, item.jumlahPcs - 1),
                                     )
                                   }
                                   className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
@@ -1970,7 +1973,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     handleUpdateItem(
                                       item.tempId,
                                       "jumlahPcs",
-                                      Math.max(0, parseInt(e.target.value) || 0)
+                                      Math.max(
+                                        0,
+                                        parseInt(e.target.value) || 0,
+                                      ),
                                     )
                                   }
                                   onWheel={(e) =>
@@ -1985,7 +1991,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                     handleUpdateItem(
                                       item.tempId,
                                       "jumlahPcs",
-                                      item.jumlahPcs + 1
+                                      item.jumlahPcs + 1,
                                     )
                                   }
                                   className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
@@ -2010,7 +2016,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   handleUpdateItem(
                                     item.tempId,
                                     "jumlahPcs",
-                                    Math.max(0, item.jumlahPcs - 1)
+                                    Math.max(0, item.jumlahPcs - 1),
                                   )
                                 }
                                 className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
@@ -2027,7 +2033,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   handleUpdateItem(
                                     item.tempId,
                                     "jumlahPcs",
-                                    Math.max(0, parseInt(e.target.value) || 0)
+                                    Math.max(0, parseInt(e.target.value) || 0),
                                   )
                                 }
                                 onWheel={(e) =>
@@ -2041,7 +2047,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                   handleUpdateItem(
                                     item.tempId,
                                     "jumlahPcs",
-                                    item.jumlahPcs + 1
+                                    item.jumlahPcs + 1,
                                   )
                                 }
                                 className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
@@ -2079,7 +2085,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                                 handleItemDiskonChange(
                                   item,
                                   e.target.value,
-                                  itemDiskonTypes[item.tempId] || "rupiah"
+                                  itemDiskonTypes[item.tempId] || "rupiah",
                                 )
                               }
                               className="w-20 text-right text-xs border-2 border-yellow-300 rounded-lg px-2 py-1 font-bold bg-white focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all"
@@ -2100,9 +2106,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                               Math.round(
                                 (item.hargaJual /
                                   item.barang.jumlahPerKemasan) *
-                                  item.jumlahPcs
+                                  item.jumlahPcs,
                               ) -
-                              item.diskonPerItem * item.jumlahDus
+                              item.diskonPerItem * item.jumlahDus,
                           )}
                         </p>
                       </div>
@@ -2170,12 +2176,13 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                       />
                     </div>
                   </div>
-
                 </div>
 
                 {/* Total Besar */}
                 <div className="mt-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl px-4 py-4 flex items-center justify-between shadow-lg">
-                  <span className="text-white font-bold text-lg uppercase tracking-wide">TOTAL</span>
+                  <span className="text-white font-bold text-lg uppercase tracking-wide">
+                    TOTAL
+                  </span>
                   <span className="text-white font-extrabold text-4xl">
                     {formatRupiah(Math.max(0, calculatedTotal))}
                   </span>
@@ -2456,7 +2463,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                         key={percent}
                         onClick={() => {
                           const total = Math.round(
-                            Math.max(0, calculatedTotal) * (percent / 750000)
+                            Math.max(0, calculatedTotal) * (percent / 750000),
                           );
                           setJumlahByNumber(setJumlahDibayar, total);
                         }}
@@ -2465,8 +2472,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                         {percent === 375000
                           ? "50%"
                           : percent === 562500
-                          ? "75%"
-                          : "100%"}
+                            ? "75%"
+                            : "100%"}
                       </button>
                     ))}
                   </div>
@@ -2480,8 +2487,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                     paymentStatus.status === "LUNAS"
                       ? "bg-green-50 border border-green-200"
                       : paymentStatus.canCheckout
-                      ? "bg-yellow-50 border border-yellow-200"
-                      : "bg-red-50 border border-red-200"
+                        ? "bg-yellow-50 border border-yellow-200"
+                        : "bg-red-50 border border-red-200"
                   }`}
                 >
                   {paymentStatus.status === "LUNAS" ? (
@@ -2634,13 +2641,11 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                       receiptData.metodePembayaran === "CASH"
                         ? "bg-green-100 text-green-700"
                         : receiptData.metodePembayaran === "TRANSFER"
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-blue-100 text-blue-700"
+                          ? "bg-purple-100 text-purple-700"
+                          : "bg-blue-100 text-blue-700"
                     }`}
                   >
-                    {formatMetodePembayaranLabel(
-                      receiptData.metodePembayaran
-                    )}
+                    {formatMetodePembayaranLabel(receiptData.metodePembayaran)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -2694,7 +2699,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   onClick={() => {
                     window.open(
                       `/api/penjualan/${receiptData.id}/print-receipt`,
-                      "_blank"
+                      "_blank",
                     );
                   }}
                   className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98"

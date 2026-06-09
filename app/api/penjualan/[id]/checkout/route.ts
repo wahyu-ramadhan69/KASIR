@@ -233,14 +233,15 @@ export async function POST(
         const totalSetelahCheckout = totalTerjualHariIni + totalPcsItem;
 
         if (totalSetelahCheckout > limitPenjualan) {
-          const sisaLimit = Math.max(0, limitPenjualan - totalTerjualHariIni);
-          return NextResponse.json(
-            {
-              success: false,
-              error: `CHECKOUT DITOLAK - LIMIT TERLAMPAUI!\n\n📦 ${item.barang.namaBarang}\n⚠️ Limit: ${limitPenjualan} unit/hari\n✅ Terjual: ${totalTerjualHariIni} unit\n🔸 Sisa: ${sisaLimit} unit\n🛒 Keranjang: ${totalPcsItem} unit\n\nKurangi jumlah atau hubungi admin!`,
-            },
-            { status: 400 }
-          );
+          // Limit hanya bersifat peringatan, tidak memblokir checkout
+          // const sisaLimit = Math.max(0, limitPenjualan - totalTerjualHariIni);
+          // return NextResponse.json(
+          //   {
+          //     success: false,
+          //     error: `CHECKOUT DITOLAK - LIMIT TERLAMPAUI!\n\n📦 ${item.barang.namaBarang}\n⚠️ Limit: ${limitPenjualan} unit/hari\n✅ Terjual: ${totalTerjualHariIni} unit\n🔸 Sisa: ${sisaLimit} unit\n🛒 Keranjang: ${totalPcsItem} unit\n\nKurangi jumlah atau hubungi admin!`,
+          //   },
+          //   { status: 400 }
+          // );
         }
       }
     }

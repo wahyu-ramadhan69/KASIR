@@ -513,12 +513,12 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         toast.error(
           `Limit harian untuk ${barang.namaBarang} sudah tercapai (${limitPenjualan} pcs)`
         );
-        return;
+        // return; // limit tidak memblokir penjualan
       }
 
       if (addPcs > remainingLimit) {
         toast.error(`Limit penjualan harian telah tercapai !`);
-        return;
+        // return; // limit tidak memblokir penjualan
       }
     }
 
@@ -588,7 +588,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           limitPenjualan > 0
             ? Math.max(0, limitPenjualan - Math.max(0, todaySold - originalQty))
             : Number.POSITIVE_INFINITY;
-        const maxAllowed = Math.min(stokTersedia, allowedByLimit);
+        // const maxAllowed = Math.min(stokTersedia, allowedByLimit); // limit tidak memblokir
+        const maxAllowed = stokTersedia;
 
         if (totalPcs > maxAllowed) {
           let clampedDus = updatedItem.jumlahDus;
@@ -1677,20 +1678,20 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                           <div className="flex-shrink-0">
                             <button
                               onClick={() => handleQuickAddItem(barang)}
-                              disabled={loading || isLowStock || isLimitReached}
+                              disabled={loading || isLowStock /* || isLimitReached */}
                               className={`relative overflow-hidden p-2 rounded-xl transition-all duration-300 transform ${
-                                isLowStock || isLimitReached
+                                isLowStock /* || isLimitReached */
                                   ? "bg-gray-300 cursor-not-allowed opacity-50"
                                   : "bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl active:scale-95 group-hover:scale-110"
                               }`}
                             >
-                              {!isLowStock && !isLimitReached && (
+                              {!isLowStock /* && !isLimitReached */ && (
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
                               )}
 
                               <Plus
                                 className={`w-6 h-6 relative z-10 ${
-                                  isLowStock || isLimitReached
+                                  isLowStock /* || isLimitReached */
                                     ? "text-gray-500"
                                     : "text-white"
                                 }`}

@@ -335,14 +335,15 @@ export async function POST(
         );
         const totalSetelahEdit = totalTerjualHariIni + newQty;
         if (totalSetelahEdit > limitPenjualan) {
-          const sisaLimit = Math.max(0, limitPenjualan - totalTerjualHariIni);
-          return NextResponse.json(
-            {
-              success: false,
-              error: `LIMIT PENJUALAN TERLAMPAUI!\n\n📦 ${barang.namaBarang}\n⚠️ Limit: ${limitPenjualan} unit/hari\n✅ Terjual: ${totalTerjualHariIni} unit\n🔸 Sisa: ${sisaLimit} unit\n❌ Diubah menjadi: ${newQty} unit\n\nSilakan kurangi jumlah!`,
-            },
-            { status: 400 }
-          );
+          // Limit hanya bersifat peringatan, tidak memblokir edit
+          // const sisaLimit = Math.max(0, limitPenjualan - totalTerjualHariIni);
+          // return NextResponse.json(
+          //   {
+          //     success: false,
+          //     error: `LIMIT PENJUALAN TERLAMPAUI!\n\n📦 ${barang.namaBarang}\n⚠️ Limit: ${limitPenjualan} unit/hari\n✅ Terjual: ${totalTerjualHariIni} unit\n🔸 Sisa: ${sisaLimit} unit\n❌ Diubah menjadi: ${newQty} unit\n\nSilakan kurangi jumlah!`,
+          //   },
+          //   { status: 400 }
+          // );
         }
       }
     }
