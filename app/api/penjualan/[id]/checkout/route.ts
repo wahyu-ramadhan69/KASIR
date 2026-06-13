@@ -168,7 +168,7 @@ export async function POST(
   }
   try {
     const authData = await getAuthData();
-    const userId = authData?.userId ? parseInt(authData.userId, 10) : undefined;
+    const authUserId = authData?.userId ? parseInt(authData.userId, 10) : undefined;
     const { id } = await params;
     const penjualanId = parseInt(id);
     const body = await request.json();
@@ -203,6 +203,8 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    const userId = authUserId ?? (penjualan.userId ?? undefined);
 
     if (penjualan.statusTransaksi !== "KERANJANG") {
       return NextResponse.json(
