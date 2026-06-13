@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       where: {
         tanggalBayar: { gte: startDate, lte: endDate },
         jenisPembayaran: "PENJUALAN",
-        penjualan: { statusTransaksi: "SELESAI" },
+        penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
         ...(shouldFilterByUser ? { userId } : {}),
       },
       _sum: { nominal: true },
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       where: {
         tanggalBayar: { gte: startDate, lte: endDate },
         jenisPembayaran: "PIUTANG",
-        penjualan: { statusTransaksi: "SELESAI" },
+        penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
         ...(shouldFilterByUser ? { userId } : {}),
       },
       _sum: { nominal: true },
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
     const pembayaranAgg = await prisma.pembayaranPenjualan.aggregate({
       where: {
         tanggalBayar: { gte: startDate, lte: endDate },
-        penjualan: { statusTransaksi: "SELESAI" },
+        penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
         ...(shouldFilterByUser ? { userId } : {}),
       },
       _sum: { totalCash: true, totalTransfer: true },

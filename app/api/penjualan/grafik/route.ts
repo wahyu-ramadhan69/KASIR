@@ -183,7 +183,7 @@ export async function GET(request: Request) {
         where: {
           tanggalBayar: { gte: startDate, lte: today },
           jenisPembayaran: "PIUTANG",
-          penjualan: { isDeleted: false },
+          penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
           ...(shouldFilterByUser ? { userId } : {}),
         },
         select: { tanggalBayar: true, nominal: true },
