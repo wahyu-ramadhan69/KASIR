@@ -267,8 +267,21 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
-    const penjualanWithCalculation = penjualan.map((p) => ({
+    let userMap: Record<number, { username: string; role: string }> = {};
+    if (penjualan.length > 0) {
+      const userIds = [...new Set(penjualan.map((p: any) => p.userId).filter(Boolean))] as number[];
+      if (userIds.length > 0) {
+        const users = await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, username: true, role: true },
+        });
+        userMap = Object.fromEntries(users.map((u) => [u.id, { username: u.username, role: u.role }]));
+      }
+    }
+
+    const penjualanWithCalculation = penjualan.map((p: any) => ({
       ...p,
+      inputBy: p.userId ? (userMap[p.userId] ?? null) : null,
       calculation: calculatePenjualan(p.items, Number(p.diskonNota)),
     }));
 

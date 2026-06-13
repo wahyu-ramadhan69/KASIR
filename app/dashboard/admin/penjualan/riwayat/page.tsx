@@ -89,6 +89,7 @@ interface PenjualanHeader {
   customer: Customer | null;
   sales: Sales | null;
   items: PenjualanItem[];
+  inputBy: { username: string; role: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -719,6 +720,9 @@ const RiwayatPenjualanPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Status
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Diinput Oleh
+                    </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Aksi
                     </th>
@@ -728,7 +732,7 @@ const RiwayatPenjualanPage = () => {
                   {penjualanList.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         <Receipt className="w-12 h-12 mx-auto mb-2 text-gray-300" />
@@ -813,6 +817,25 @@ const RiwayatPenjualanPage = () => {
                                 </span>
                               )}
                             </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {pj.inputBy ? (
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded font-medium ${
+                                  pj.inputBy.role === "ADMIN"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : pj.inputBy.role === "KASIR"
+                                      ? "bg-green-100 text-green-700"
+                                      : pj.inputBy.role === "SALES"
+                                        ? "bg-purple-100 text-purple-700"
+                                        : "bg-gray-100 text-gray-600"
+                                }`}
+                              >
+                                {pj.inputBy.role}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-center">
                             <div className="flex items-center justify-center gap-2">
