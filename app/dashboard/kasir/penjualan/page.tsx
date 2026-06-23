@@ -1141,16 +1141,19 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         };
       }
 
-      const sisaLimit = getSisaLimitPiutang(selectedCustomer);
-      if (selectedCustomer.limit_piutang > 0 && sisaHutang > sisaLimit) {
+      const sisaLimit = customerHutangInfo
+        ? customerHutangInfo.sisaLimitHutang
+        : getSisaLimitPiutang(selectedCustomer);
+      const limitPiutang = customerHutangInfo
+        ? customerHutangInfo.limit_piutang
+        : selectedCustomer.limit_piutang;
+      if (limitPiutang > 0 && sisaHutang > sisaLimit) {
         return {
           status: "HUTANG",
           kembalian: 0,
           sisaHutang,
-          canCheckout: true,
-          message: `Piutang melebihi limit! Sisa limit: ${formatRupiah(
-            sisaLimit
-          )}`,
+          canCheckout: false,
+          message: `Checkout tidak bisa dilakukan! Hutang baru ${formatRupiah(sisaHutang)} melebihi sisa limit piutang customer ${formatRupiah(sisaLimit)}.`,
         };
       }
 

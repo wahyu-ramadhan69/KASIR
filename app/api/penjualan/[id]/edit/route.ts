@@ -382,6 +382,51 @@ export async function POST(
         ? Math.max(0, oldTotalHarga - oldJumlahDibayar)
         : 0;
 
+    // Validasi limit piutang customer sebelum transaksi (hanya untuk penjualan toko)
+    if (!penjualan.karyawanId) {
+      const targetCustomerId = body.customerId
+        ? parseInt(body.customerId)
+        : penjualan.customerId;
+
+      if (targetCustomerId) {
+        const normalizedForCalc = itemsPayload.map((item: any) => ({
+          ...item,
+          barang: barangById.get(Number(item.barangId)),
+        }));
+        const preCalc = calculatePenjualan(normalizedForCalc, diskonNota);
+        const newTotalHarga = preCalc.ringkasan.totalHarga;
+        const newSisaHutang =
+          jumlahDibayar >= newTotalHarga ? 0 : newTotalHarga - jumlahDibayar;
+
+        if (newSisaHutang > 0) {
+          const customer = await prisma.customer.findUnique({
+            where: { id: targetCustomerId },
+          });
+
+          if (customer) {
+            const limitPiutang = toNumber(customer.limit_piutang);
+            if (limitPiutang > 0) {
+              const piutangSekarang = toNumber(customer.piutang);
+              const isSameCustomer = penjualan.customerId === targetCustomerId;
+              const oldContribution = isSameCustomer ? oldSisaHutang : 0;
+              const piutangBaru = piutangSekarang - oldContribution + newSisaHutang;
+
+              if (piutangBaru > limitPiutang) {
+                const sisaLimit = Math.max(0, limitPiutang - piutangSekarang + oldContribution);
+                return NextResponse.json(
+                  {
+                    success: false,
+                    error: `Edit ditolak! Hutang baru Rp ${newSisaHutang.toLocaleString("id-ID")} melebihi sisa limit piutang customer Rp ${sisaLimit.toLocaleString("id-ID")}.`,
+                  },
+                  { status: 400 }
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const keptItemIds = new Set<number>();
 

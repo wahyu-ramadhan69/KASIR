@@ -315,7 +315,14 @@ export async function POST(
       const piutangBaru = piutangSekarang + sisaHutang;
 
       if (limitPiutang > 0 && piutangBaru > limitPiutang) {
-        // Over-limit tetap boleh, tapi limit_piutang tidak diubah
+        const sisaLimit = Math.max(0, limitPiutang - piutangSekarang);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Checkout ditolak! Hutang baru Rp ${sisaHutang.toLocaleString("id-ID")} melebihi sisa limit piutang customer Rp ${sisaLimit.toLocaleString("id-ID")}.`,
+          },
+          { status: 400 }
+        );
       }
     } else if (statusPembayaran === "HUTANG" && !isPenjualanSales) {
       return NextResponse.json(
