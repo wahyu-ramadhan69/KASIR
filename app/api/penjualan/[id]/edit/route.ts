@@ -651,8 +651,10 @@ export async function POST(
 
       if (nextCustomerId) {
         updateData.customer = { connect: { id: nextCustomerId } };
+        updateData.namaCustomer = null;
       } else {
         updateData.customer = { disconnect: true };
+        updateData.namaCustomer = nextNamaCustomer;
       }
 
       const updatedHeader = await tx.penjualanHeader.update({
@@ -727,38 +729,36 @@ export async function POST(
         }
       }
 
-      if (!updatedHeader.karyawanId) {
-        const oldCustomerId = penjualan.customerId;
-        const newCustomerId = updatedHeader.customerId;
-        const newSisaHutang = sisaHutang;
+      const oldCustomerId = penjualan.customerId;
+      const newCustomerId = updatedHeader.customerId;
+      const newSisaHutang = sisaHutang;
 
-        if (oldCustomerId && oldCustomerId !== newCustomerId && oldSisaHutang) {
-          await tx.customer.update({
-            where: { id: oldCustomerId },
-            data: { piutang: { decrement: BigInt(oldSisaHutang) } },
-          });
-        }
+      if (oldCustomerId && oldCustomerId !== newCustomerId && oldSisaHutang) {
+        await tx.customer.update({
+          where: { id: oldCustomerId },
+          data: { piutang: { decrement: BigInt(oldSisaHutang) } },
+        });
+      }
 
-        if (newCustomerId && oldCustomerId !== newCustomerId && newSisaHutang) {
+      if (newCustomerId && oldCustomerId !== newCustomerId && newSisaHutang) {
+        await tx.customer.update({
+          where: { id: newCustomerId },
+          data: { piutang: { increment: BigInt(newSisaHutang) } },
+        });
+      }
+
+      if (newCustomerId && oldCustomerId === newCustomerId) {
+        const deltaPiutang = newSisaHutang - oldSisaHutang;
+        if (deltaPiutang > 0) {
           await tx.customer.update({
             where: { id: newCustomerId },
-            data: { piutang: { increment: BigInt(newSisaHutang) } },
+            data: { piutang: { increment: BigInt(deltaPiutang) } },
           });
-        }
-
-        if (newCustomerId && oldCustomerId === newCustomerId) {
-          const deltaPiutang = newSisaHutang - oldSisaHutang;
-          if (deltaPiutang > 0) {
-            await tx.customer.update({
-              where: { id: newCustomerId },
-              data: { piutang: { increment: BigInt(deltaPiutang) } },
-            });
-          } else if (deltaPiutang < 0) {
-            await tx.customer.update({
-              where: { id: newCustomerId },
-              data: { piutang: { decrement: BigInt(Math.abs(deltaPiutang)) } },
-            });
-          }
+        } else if (deltaPiutang < 0) {
+          await tx.customer.update({
+            where: { id: newCustomerId },
+            data: { piutang: { decrement: BigInt(Math.abs(deltaPiutang)) } },
+          });
         }
       }
 
