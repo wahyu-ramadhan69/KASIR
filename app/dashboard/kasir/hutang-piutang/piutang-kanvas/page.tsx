@@ -293,6 +293,8 @@ const RiwayatPenjualanPage = () => {
       params.append("pembayaran", filterPembayaran);
     }
 
+    params.append("excludeDeleted", "1");
+
     if (debouncedSearch) {
       params.append("search", debouncedSearch);
     }
