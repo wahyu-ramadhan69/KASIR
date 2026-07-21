@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Calendar,
   FileSpreadsheet,
@@ -7,8 +7,14 @@ import {
   TrendingUp,
   ShoppingCart,
   Loader2,
+  User,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+
+interface KasirUser {
+  id: number;
+  username: string;
+}
 
 const toInputDate = (date: Date): string => {
   const year = date.getFullYear();
@@ -30,19 +36,65 @@ const LaporanLengkapPage = () => {
     getDefaultStartDate()
   );
   const [endDate, setEndDate] = useState<string>(() => getDefaultEndDate());
-  const [mode, setMode] = useState<"summary" | "detail">("summary");
+  const [mode, setMode] = useState<"summary" | "detail" | "kasir">("summary");
   const [exporting, setExporting] = useState<boolean>(false);
+  const [kasirList, setKasirList] = useState<KasirUser[]>([]);
+  const [selectedKasirId, setSelectedKasirId] = useState<string>("");
+  const [loadingKasir, setLoadingKasir] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (mode !== "kasir" || kasirList.length > 0) return;
+
+    const fetchKasir = async () => {
+      setLoadingKasir(true);
+      try {
+        const res = await fetch("/api/users");
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        const json = await res.json();
+        const users: KasirUser[] = (json.data || [])
+          .filter((u: { role: string }) => u.role === "KASIR")
+          .map((u: { id: number; username: string }) => ({
+            id: u.id,
+            username: u.username,
+          }));
+        setKasirList(users);
+      } catch (error) {
+        console.error("Error fetching kasir list:", error);
+        toast.error("Gagal memuat daftar kasir");
+      } finally {
+        setLoadingKasir(false);
+      }
+    };
+
+    fetchKasir();
+  }, [mode, kasirList.length]);
+
+  const handleModeChange = (newMode: "summary" | "detail" | "kasir") => {
+    setMode(newMode);
+    setStartDate(getDefaultEndDate());
+    setEndDate(getDefaultEndDate());
+  };
 
   const handleExport = async () => {
+    if (mode === "kasir" && !selectedKasirId) {
+      toast.error("Pilih kasir terlebih dahulu");
+      return;
+    }
+
     setExporting(true);
 
     try {
-      let url = `/api/laporan/all`;
+      let url = mode === "kasir" ? `/api/laporan/kasir` : `/api/laporan/all`;
 
       const params = new URLSearchParams();
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
-      params.append("mode", mode); // Add mode parameter
+
+      if (mode === "kasir") {
+        params.append("userId", selectedKasirId);
+      } else {
+        params.append("mode", mode); // Add mode parameter
+      }
 
       if (params.toString()) {
         url += `?${params.toString()}`;
@@ -60,7 +112,13 @@ const LaporanLengkapPage = () => {
       const link = document.createElement("a");
       link.href = downloadUrl;
 
-      let filename = "Laporan-Lengkap";
+      let filename =
+        mode === "kasir"
+          ? `Laporan-Kasir-${
+              kasirList.find((k) => String(k.id) === selectedKasirId)
+                ?.username ?? selectedKasirId
+            }`
+          : "Laporan-Lengkap";
       if (startDate && endDate) {
         filename += `-${startDate}-sd-${endDate}`;
       } else if (startDate) {
@@ -70,17 +128,25 @@ const LaporanLengkapPage = () => {
       } else {
         filename += "-Semua-Periode";
       }
-      filename += `-${Date.now()}.xlsx`;
+      filename += `-${Date.now()}.${mode === "kasir" ? "pdf" : "xlsx"}`;
 
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
 
-      toast.success("Laporan lengkap berhasil didownload!");
+      toast.success(
+        mode === "kasir"
+          ? "Laporan kasir berhasil didownload!"
+          : "Laporan lengkap berhasil didownload!"
+      );
     } catch (error) {
       console.error("Error exporting:", error);
-      toast.error("Gagal export laporan lengkap");
+      toast.error(
+        mode === "kasir"
+          ? "Gagal export laporan kasir"
+          : "Gagal export laporan lengkap"
+      );
     } finally {
       setExporting(false);
     }
@@ -187,7 +253,7 @@ const LaporanLengkapPage = () => {
             </label>
             <div className="flex gap-3">
               <button
-                onClick={() => setMode("summary")}
+                onClick={() => handleModeChange("summary")}
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all border-2 ${
                   mode === "summary"
                     ? "bg-blue-600 text-white border-blue-600"
@@ -205,7 +271,7 @@ const LaporanLengkapPage = () => {
                 </div>
               </button>
               <button
-                onClick={() => setMode("detail")}
+                onClick={() => handleModeChange("detail")}
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all border-2 ${
                   mode === "detail"
                     ? "bg-blue-600 text-white border-blue-600"
@@ -220,7 +286,46 @@ const LaporanLengkapPage = () => {
                   </div>
                 </div>
               </button>
+              <button
+                onClick={() => handleModeChange("kasir")}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all border-2 ${
+                  mode === "kasir"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <User className="w-5 h-5" />
+                  <div className="text-left">
+                    <div className="font-semibold">Kasir</div>
+                    <div className="text-xs opacity-80">Laporan per kasir (PDF)</div>
+                  </div>
+                </div>
+              </button>
             </div>
+
+            {mode === "kasir" && (
+              <div className="mt-4">
+                <label className="block text-xs text-gray-500 mb-2">
+                  Pilih Kasir
+                </label>
+                <select
+                  value={selectedKasirId}
+                  onChange={(e) => setSelectedKasirId(e.target.value)}
+                  disabled={loadingKasir}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white disabled:bg-gray-100"
+                >
+                  <option value="">
+                    {loadingKasir ? "Memuat daftar kasir..." : "-- Pilih Kasir --"}
+                  </option>
+                  {kasirList.map((kasir) => (
+                    <option key={kasir.id} value={kasir.id}>
+                      {kasir.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Date Range Filter */}
@@ -382,7 +487,7 @@ const LaporanLengkapPage = () => {
           {/* Export Button */}
           <button
             onClick={handleExport}
-            disabled={exporting}
+            disabled={exporting || (mode === "kasir" && !selectedKasirId)}
             className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 text-white py-4 rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 text-lg"
           >
             {exporting ? (
@@ -393,7 +498,9 @@ const LaporanLengkapPage = () => {
             ) : (
               <>
                 <Download className="w-6 h-6" />
-                Download Laporan Lengkap (Excel)
+                {mode === "kasir"
+                  ? "Download Laporan Kasir (PDF)"
+                  : "Download Laporan Lengkap (Excel)"}
               </>
             )}
           </button>

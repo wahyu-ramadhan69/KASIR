@@ -55,25 +55,70 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get("date");
-    const baseDate = dateParam ? new Date(`${dateParam}T00:00:00`) : new Date();
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
 
-    const startDate = new Date(baseDate);
+    const rangeStart = startDateParam
+      ? new Date(`${startDateParam}T00:00:00`)
+      : dateParam
+      ? new Date(`${dateParam}T00:00:00`)
+      : new Date();
+    const rangeEnd = endDateParam
+      ? new Date(`${endDateParam}T00:00:00`)
+      : dateParam
+      ? new Date(`${dateParam}T00:00:00`)
+      : new Date();
+
+    const startDate = new Date(rangeStart);
     startDate.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(baseDate);
+    const endDate = new Date(rangeEnd);
     endDate.setHours(23, 59, 59, 999);
+
+    const isSingleDay = startDate.toDateString() === endDate.toDateString();
 
     const roleUpper = authData.role?.toUpperCase();
     const isAdmin = roleUpper === "ADMIN";
-    const userId = Number(authData.userId);
-    const shouldFilterByUser = !isAdmin && !Number.isNaN(userId);
+    const requestedUserId = searchParams.get("userId");
+
+    let targetUserId: number | null = null;
+    let targetUsername: string | null = null;
+
+    if (isAdmin) {
+      if (requestedUserId) {
+        const parsedUserId = Number(requestedUserId);
+        if (!Number.isNaN(parsedUserId)) {
+          const targetUser = await prisma.user.findUnique({
+            where: { id: parsedUserId },
+            select: { id: true, username: true },
+          });
+          if (!targetUser) {
+            return NextResponse.json(
+              { error: "Kasir tidak ditemukan" },
+              { status: 404 }
+            );
+          }
+          targetUserId = targetUser.id;
+          targetUsername = targetUser.username;
+        }
+      }
+    } else {
+      const selfUserId = Number(authData.userId);
+      if (!Number.isNaN(selfUserId)) {
+        targetUserId = selfUserId;
+        targetUsername = authData.username;
+      }
+    }
+
+    const shouldFilterByUser = targetUserId !== null;
+    const userId = targetUserId ?? undefined;
 
     const penjualanAgg = await prisma.pembayaranPenjualan.aggregate({
       where: {
         tanggalBayar: { gte: startDate, lte: endDate },
         jenisPembayaran: "PENJUALAN",
         penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
-        ...(shouldFilterByUser ? { userId } : {}),
+        ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
       _sum: { nominal: true },
     });
@@ -83,7 +128,7 @@ export async function GET(request: NextRequest) {
         tanggalBayar: { gte: startDate, lte: endDate },
         jenisPembayaran: "PIUTANG",
         penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
-        ...(shouldFilterByUser ? { userId } : {}),
+        ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
       _sum: { nominal: true },
     });
@@ -92,7 +137,7 @@ export async function GET(request: NextRequest) {
       where: {
         tanggalBayar: { gte: startDate, lte: endDate },
         penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
-        ...(shouldFilterByUser ? { userId } : {}),
+        ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
       _sum: { totalCash: true, totalTransfer: true },
     });
@@ -100,7 +145,7 @@ export async function GET(request: NextRequest) {
     const pengeluaranAgg = await prisma.pengeluaran.aggregate({
       where: {
         tanggalInput: { gte: startDate, lte: endDate },
-        ...(shouldFilterByUser ? { userId } : {}),
+        ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
       _sum: { jumlah: true },
     });
@@ -109,7 +154,7 @@ export async function GET(request: NextRequest) {
       where: {
         tanggalPengembalian: { gte: startDate, lte: endDate },
         kondisiBarang: { in: ["RUSAK", "KADALUARSA"] },
-        ...(shouldFilterByUser ? { userId } : {}),
+        ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
       select: {
         jumlahDus: true,
@@ -128,7 +173,7 @@ export async function GET(request: NextRequest) {
         tanggalTransaksi: { gte: startDate, lte: endDate },
         statusTransaksi: "SELESAI",
         statusPembayaran: "HUTANG",
-        ...(shouldFilterByUser ? { userId } : {}),
+        ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
       select: {
         totalHarga: true,
@@ -212,20 +257,31 @@ export async function GET(request: NextRequest) {
       .fillColor("#ffffff")
       .fontSize(20)
       .font("Helvetica-Bold")
-      .text("Laporan Kasir Harian", 120, 28, { align: "left" });
+      .text(
+        isSingleDay ? "Laporan Kasir Harian" : "Laporan Kasir Periode",
+        120,
+        28,
+        { align: "left" }
+      );
 
     doc
       .fontSize(11)
       .font("Helvetica")
       .fillColor("#cbd5f5")
-      .text(`Tanggal: ${formatTanggal(startDate)}`, 120, 55);
+      .text(
+        isSingleDay
+          ? `Tanggal: ${formatTanggal(startDate)}`
+          : `Periode: ${formatTanggal(startDate)} - ${formatTanggal(endDate)}`,
+        120,
+        55
+      );
 
     doc
       .fontSize(10)
       .fillColor("#94a3b8")
       .text(
         shouldFilterByUser
-          ? `Petugas: ${authData.username}`
+          ? `Petugas: ${targetUsername ?? authData.username}`
           : "Ringkasan Semua Kasir",
         120,
         72
@@ -353,9 +409,15 @@ export async function GET(request: NextRequest) {
     doc.end();
 
     const pdfBuffer = await pdfBufferPromise;
-    const filename = `Laporan-Kasir-${startDate
-      .toISOString()
-      .slice(0, 10)}.pdf`;
+    const datePart = isSingleDay
+      ? startDate.toISOString().slice(0, 10)
+      : `${startDate.toISOString().slice(0, 10)}_sd_${endDate
+          .toISOString()
+          .slice(0, 10)}`;
+    const namePart = shouldFilterByUser
+      ? `-${(targetUsername ?? authData.username).replace(/\s+/g, "_")}`
+      : "";
+    const filename = `Laporan-Kasir${namePart}-${datePart}.pdf`;
 
     // Convert Buffer to Uint8Array explicitly
     const uint8Array = new Uint8Array(pdfBuffer);
