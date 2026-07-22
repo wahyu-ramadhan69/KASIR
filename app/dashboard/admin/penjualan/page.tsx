@@ -231,6 +231,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
   const [loadingEdit, setLoadingEdit] = useState<boolean>(false);
+  const [originalTransactionHutang, setOriginalTransactionHutang] = useState<{
+    customerId: number;
+    sisaHutang: number;
+  } | null>(null);
   const [originalQtyByBarangId, setOriginalQtyByBarangId] = useState<{
     [key: number]: number;
   }>({});
@@ -367,10 +371,22 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         setManualCustomerName("");
         setUseManualCustomer(false);
         fetchCustomerHutangInfo(penjualan.customer.id);
+        setOriginalTransactionHutang({
+          customerId: penjualan.customer.id,
+          sisaHutang:
+            penjualan.statusPembayaran === "HUTANG"
+              ? Math.max(
+                  0,
+                  Number(penjualan.totalHarga) -
+                    Number(penjualan.jumlahDibayar),
+                )
+              : 0,
+        });
       } else {
         setSelectedCustomer(null);
         setManualCustomerName(penjualan.namaCustomer || "");
         setUseManualCustomer(true);
+        setOriginalTransactionHutang(null);
       }
 
       setDiskonNotaType("rupiah");
@@ -891,10 +907,6 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     }
   };
 
-  const getSisaLimitPiutang = (customer: Customer): number => {
-    return Math.max(0, customer.limit_piutang - customer.piutang);
-  };
-
   const getEffectiveJumlahDibayar = (): number => {
     if (metodePembayaran === "CASH_TRANSFER") {
       return (
@@ -1122,6 +1134,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
     setSearchCustomer("");
     if (editPenjualanId) {
       setEditPenjualanId(null);
+      setOriginalTransactionHutang(null);
       router.replace("/dashboard/admin/penjualan");
     }
     setExpandCustomerSearch(false);
@@ -1179,12 +1192,27 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         };
       }
 
-      const sisaLimit = customerHutangInfo
-        ? customerHutangInfo.sisaLimitHutang
-        : getSisaLimitPiutang(selectedCustomer);
+      const piutangSekarang = customerHutangInfo
+        ? customerHutangInfo.piutang
+        : selectedCustomer.piutang;
       const limitPiutang = customerHutangInfo
         ? customerHutangInfo.limit_piutang
         : selectedCustomer.limit_piutang;
+
+      // Saat mode edit, hutang lama dari transaksi yang sedang diedit sudah
+      // termasuk di piutang customer saat ini. Tambahkan kembali kontribusi
+      // lama tersebut agar tidak dihitung dobel dengan hutang baru.
+      const oldContribution =
+        editPenjualanId &&
+        originalTransactionHutang &&
+        originalTransactionHutang.customerId === selectedCustomer.id
+          ? originalTransactionHutang.sisaHutang
+          : 0;
+      const sisaLimit = Math.max(
+        0,
+        limitPiutang - piutangSekarang + oldContribution,
+      );
+
       if (limitPiutang > 0 && sisaHutang > sisaLimit) {
         return {
           status: "HUTANG",

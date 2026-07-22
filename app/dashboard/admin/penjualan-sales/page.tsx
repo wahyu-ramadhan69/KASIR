@@ -194,6 +194,10 @@ const PenjualanPage = () => {
   const [loading, setLoading] = useState(false);
   const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
+  const [originalTransactionHutang, setOriginalTransactionHutang] = useState<{
+    customerId: number;
+    sisaHutang: number;
+  } | null>(null);
   const [originalQtyByBarangId, setOriginalQtyByBarangId] = useState<{
     [key: number]: number;
   }>({});
@@ -514,6 +518,19 @@ const PenjualanPage = () => {
 
       if (penjualan.customer?.id) {
         fetchCustomerHutangInfo(penjualan.customer.id);
+        setOriginalTransactionHutang({
+          customerId: penjualan.customer.id,
+          sisaHutang:
+            penjualan.statusPembayaran === "HUTANG"
+              ? Math.max(
+                  0,
+                  Number(penjualan.totalHarga) -
+                    Number(penjualan.jumlahDibayar),
+                )
+              : 0,
+        });
+      } else {
+        setOriginalTransactionHutang(null);
       }
     } catch (error) {
       console.error("Error loading penjualan:", error);
@@ -1440,6 +1457,7 @@ const PenjualanPage = () => {
     setExpandCustomerSearch(false);
     setExpandKaryawanSearch(false);
     setCustomerHutangInfo(null);
+    setOriginalTransactionHutang(null);
     if (editPenjualanId) {
       setEditPenjualanId(null);
       router.replace("/dashboard/admin/penjualan-sales");
@@ -1466,12 +1484,27 @@ const PenjualanPage = () => {
       const sisaHutang = total - bayar;
 
       if (selectedCustomer) {
-        const sisaLimit = customerHutangInfo
-          ? customerHutangInfo.sisaLimitHutang
-          : selectedCustomer.limit_piutang - selectedCustomer.piutang;
+        const piutangSekarang = customerHutangInfo
+          ? customerHutangInfo.piutang
+          : selectedCustomer.piutang;
         const limitPiutang = customerHutangInfo
           ? customerHutangInfo.limit_piutang
           : selectedCustomer.limit_piutang;
+
+        // Saat mode edit, hutang lama dari transaksi yang sedang diedit sudah
+        // termasuk di piutang customer saat ini. Tambahkan kembali kontribusi
+        // lama tersebut agar tidak dihitung dobel dengan hutang baru.
+        const oldContribution =
+          editPenjualanId &&
+          originalTransactionHutang &&
+          originalTransactionHutang.customerId === selectedCustomer.id
+            ? originalTransactionHutang.sisaHutang
+            : 0;
+        const sisaLimit = Math.max(
+          0,
+          limitPiutang - piutangSekarang + oldContribution,
+        );
+
         if (limitPiutang > 0 && sisaHutang > sisaLimit) {
           return {
             status: "HUTANG",
