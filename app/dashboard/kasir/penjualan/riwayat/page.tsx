@@ -177,7 +177,7 @@ const RiwayatPenjualanPage = () => {
     useState<PenjualanHeader | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [deleteTarget, setDeleteTarget] = useState<PenjualanHeader | null>(
-    null
+    null,
   );
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -244,7 +244,7 @@ const RiwayatPenjualanPage = () => {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (loadMoreRef.current) {
@@ -800,13 +800,13 @@ const RiwayatPenjualanPage = () => {
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
-                                  <Link
+                                  {/* <Link
                                     href={`/dashboard/kasir/penjualan?editId=${pj.id}`}
                                     className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
                                     title="Edit Penjualan"
                                   >
                                     <Pencil className="w-4 h-4" />
-                                  </Link>
+                                  </Link> */}
                                 </>
                               )}
                             </div>
@@ -879,7 +879,7 @@ const RiwayatPenjualanPage = () => {
                       <p className="text-sm text-gray-500">Tanggal</p>
                       <p className="font-semibold">
                         {new Date(
-                          selectedPenjualan.tanggalTransaksi
+                          selectedPenjualan.tanggalTransaksi,
                         ).toLocaleString("id-ID")}
                       </p>
                     </div>
@@ -910,7 +910,7 @@ const RiwayatPenjualanPage = () => {
                             {" "}
                             /{" "}
                             {formatRupiah(
-                              selectedPenjualan.customer.limit_piutang
+                              selectedPenjualan.customer.limit_piutang,
                             )}
                           </span>
                         </div>
@@ -965,7 +965,7 @@ const RiwayatPenjualanPage = () => {
                             </p>
                             {(() => {
                               const status = getJatuhTempoStatus(
-                                selectedPenjualan.tanggalJatuhTempo
+                                selectedPenjualan.tanggalJatuhTempo,
                               );
                               return (
                                 <span
@@ -1006,13 +1006,14 @@ const RiwayatPenjualanPage = () => {
                           item.totalItem ??
                           item.jumlahDus * jumlahPerKemasan + item.jumlahPcs;
                         const jumlahKemasan = Math.floor(
-                          totalItem / jumlahPerKemasan
+                          totalItem / jumlahPerKemasan,
                         );
                         const jumlahSisa = totalItem % jumlahPerKemasan;
                         const hargaPcs =
                           jumlahSisa > 0
                             ? Math.round(
-                                (item.hargaJual / jumlahPerKemasan) * jumlahSisa
+                                (item.hargaJual / jumlahPerKemasan) *
+                                  jumlahSisa,
                               )
                             : 0;
                         const subtotal =
@@ -1024,8 +1025,8 @@ const RiwayatPenjualanPage = () => {
                           jumlahKemasan > 0 && jumlahSisa > 0
                             ? `${jumlahKemasan} ${labelKemasan} & ${jumlahSisa} item`
                             : jumlahKemasan > 0
-                            ? `${jumlahKemasan} ${labelKemasan}`
-                            : `${jumlahSisa} item`;
+                              ? `${jumlahKemasan} ${labelKemasan}`
+                              : `${jumlahSisa} item`;
 
                         return (
                           <tr key={item.id}>
@@ -1046,7 +1047,7 @@ const RiwayatPenjualanPage = () => {
                             <td className="px-3 py-2 text-right text-red-500">
                               {item.diskonPerItem > 0
                                 ? `-${formatRupiah(
-                                    item.diskonPerItem * jumlahKemasan
+                                    item.diskonPerItem * jumlahKemasan,
                                   )}`
                                 : "-"}
                             </td>
@@ -1105,7 +1106,7 @@ const RiwayatPenjualanPage = () => {
                         window.open(
                           `/api/penjualan/${selectedPenjualan.id}/print-receipt`,
                           "_blank",
-                          "noopener,noreferrer"
+                          "noopener,noreferrer",
                         );
                       }}
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2"

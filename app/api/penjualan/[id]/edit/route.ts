@@ -1,7 +1,7 @@
 // app/api/penjualan/[id]/edit/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { isAuthenticated } from "@/app/AuthGuard";
+import { isAuthenticated, getAuthData } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
@@ -197,6 +197,12 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    const authData = await getAuthData();
+    const authUserId = authData?.userId
+      ? parseInt(authData.userId, 10)
+      : undefined;
+    const pembayaranUserId = authUserId ?? (penjualan.userId ?? undefined);
 
     if (penjualan.statusTransaksi !== "SELESAI") {
       return NextResponse.json(
@@ -724,6 +730,7 @@ export async function POST(
               totalCash: BigInt(totalCashFinal),
               totalTransfer: BigInt(totalTransferFinal),
               metode: metodePembayaran,
+              ...(pembayaranUserId ? { userId: pembayaranUserId } : {}),
             },
           });
         }
