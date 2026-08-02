@@ -124,19 +124,6 @@ export async function GET(request: NextRequest) {
       _sum: { jumlah: true },
     });
 
-    const piutangBelumDibayar = await prisma.penjualanHeader.findMany({
-      where: {
-        tanggalTransaksi: { gte: startDate, lte: endDate },
-        statusTransaksi: "SELESAI",
-        statusPembayaran: "HUTANG",
-        ...(shouldFilterByUser ? { userId: userId as number } : {}),
-      },
-      select: {
-        totalHarga: true,
-        jumlahDibayar: true,
-      },
-    });
-
     const totalPenjualanHariIni = Number(
       totalPenjualanHariIniAgg._sum.totalHarga || 0
     );
@@ -149,11 +136,10 @@ export async function GET(request: NextRequest) {
     const piutangTransfer = Number(piutangBayarAgg._sum.totalTransfer || 0);
     const totalPembayaranPiutang = piutangCash + piutangTransfer;
     const totalPengeluaran = Number(pengeluaranAgg._sum.jumlah || 0);
-    const totalSisaPiutang = piutangBelumDibayar.reduce((sum, item) => {
-      const total = Number(item.totalHarga || 0);
-      const dibayar = Number(item.jumlahDibayar || 0);
-      return sum + Math.max(0, total - dibayar);
-    }, 0);
+    const totalPiutang = Math.max(
+      0,
+      totalPenjualanHariIni - totalPembayaranPenjualan
+    );
     const setoranCash = penjualanCash + piutangCash;
     const setoranTransfer = penjualanTransfer + piutangTransfer;
 
@@ -323,7 +309,7 @@ export async function GET(request: NextRequest) {
       { label: "Total Pembayaran Piutang", value: totalPembayaranPiutang },
       { label: "Cash", value: piutangCash, indent: true },
       { label: "Transfer", value: piutangTransfer, indent: true },
-      { label: "Total Piutang", value: totalSisaPiutang },
+      { label: "Total Piutang", value: totalPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
       { label: "Setoran Cash", value: setoranCash },
       { label: "Setoran Transfer", value: setoranTransfer },
