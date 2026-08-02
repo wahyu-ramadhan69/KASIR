@@ -33,19 +33,6 @@ function formatTanggal(date: Date): string {
   }).format(date);
 }
 
-function calcKerugian(items: any[]) {
-  return items.reduce((sum, item) => {
-    const hargaBeli = Number(item.barang.hargaBeli);
-    const jumlahPerKemasan = Number(item.barang.jumlahPerKemasan);
-    const modalDus = hargaBeli * Number(item.jumlahDus);
-    const modalPcs =
-      jumlahPerKemasan > 0
-        ? Math.round((hargaBeli / jumlahPerKemasan) * Number(item.jumlahPcs))
-        : 0;
-    return sum + modalDus + modalPcs;
-  }, 0);
-}
-
 export async function GET(request: NextRequest) {
   const authData = await getAuthData();
   if (!authData) {
@@ -55,27 +42,13 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get("date");
-    const startDateParam = searchParams.get("startDate");
-    const endDateParam = searchParams.get("endDate");
+    const baseDate = dateParam ? new Date(`${dateParam}T00:00:00`) : new Date();
 
-    const rangeStart = startDateParam
-      ? new Date(`${startDateParam}T00:00:00`)
-      : dateParam
-      ? new Date(`${dateParam}T00:00:00`)
-      : new Date();
-    const rangeEnd = endDateParam
-      ? new Date(`${endDateParam}T00:00:00`)
-      : dateParam
-      ? new Date(`${dateParam}T00:00:00`)
-      : new Date();
-
-    const startDate = new Date(rangeStart);
+    const startDate = new Date(baseDate);
     startDate.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(rangeEnd);
+    const endDate = new Date(baseDate);
     endDate.setHours(23, 59, 59, 999);
-
-    const isSingleDay = startDate.toDateString() === endDate.toDateString();
 
     const roleUpper = authData.role?.toUpperCase();
     const isAdmin = roleUpper === "ADMIN";
@@ -113,29 +86,30 @@ export async function GET(request: NextRequest) {
     const shouldFilterByUser = targetUserId !== null;
     const userId = targetUserId ?? undefined;
 
-    const penjualanAgg = await prisma.pembayaranPenjualan.aggregate({
+    const totalPenjualanHariIniAgg = await prisma.penjualanHeader.aggregate({
+      where: {
+        tanggalTransaksi: { gte: startDate, lte: endDate },
+        statusTransaksi: "SELESAI",
+        isDeleted: false,
+        ...(shouldFilterByUser ? { userId: userId as number } : {}),
+      },
+      _sum: { totalHarga: true },
+    });
+
+    const penjualanBayarAgg = await prisma.pembayaranPenjualan.aggregate({
       where: {
         tanggalBayar: { gte: startDate, lte: endDate },
         jenisPembayaran: "PENJUALAN",
         penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
         ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
-      _sum: { nominal: true },
+      _sum: { totalCash: true, totalTransfer: true },
     });
 
-    const piutangAgg = await prisma.pembayaranPenjualan.aggregate({
+    const piutangBayarAgg = await prisma.pembayaranPenjualan.aggregate({
       where: {
         tanggalBayar: { gte: startDate, lte: endDate },
         jenisPembayaran: "PIUTANG",
-        penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
-        ...(shouldFilterByUser ? { userId: userId as number } : {}),
-      },
-      _sum: { nominal: true },
-    });
-
-    const pembayaranAgg = await prisma.pembayaranPenjualan.aggregate({
-      where: {
-        tanggalBayar: { gte: startDate, lte: endDate },
         penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
         ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
@@ -148,24 +122,6 @@ export async function GET(request: NextRequest) {
         ...(shouldFilterByUser ? { userId: userId as number } : {}),
       },
       _sum: { jumlah: true },
-    });
-
-    const pengembalianRusak = await prisma.pengembalianBarang.findMany({
-      where: {
-        tanggalPengembalian: { gte: startDate, lte: endDate },
-        kondisiBarang: { in: ["RUSAK", "KADALUARSA"] },
-        ...(shouldFilterByUser ? { userId: userId as number } : {}),
-      },
-      select: {
-        jumlahDus: true,
-        jumlahPcs: true,
-        barang: {
-          select: {
-            hargaBeli: true,
-            jumlahPerKemasan: true,
-          },
-        },
-      },
     });
 
     const piutangBelumDibayar = await prisma.penjualanHeader.findMany({
@@ -181,19 +137,25 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const totalPenjualan = Number(penjualanAgg._sum.nominal || 0);
-    const totalPiutang = Number(piutangAgg._sum.nominal || 0);
-    const totalCash = Number(pembayaranAgg._sum.totalCash || 0);
-    const totalTransfer = Number(pembayaranAgg._sum.totalTransfer || 0);
+    const totalPenjualanHariIni = Number(
+      totalPenjualanHariIniAgg._sum.totalHarga || 0
+    );
+    const penjualanCash = Number(penjualanBayarAgg._sum.totalCash || 0);
+    const penjualanTransfer = Number(
+      penjualanBayarAgg._sum.totalTransfer || 0
+    );
+    const totalPembayaranPenjualan = penjualanCash + penjualanTransfer;
+    const piutangCash = Number(piutangBayarAgg._sum.totalCash || 0);
+    const piutangTransfer = Number(piutangBayarAgg._sum.totalTransfer || 0);
+    const totalPembayaranPiutang = piutangCash + piutangTransfer;
     const totalPengeluaran = Number(pengeluaranAgg._sum.jumlah || 0);
-    const totalKerugian = calcKerugian(pengembalianRusak);
     const totalSisaPiutang = piutangBelumDibayar.reduce((sum, item) => {
       const total = Number(item.totalHarga || 0);
       const dibayar = Number(item.jumlahDibayar || 0);
       return sum + Math.max(0, total - dibayar);
     }, 0);
-    const totalSetoran =
-      totalPenjualan + totalPiutang - totalPengeluaran - totalKerugian;
+    const setoranCash = penjualanCash + piutangCash;
+    const setoranTransfer = penjualanTransfer + piutangTransfer;
 
     const doc = new PDFDocument({
       size: "A4",
@@ -257,24 +219,13 @@ export async function GET(request: NextRequest) {
       .fillColor("#ffffff")
       .fontSize(20)
       .font("Helvetica-Bold")
-      .text(
-        isSingleDay ? "Laporan Kasir Harian" : "Laporan Kasir Periode",
-        120,
-        28,
-        { align: "left" }
-      );
+      .text("Laporan Kasir Harian", 120, 28, { align: "left" });
 
     doc
       .fontSize(11)
       .font("Helvetica")
       .fillColor("#cbd5f5")
-      .text(
-        isSingleDay
-          ? `Tanggal: ${formatTanggal(startDate)}`
-          : `Periode: ${formatTanggal(startDate)} - ${formatTanggal(endDate)}`,
-        120,
-        55
-      );
+      .text(`Tanggal: ${formatTanggal(startDate)}`, 120, 55);
 
     doc
       .fontSize(10)
@@ -364,13 +315,18 @@ export async function GET(request: NextRequest) {
       align: "right",
     });
 
-    const rows = [
-      { label: "Pembayaran Penjualan", value: totalPenjualan },
-      { label: "Pembayaran Piutang Customer", value: totalPiutang },
-      { label: "Total Piutang Customer", value: totalSisaPiutang },
+    const rows: { label: string; value: number; indent?: boolean }[] = [
+      { label: "Total Penjualan Hari Ini (Toko & Sales)", value: totalPenjualanHariIni },
+      { label: "Total Pembayaran Penjualan", value: totalPembayaranPenjualan },
+      { label: "Cash", value: penjualanCash, indent: true },
+      { label: "Transfer", value: penjualanTransfer, indent: true },
+      { label: "Total Pembayaran Piutang", value: totalPembayaranPiutang },
+      { label: "Cash", value: piutangCash, indent: true },
+      { label: "Transfer", value: piutangTransfer, indent: true },
+      { label: "Total Piutang", value: totalSisaPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
-      { label: "Setoran Transfer", value: totalTransfer },
-      { label: "Setoran Cash", value: totalCash },
+      { label: "Setoran Cash", value: setoranCash },
+      { label: "Setoran Transfer", value: setoranTransfer },
     ];
 
     rows.forEach((row, index) => {
@@ -380,13 +336,15 @@ export async function GET(request: NextRequest) {
         .fill(index % 2 === 0 ? "#f8fafc" : "#ffffff");
 
       doc
-        .fillColor("#0f172a")
-        .font("Helvetica")
-        .fontSize(10)
-        .text(row.label, doc.page.margins.left + 14, y + 8);
+        .fillColor(row.indent ? "#64748b" : "#0f172a")
+        .font(row.indent ? "Helvetica" : "Helvetica-Bold")
+        .fontSize(row.indent ? 9 : 10)
+        .text(row.label, doc.page.margins.left + (row.indent ? 28 : 14), y + 8);
 
       doc
-        .font("Helvetica-Bold")
+        .fillColor(row.indent ? "#64748b" : "#0f172a")
+        .font(row.indent ? "Helvetica" : "Helvetica-Bold")
+        .fontSize(row.indent ? 9 : 10)
         .text(
           formatRupiah(row.value),
           doc.page.margins.left + tableWidth - 160,
@@ -409,15 +367,12 @@ export async function GET(request: NextRequest) {
     doc.end();
 
     const pdfBuffer = await pdfBufferPromise;
-    const datePart = isSingleDay
-      ? startDate.toISOString().slice(0, 10)
-      : `${startDate.toISOString().slice(0, 10)}_sd_${endDate
-          .toISOString()
-          .slice(0, 10)}`;
     const namePart = shouldFilterByUser
       ? `-${(targetUsername ?? authData.username).replace(/\s+/g, "_")}`
       : "";
-    const filename = `Laporan-Kasir${namePart}-${datePart}.pdf`;
+    const filename = `Laporan-Kasir${namePart}-${startDate
+      .toISOString()
+      .slice(0, 10)}.pdf`;
 
     // Convert Buffer to Uint8Array explicitly
     const uint8Array = new Uint8Array(pdfBuffer);

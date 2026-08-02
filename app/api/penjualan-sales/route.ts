@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     const summary = searchParams.get("summary") === "1";
     const excludeDeleted = searchParams.get("excludeDeleted") === "1";
 
-    const isPrivileged = authData.role === "ADMIN" || authData.role === "KASIR";
+    const isPrivileged = authData.role === "ADMIN";
     const baseWhere: any = {
       // Filter hanya penjualan dengan karyawan jenis SALES
       karyawan: {

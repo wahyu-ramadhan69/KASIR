@@ -41,6 +41,7 @@ const LaporanLengkapPage = () => {
   const [kasirList, setKasirList] = useState<KasirUser[]>([]);
   const [selectedKasirId, setSelectedKasirId] = useState<string>("");
   const [loadingKasir, setLoadingKasir] = useState<boolean>(false);
+  const [kasirDate, setKasirDate] = useState<string>(() => getDefaultEndDate());
 
   useEffect(() => {
     if (mode !== "kasir" || kasirList.length > 0) return;
@@ -73,6 +74,7 @@ const LaporanLengkapPage = () => {
     setMode(newMode);
     setStartDate(getDefaultEndDate());
     setEndDate(getDefaultEndDate());
+    setKasirDate(getDefaultEndDate());
   };
 
   const handleExport = async () => {
@@ -87,12 +89,13 @@ const LaporanLengkapPage = () => {
       let url = mode === "kasir" ? `/api/laporan/kasir` : `/api/laporan/all`;
 
       const params = new URLSearchParams();
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
 
       if (mode === "kasir") {
         params.append("userId", selectedKasirId);
+        if (kasirDate) params.append("date", kasirDate);
       } else {
+        if (startDate) params.append("startDate", startDate);
+        if (endDate) params.append("endDate", endDate);
         params.append("mode", mode); // Add mode parameter
       }
 
@@ -119,14 +122,18 @@ const LaporanLengkapPage = () => {
                 ?.username ?? selectedKasirId
             }`
           : "Laporan-Lengkap";
-      if (startDate && endDate) {
-        filename += `-${startDate}-sd-${endDate}`;
-      } else if (startDate) {
-        filename += `-sejak-${startDate}`;
-      } else if (endDate) {
-        filename += `-sampai-${endDate}`;
+      if (mode === "kasir") {
+        if (kasirDate) filename += `-${kasirDate}`;
       } else {
-        filename += "-Semua-Periode";
+        if (startDate && endDate) {
+          filename += `-${startDate}-sd-${endDate}`;
+        } else if (startDate) {
+          filename += `-sejak-${startDate}`;
+        } else if (endDate) {
+          filename += `-sampai-${endDate}`;
+        } else {
+          filename += "-Semua-Periode";
+        }
       }
       filename += `-${Date.now()}.${mode === "kasir" ? "pdf" : "xlsx"}`;
 
@@ -303,95 +310,126 @@ const LaporanLengkapPage = () => {
                 </div>
               </button>
             </div>
-
-            {mode === "kasir" && (
-              <div className="mt-4">
-                <label className="block text-xs text-gray-500 mb-2">
-                  Pilih Kasir
-                </label>
-                <select
-                  value={selectedKasirId}
-                  onChange={(e) => setSelectedKasirId(e.target.value)}
-                  disabled={loadingKasir}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white disabled:bg-gray-100"
-                >
-                  <option value="">
-                    {loadingKasir ? "Memuat daftar kasir..." : "-- Pilih Kasir --"}
-                  </option>
-                  {kasirList.map((kasir) => (
-                    <option key={kasir.id} value={kasir.id}>
-                      {kasir.username}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
 
           {/* Date Range Filter */}
-          <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Periode Tanggal
-            </label>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-2">
-                  Tanggal Mulai
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                  />
+          {mode !== "kasir" && (
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Periode Tanggal
+              </label>
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-2">
+                    Tanggal Mulai
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-center pb-3">
+                  <span className="text-gray-400 font-medium">—</span>
+                </div>
+
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-2">
+                    Tanggal Selesai
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-end justify-center pb-3">
-                <span className="text-gray-400 font-medium">—</span>
-              </div>
-
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-2">
-                  Tanggal Selesai
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
-                  />
+              {/* Selected Period Display */}
+              {(startDate || endDate) && (
+                <div className="mt-4 bg-blue-50 rounded-lg px-4 py-3 border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    <span className="font-semibold">Periode yang dipilih:</span>{" "}
+                    {startDate && formatDate(startDate)}
+                    {startDate && endDate && " s/d "}
+                    {endDate && formatDate(endDate)}
+                    {!startDate && endDate && `Sampai ${formatDate(endDate)}`}
+                    {startDate && !endDate && `Sejak ${formatDate(startDate)}`}
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {!startDate && !endDate && (
+                <div className="mt-4 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    <span className="font-semibold">Catatan:</span> Default
+                    periode adalah 3 bulan terakhir dari hari ini
+                  </p>
+                </div>
+              )}
             </div>
+          )}
 
-            {/* Selected Period Display */}
-            {(startDate || endDate) && (
-              <div className="mt-4 bg-blue-50 rounded-lg px-4 py-3 border border-blue-200">
-                <p className="text-sm text-blue-800">
-                  <span className="font-semibold">Periode yang dipilih:</span>{" "}
-                  {startDate && formatDate(startDate)}
-                  {startDate && endDate && " s/d "}
-                  {endDate && formatDate(endDate)}
-                  {!startDate && endDate && `Sampai ${formatDate(endDate)}`}
-                  {startDate && !endDate && `Sejak ${formatDate(startDate)}`}
-                </p>
-              </div>
-            )}
+          {/* Kasir & Tanggal Filter (Kasir mode) */}
+          {mode === "kasir" && (
+            <div className="mb-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-2">
+                    Pilih Kasir
+                  </label>
+                  <select
+                    value={selectedKasirId}
+                    onChange={(e) => setSelectedKasirId(e.target.value)}
+                    disabled={loadingKasir}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white disabled:bg-gray-100"
+                  >
+                    <option value="">
+                      {loadingKasir ? "Memuat daftar kasir..." : "-- Pilih Kasir --"}
+                    </option>
+                    {kasirList.map((kasir) => (
+                      <option key={kasir.id} value={kasir.id}>
+                        {kasir.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {!startDate && !endDate && (
-              <div className="mt-4 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
-                <p className="text-sm text-gray-600">
-                  <span className="font-semibold">Catatan:</span> Default
-                  periode adalah 3 bulan terakhir dari hari ini
-                </p>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-2">
+                    Tanggal Laporan
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="date"
+                      value={kasirDate}
+                      onChange={(e) => setKasirDate(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                    />
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
+
+              {kasirDate && (
+                <div className="mt-4 bg-blue-50 rounded-lg px-4 py-3 border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    <span className="font-semibold">Tanggal yang dipilih:</span>{" "}
+                    {formatDate(kasirDate)}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* What's Included Section */}
           <div className="mb-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-6 border border-gray-200">
