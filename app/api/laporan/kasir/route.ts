@@ -142,6 +142,7 @@ export async function GET(request: NextRequest) {
     );
     const setoranCash = penjualanCash + piutangCash;
     const setoranTransfer = penjualanTransfer + piutangTransfer;
+    const setoranCashBersih = setoranCash - totalPengeluaran;
 
     const doc = new PDFDocument({
       size: "A4",
@@ -311,8 +312,18 @@ export async function GET(request: NextRequest) {
       { label: "Transfer", value: piutangTransfer, indent: true },
       { label: "Total Piutang", value: totalPiutang },
       { label: "Total Pengeluaran", value: totalPengeluaran },
-      { label: "Setoran Cash", value: setoranCash },
-      { label: "Setoran Transfer", value: setoranTransfer },
+      {
+        label: isAdmin ? "Pemasukan Cash Kotor" : "Setoran Cash Kotor",
+        value: setoranCash,
+      },
+      {
+        label: isAdmin ? "Pemasukan Transfer Kotor" : "Setoran Transfer",
+        value: setoranTransfer,
+      },
+      {
+        label: isAdmin ? "Pemasukan Cash Bersih" : "Setoran Cash Bersih",
+        value: setoranCashBersih,
+      },
     ];
 
     rows.forEach((row, index) => {

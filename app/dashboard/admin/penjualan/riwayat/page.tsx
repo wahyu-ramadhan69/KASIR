@@ -21,6 +21,7 @@ import {
   CalendarClock,
   Pencil,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
@@ -188,6 +189,11 @@ const RiwayatPenjualanPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<PenjualanHeader | null>(
     null,
   );
+  const [showRestoreModal, setShowRestoreModal] = useState<boolean>(false);
+  const [restoreTarget, setRestoreTarget] = useState<PenjualanHeader | null>(
+    null,
+  );
+  const [isRestoring, setIsRestoring] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -400,6 +406,35 @@ const RiwayatPenjualanPage = () => {
     } catch (error) {
       console.error("Error deleting penjualan:", error);
       toast.error("Terjadi kesalahan saat menghapus penjualan");
+    }
+  };
+
+  const handleOpenRestoreModal = (penjualan: PenjualanHeader) => {
+    setRestoreTarget(penjualan);
+    setShowRestoreModal(true);
+  };
+
+  const handleRestore = async (penjualanId: number) => {
+    setIsRestoring(true);
+    try {
+      const res = await fetch(`/api/penjualan/${penjualanId}/restore`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Penjualan berhasil dipulihkan");
+        setShowRestoreModal(false);
+        setRestoreTarget(null);
+        fetchPenjualan(1, true);
+        fetchStats();
+      } else {
+        toast.error(data.error || "Gagal memulihkan penjualan");
+      }
+    } catch (error) {
+      console.error("Error restoring penjualan:", error);
+      toast.error("Terjadi kesalahan saat memulihkan penjualan");
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -846,24 +881,33 @@ const RiwayatPenjualanPage = () => {
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
-                              {pj.statusTransaksi === "SELESAI" && (
-                                <>
+                              {pj.statusTransaksi === "SELESAI" &&
+                                (pj.isDeleted ? (
                                   <button
-                                    onClick={() => handleOpenDeleteModal(pj)}
-                                    className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
-                                    title="Hapus Penjualan"
+                                    onClick={() => handleOpenRestoreModal(pj)}
+                                    className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all"
+                                    title="Batalkan Hapus (Undo)"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <RotateCcw className="w-4 h-4" />
                                   </button>
-                                  <Link
-                                    href={`/dashboard/admin/penjualan?editId=${pj.id}`}
-                                    className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
-                                    title="Edit Penjualan"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </Link>
-                                </>
-                              )}
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleOpenDeleteModal(pj)}
+                                      className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
+                                      title="Hapus Penjualan"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                    <Link
+                                      href={`/dashboard/admin/penjualan?editId=${pj.id}`}
+                                      className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                      title="Edit Penjualan"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </Link>
+                                  </>
+                                ))}
                             </div>
                           </td>
                         </tr>
@@ -1238,6 +1282,55 @@ const RiwayatPenjualanPage = () => {
                   className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-medium transition-all"
                 >
                   Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showRestoreModal && restoreTarget && (
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              if (isRestoring) return;
+              setShowRestoreModal(false);
+              setRestoreTarget(null);
+            }}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b">
+                <h3 className="text-lg font-bold text-gray-900">
+                  Batalkan Hapus Penjualan
+                </h3>
+                <p className="text-sm text-gray-600 mt-2">
+                  Pulihkan penjualan{" "}
+                  <span className="font-semibold">
+                    {restoreTarget.kodePenjualan}
+                  </span>
+                  ? Stok barang akan dikurangi kembali dan piutang customer
+                  akan disesuaikan seperti sebelum dihapus.
+                </p>
+              </div>
+              <div className="p-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowRestoreModal(false);
+                    setRestoreTarget(null);
+                  }}
+                  disabled={isRestoring}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2.5 rounded-lg font-medium transition-all disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => handleRestore(restoreTarget.id)}
+                  disabled={isRestoring}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg font-medium transition-all disabled:opacity-50"
+                >
+                  {isRestoring ? "Memulihkan..." : "Pulihkan"}
                 </button>
               </div>
             </div>
