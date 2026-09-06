@@ -141,6 +141,11 @@ const DataBarangPage = () => {
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [selectedBarang, setSelectedBarang] = useState<Barang | null>(null);
+  const [riwayatTipe, setRiwayatTipe] = useState<
+    "penjualan" | "pembelian" | null
+  >(null);
+  const [riwayatData, setRiwayatData] = useState<any[]>([]);
+  const [loadingRiwayat, setLoadingRiwayat] = useState<boolean>(false);
   const [editingBarang, setEditingBarang] = useState<{
     id: number;
     data: BarangFormData;
@@ -389,6 +394,45 @@ const DataBarangPage = () => {
       console.error("Error fetching barang:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openDetailBarang = (barang: Barang) => {
+    setSelectedBarang(barang);
+    setRiwayatTipe(null);
+    setRiwayatData([]);
+    setLoadingRiwayat(false);
+    setShowDetailModal(true);
+  };
+
+  const fetchRiwayatBarang = async (tipe: "penjualan" | "pembelian") => {
+    if (!selectedBarang) return;
+
+    // Toggle: klik tombol yang sama menutup panel tanpa query ulang
+    if (riwayatTipe === tipe) {
+      setRiwayatTipe(null);
+      setRiwayatData([]);
+      return;
+    }
+
+    setRiwayatTipe(tipe);
+    setRiwayatData([]);
+    setLoadingRiwayat(true);
+    try {
+      const res = await fetch(
+        `/api/barang/${selectedBarang.id}/riwayat?tipe=${tipe}`,
+      );
+      const data = await res.json();
+      if (data.success) {
+        setRiwayatData(data.data || []);
+      } else {
+        toast.error(data.error || "Gagal memuat riwayat");
+      }
+    } catch (error) {
+      console.error("Error fetching riwayat barang:", error);
+      toast.error("Terjadi kesalahan saat memuat riwayat");
+    } finally {
+      setLoadingRiwayat(false);
     }
   };
 
@@ -1560,10 +1604,7 @@ const DataBarangPage = () => {
                             <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-blue-50 transition-colors">
                               <div className="flex items-center justify-center gap-2">
                                 <button
-                                  onClick={() => {
-                                    setSelectedBarang(item);
-                                    setShowDetailModal(true);
-                                  }}
+                                  onClick={() => openDetailBarang(item)}
                                   className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
                                   title="Lihat Detail"
                                 >
@@ -2225,6 +2266,113 @@ const DataBarangPage = () => {
                   <p className="text-gray-900 text-lg font-semibold pl-11">
                     {selectedBarang.supplier?.namaSupplier || "-"}
                   </p>
+                </div>
+
+                {/* Riwayat / History Barang */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="bg-white p-2 rounded-lg">
+                      <Activity className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <p className="text-xs text-gray-600 font-bold uppercase tracking-wider">
+                      Riwayat Barang
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => fetchRiwayatBarang("penjualan")}
+                      className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all border-2 ${
+                        riwayatTipe === "penjualan"
+                          ? "bg-green-600 text-white border-green-600 shadow-md"
+                          : "bg-white text-green-700 border-green-200 hover:border-green-400"
+                      }`}
+                    >
+                      <TrendingUp className="w-4 h-4" />
+                      History Penjualan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fetchRiwayatBarang("pembelian")}
+                      className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all border-2 ${
+                        riwayatTipe === "pembelian"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                          : "bg-white text-blue-700 border-blue-200 hover:border-blue-400"
+                      }`}
+                    >
+                      <TrendingDown className="w-4 h-4" />
+                      History Pembelian
+                    </button>
+                  </div>
+
+                  {riwayatTipe && (
+                    <div className="mt-4">
+                      {loadingRiwayat ? (
+                        <div className="flex items-center justify-center gap-2 py-8 text-gray-500">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span className="text-sm font-medium">
+                            Memuat riwayat...
+                          </span>
+                        </div>
+                      ) : riwayatData.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-gray-500">
+                          Belum ada riwayat{" "}
+                          {riwayatTipe === "penjualan"
+                            ? "penjualan"
+                            : "pembelian"}{" "}
+                          untuk barang ini.
+                        </div>
+                      ) : (
+                        <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-200 bg-white">
+                          <table className="w-full text-xs">
+                            <thead className="sticky top-0 bg-gray-100 text-gray-600 uppercase tracking-wider">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-bold">
+                                  Tanggal
+                                </th>
+                                <th className="px-3 py-2 text-left font-bold">
+                                  Kode
+                                </th>
+                                <th className="px-3 py-2 text-right font-bold">
+                                  Qty
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {riwayatData.map((row) => {
+                                const perKemasan =
+                                  selectedBarang.jumlahPerKemasan || 1;
+                                return (
+                                  <tr key={row.id} className="hover:bg-gray-50">
+                                    <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                                      {new Date(row.tanggal).toLocaleString(
+                                        "id-ID",
+                                        {
+                                          day: "2-digit",
+                                          month: "short",
+                                          year: "numeric",
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        },
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 whitespace-nowrap font-medium text-gray-800">
+                                      {row.kode}
+                                    </td>
+                                    <td className="px-3 py-2 text-right whitespace-nowrap font-semibold text-gray-900">
+                                      {formatDecimal(row.jumlah / perKemasan)}{" "}
+                                      {selectedBarang.jenisKemasan}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
