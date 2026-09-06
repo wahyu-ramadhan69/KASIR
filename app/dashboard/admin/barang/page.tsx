@@ -146,6 +146,9 @@ const DataBarangPage = () => {
   >(null);
   const [riwayatData, setRiwayatData] = useState<any[]>([]);
   const [loadingRiwayat, setLoadingRiwayat] = useState<boolean>(false);
+  const [loadingRiwayatMore, setLoadingRiwayatMore] = useState<boolean>(false);
+  const [riwayatHasMore, setRiwayatHasMore] = useState<boolean>(false);
+  const RIWAYAT_PAGE_SIZE = 5;
   const [editingBarang, setEditingBarang] = useState<{
     id: number;
     data: BarangFormData;
@@ -402,6 +405,8 @@ const DataBarangPage = () => {
     setRiwayatTipe(null);
     setRiwayatData([]);
     setLoadingRiwayat(false);
+    setLoadingRiwayatMore(false);
+    setRiwayatHasMore(false);
     setShowDetailModal(true);
   };
 
@@ -412,19 +417,22 @@ const DataBarangPage = () => {
     if (riwayatTipe === tipe) {
       setRiwayatTipe(null);
       setRiwayatData([]);
+      setRiwayatHasMore(false);
       return;
     }
 
     setRiwayatTipe(tipe);
     setRiwayatData([]);
+    setRiwayatHasMore(false);
     setLoadingRiwayat(true);
     try {
       const res = await fetch(
-        `/api/barang/${selectedBarang.id}/riwayat?tipe=${tipe}`,
+        `/api/barang/${selectedBarang.id}/riwayat?tipe=${tipe}&skip=0&take=${RIWAYAT_PAGE_SIZE}`,
       );
       const data = await res.json();
       if (data.success) {
         setRiwayatData(data.data || []);
+        setRiwayatHasMore(Boolean(data.hasMore));
       } else {
         toast.error(data.error || "Gagal memuat riwayat");
       }
@@ -433,6 +441,52 @@ const DataBarangPage = () => {
       toast.error("Terjadi kesalahan saat memuat riwayat");
     } finally {
       setLoadingRiwayat(false);
+    }
+  };
+
+  const loadMoreRiwayat = async () => {
+    if (
+      !selectedBarang ||
+      !riwayatTipe ||
+      loadingRiwayat ||
+      loadingRiwayatMore ||
+      !riwayatHasMore
+    ) {
+      return;
+    }
+
+    setLoadingRiwayatMore(true);
+    try {
+      const res = await fetch(
+        `/api/barang/${selectedBarang.id}/riwayat?tipe=${riwayatTipe}&skip=${riwayatData.length}&take=${RIWAYAT_PAGE_SIZE}`,
+      );
+      const data = await res.json();
+      if (data.success) {
+        setRiwayatData((prev) => {
+          const existingIds = new Set(prev.map((r) => r.id));
+          const fresh = (data.data || []).filter(
+            (r: any) => !existingIds.has(r.id),
+          );
+          return [...prev, ...fresh];
+        });
+        setRiwayatHasMore(Boolean(data.hasMore));
+      } else {
+        toast.error(data.error || "Gagal memuat riwayat");
+      }
+    } catch (error) {
+      console.error("Error loading more riwayat barang:", error);
+      toast.error("Terjadi kesalahan saat memuat riwayat");
+    } finally {
+      setLoadingRiwayatMore(false);
+    }
+  };
+
+  const handleRiwayatScroll = (
+    e: React.UIEvent<HTMLDivElement>,
+  ) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 48) {
+      loadMoreRiwayat();
     }
   };
 
@@ -2324,7 +2378,10 @@ const DataBarangPage = () => {
                           untuk barang ini.
                         </div>
                       ) : (
-                        <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-200 bg-white">
+                        <div
+                          className="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white"
+                          onScroll={handleRiwayatScroll}
+                        >
                           <table className="w-full text-xs">
                             <thead className="sticky top-0 bg-gray-100 text-gray-600 uppercase tracking-wider">
                               <tr>
@@ -2369,6 +2426,21 @@ const DataBarangPage = () => {
                               })}
                             </tbody>
                           </table>
+
+                          {loadingRiwayatMore && (
+                            <div className="flex items-center justify-center gap-2 py-3 text-gray-500 border-t border-gray-100">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span className="text-xs font-medium">
+                                Memuat data...
+                              </span>
+                            </div>
+                          )}
+
+                          {!loadingRiwayatMore && !riwayatHasMore && (
+                            <div className="py-3 text-center text-[11px] text-gray-400 border-t border-gray-100">
+                              Semua riwayat sudah ditampilkan
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

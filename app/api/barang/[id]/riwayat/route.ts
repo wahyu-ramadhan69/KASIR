@@ -7,6 +7,9 @@ const prisma = new PrismaClient();
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+const DEFAULT_TAKE = 5;
+const MAX_TAKE = 50;
+
 function toNumber(value: bigint | number | null | undefined): number {
   if (value == null) return 0;
   return typeof value === "bigint" ? Number(value) : value;
@@ -17,8 +20,14 @@ function parseId(id: string | undefined) {
   return !id || Number.isNaN(num) ? null : num;
 }
 
-// GET riwayat penjualan / pembelian untuk 1 barang
-// query: ?tipe=penjualan | pembelian  (opsional: ?limit=100)
+function parseIntParam(value: string | null, fallback: number, max: number) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return fallback;
+  return Math.min(Math.floor(num), max);
+}
+
+// GET riwayat penjualan / pembelian untuk 1 barang (paginasi untuk infinite scroll)
+// query: ?tipe=penjualan|pembelian&skip=0&take=5
 export async function GET(req: NextRequest, { params }: RouteCtx) {
   const auth = await isAuthenticated();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -30,8 +39,8 @@ export async function GET(req: NextRequest, { params }: RouteCtx) {
 
   const { searchParams } = new URL(req.url);
   const tipe = searchParams.get("tipe");
-  const limitParam = Number(searchParams.get("limit"));
-  const take = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 300) : 10;
+  const skip = parseIntParam(searchParams.get("skip"), 0, Number.MAX_SAFE_INTEGER);
+  const take = parseIntParam(searchParams.get("take"), DEFAULT_TAKE, MAX_TAKE) || DEFAULT_TAKE;
 
   if (tipe !== "penjualan" && tipe !== "pembelian") {
     return NextResponse.json(
@@ -41,85 +50,68 @@ export async function GET(req: NextRequest, { params }: RouteCtx) {
   }
 
   try {
+    // ambil take + 1 untuk mendeteksi apakah masih ada data berikutnya
     if (tipe === "penjualan") {
-      const items = await prisma.penjualanItem.findMany({
+      const rows = await prisma.penjualanItem.findMany({
         where: {
           barangId: idNum,
           penjualan: { statusTransaksi: "SELESAI", isDeleted: false },
         },
-        include: {
+        select: {
+          id: true,
+          totalItem: true,
           penjualan: {
-            select: {
-              kodePenjualan: true,
-              tanggalTransaksi: true,
-              namaCustomer: true,
-              customer: { select: { nama: true, namaToko: true } },
-            },
+            select: { kodePenjualan: true, tanggalTransaksi: true },
           },
         },
         orderBy: { createdAt: "desc" },
-        take,
+        skip,
+        take: take + 1,
       });
 
-      const data = items.map((item) => {
-        const jumlah = toNumber(item.totalItem);
-        const harga = toNumber(item.hargaJual);
-        const diskon = toNumber(item.diskonPerItem);
-        return {
-          id: item.id,
-          kode: item.penjualan.kodePenjualan,
-          tanggal: item.penjualan.tanggalTransaksi,
-          pihak:
-            item.penjualan.namaCustomer ||
-            item.penjualan.customer?.namaToko ||
-            item.penjualan.customer?.nama ||
-            "Umum",
-          jumlah,
-          harga,
-          diskon,
-          subtotal: jumlah * harga - diskon,
-          laba: toNumber(item.laba),
-        };
-      });
+      const hasMore = rows.length > take;
+      const data = rows.slice(0, take).map((item) => ({
+        id: item.id,
+        kode: item.penjualan.kodePenjualan,
+        tanggal: item.penjualan.tanggalTransaksi,
+        jumlah: toNumber(item.totalItem),
+      }));
 
-      return NextResponse.json({ success: true, tipe, data }, { status: 200 });
+      return NextResponse.json(
+        { success: true, tipe, data, hasMore, nextSkip: skip + data.length },
+        { status: 200 }
+      );
     }
 
-    const items = await prisma.pembelianItem.findMany({
+    const rows = await prisma.pembelianItem.findMany({
       where: {
         barangId: idNum,
         pembelian: { statusTransaksi: "SELESAI" },
       },
-      include: {
+      select: {
+        id: true,
+        totalItem: true,
         pembelian: {
-          select: {
-            kodePembelian: true,
-            createdAt: true,
-            supplier: { select: { namaSupplier: true } },
-          },
+          select: { kodePembelian: true, createdAt: true },
         },
       },
       orderBy: { createdAt: "desc" },
-      take,
+      skip,
+      take: take + 1,
     });
 
-    const data = items.map((item) => {
-      const jumlah = toNumber(item.totalItem);
-      const harga = toNumber(item.hargaPokok);
-      const diskon = toNumber(item.diskonPerItem);
-      return {
-        id: item.id,
-        kode: item.pembelian.kodePembelian,
-        tanggal: item.pembelian.createdAt,
-        pihak: item.pembelian.supplier?.namaSupplier || "-",
-        jumlah,
-        harga,
-        diskon,
-        subtotal: jumlah * harga - diskon,
-      };
-    });
+    const hasMore = rows.length > take;
+    const data = rows.slice(0, take).map((item) => ({
+      id: item.id,
+      kode: item.pembelian.kodePembelian,
+      tanggal: item.pembelian.createdAt,
+      jumlah: toNumber(item.totalItem),
+    }));
 
-    return NextResponse.json({ success: true, tipe, data }, { status: 200 });
+    return NextResponse.json(
+      { success: true, tipe, data, hasMore, nextSkip: skip + data.length },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error fetching riwayat barang:", error);
     return NextResponse.json(
