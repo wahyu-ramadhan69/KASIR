@@ -158,7 +158,8 @@ const RiwayatPenjualanPage = () => {
   const [userRole, setUserRole] = useState<string>("");
 
   // Filter state
-  const todayStr = new Date().toISOString().split("T")[0];
+  // Tanggal hari ini (zona waktu lokal, format YYYY-MM-DD)
+  const todayStr = new Date().toLocaleDateString("en-CA");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
@@ -225,6 +226,20 @@ const RiwayatPenjualanPage = () => {
     };
   }, [searchTerm]);
 
+  // Kasir hanya boleh melihat data hari ini dan ke depan
+  const isKasir = userRole === "KASIR";
+  const minDate = isKasir ? todayStr : undefined;
+
+  const clampDate = (value: string) =>
+    isKasir && value && value < todayStr ? todayStr : value;
+
+  // Pastikan filter tanggal kasir tidak kurang dari hari ini
+  useEffect(() => {
+    if (!isKasir) return;
+    if (!startDate || startDate < todayStr) setStartDate(todayStr);
+    if (endDate && endDate < todayStr) setEndDate(todayStr);
+  }, [isKasir, startDate, endDate, todayStr]);
+
   // Fetch data & stats when filters change
   useEffect(() => {
     fetchPenjualan(1, true);
@@ -263,6 +278,7 @@ const RiwayatPenjualanPage = () => {
     params.append("page", page.toString());
     params.append("limit", "20");
     params.append("status", "SELESAI");
+    params.append("scope", "riwayat");
 
     if (debouncedSearch) {
       params.append("search", debouncedSearch);
@@ -312,6 +328,7 @@ const RiwayatPenjualanPage = () => {
       params.append("status", "SELESAI");
       params.append("limit", "1000");
       params.append("summary", "1");
+      params.append("scope", "riwayat");
       if (debouncedSearch) {
         params.append("search", debouncedSearch);
       }
@@ -356,8 +373,8 @@ const RiwayatPenjualanPage = () => {
   const handleClearFilters = () => {
     setSearchTerm("");
     setDebouncedSearch("");
-    setStartDate("");
-    setEndDate("");
+    setStartDate(isKasir ? todayStr : "");
+    setEndDate(isKasir ? todayStr : "");
   };
 
   const handleViewDetail = (penjualan: PenjualanHeader) => {
@@ -629,7 +646,8 @@ const RiwayatPenjualanPage = () => {
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  min={minDate}
+                  onChange={(e) => setStartDate(clampDate(e.target.value))}
                   placeholder="Tanggal Mulai"
                   className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
                 />
@@ -640,7 +658,8 @@ const RiwayatPenjualanPage = () => {
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate || minDate}
+                  onChange={(e) => setEndDate(clampDate(e.target.value))}
                   placeholder="Tanggal Akhir"
                   className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
                 />

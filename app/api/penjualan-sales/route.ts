@@ -162,6 +162,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Kasir di halaman riwayat penjualan sales hanya boleh melihat data
+    // hari ini dan ke depan (WIB). Data sebelum hari ini tidak dikembalikan.
+    const scope = searchParams.get("scope");
+    if (authData.role === "KASIR" && scope === "riwayat") {
+      const todayWIB = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+      }).format(new Date()); // YYYY-MM-DD
+      const startOfTodayWIB = new Date(`${todayWIB}T00:00:00+07:00`);
+
+      if (!baseWhere.tanggalTransaksi) baseWhere.tanggalTransaksi = {};
+      const currentGte: Date | undefined = baseWhere.tanggalTransaksi.gte;
+      if (!currentGte || currentGte < startOfTodayWIB) {
+        baseWhere.tanggalTransaksi.gte = startOfTodayWIB;
+      }
+    }
+
     const isAdmin = authData.role === "ADMIN";
     const listWhere: any = { ...baseWhere };
     if (!isAdmin || excludeDeleted) listWhere.isDeleted = false;
