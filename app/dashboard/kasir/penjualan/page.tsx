@@ -301,7 +301,19 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
       if (penjualan.statusTransaksi !== "SELESAI") {
         toast.error("Hanya penjualan selesai yang bisa diedit");
         setEditPenjualanId(null);
-        router.replace("/dashboard/admin/penjualan");
+        router.replace("/dashboard/kasir/penjualan/riwayat");
+        return;
+      }
+
+      // Transaksi tanggal sebelumnya tidak bisa diedit dari halaman kasir
+      const todayLocal = new Date().toLocaleDateString("en-CA");
+      const tanggalPenjualan = new Date(
+        penjualan.tanggalTransaksi
+      ).toLocaleDateString("en-CA");
+      if (tanggalPenjualan < todayLocal) {
+        toast.error("Transaksi tanggal sebelumnya tidak bisa diedit");
+        setEditPenjualanId(null);
+        router.replace("/dashboard/kasir/penjualan/riwayat");
         return;
       }
 

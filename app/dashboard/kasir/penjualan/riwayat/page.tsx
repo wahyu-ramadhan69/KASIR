@@ -226,19 +226,10 @@ const RiwayatPenjualanPage = () => {
     };
   }, [searchTerm]);
 
-  // Kasir hanya boleh melihat data hari ini dan ke depan
-  const isKasir = userRole === "KASIR";
-  const minDate = isKasir ? todayStr : undefined;
-
-  const clampDate = (value: string) =>
-    isKasir && value && value < todayStr ? todayStr : value;
-
-  // Pastikan filter tanggal kasir tidak kurang dari hari ini
-  useEffect(() => {
-    if (!isKasir) return;
-    if (!startDate || startDate < todayStr) setStartDate(todayStr);
-    if (endDate && endDate < todayStr) setEndDate(todayStr);
-  }, [isKasir, startDate, endDate, todayStr]);
+  // Transaksi sebelum hari ini tidak bisa diedit oleh kasir
+  const canEditPenjualan = (tanggalTransaksi: string) =>
+    userRole === "ADMIN" ||
+    new Date(tanggalTransaksi).toLocaleDateString("en-CA") >= todayStr;
 
   // Fetch data & stats when filters change
   useEffect(() => {
@@ -278,7 +269,6 @@ const RiwayatPenjualanPage = () => {
     params.append("page", page.toString());
     params.append("limit", "20");
     params.append("status", "SELESAI");
-    params.append("scope", "riwayat");
 
     if (debouncedSearch) {
       params.append("search", debouncedSearch);
@@ -328,7 +318,6 @@ const RiwayatPenjualanPage = () => {
       params.append("status", "SELESAI");
       params.append("limit", "1000");
       params.append("summary", "1");
-      params.append("scope", "riwayat");
       if (debouncedSearch) {
         params.append("search", debouncedSearch);
       }
@@ -373,8 +362,8 @@ const RiwayatPenjualanPage = () => {
   const handleClearFilters = () => {
     setSearchTerm("");
     setDebouncedSearch("");
-    setStartDate(isKasir ? todayStr : "");
-    setEndDate(isKasir ? todayStr : "");
+    setStartDate("");
+    setEndDate("");
   };
 
   const handleViewDetail = (penjualan: PenjualanHeader) => {
@@ -646,8 +635,7 @@ const RiwayatPenjualanPage = () => {
                 <input
                   type="date"
                   value={startDate}
-                  min={minDate}
-                  onChange={(e) => setStartDate(clampDate(e.target.value))}
+                  onChange={(e) => setStartDate(e.target.value)}
                   placeholder="Tanggal Mulai"
                   className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
                 />
@@ -658,8 +646,8 @@ const RiwayatPenjualanPage = () => {
                 <input
                   type="date"
                   value={endDate}
-                  min={startDate || minDate}
-                  onChange={(e) => setEndDate(clampDate(e.target.value))}
+                  min={startDate || undefined}
+                  onChange={(e) => setEndDate(e.target.value)}
                   placeholder="Tanggal Akhir"
                   className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
                 />
@@ -819,13 +807,15 @@ const RiwayatPenjualanPage = () => {
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
-                                  <Link
-                                    href={`/dashboard/kasir/penjualan?editId=${pj.id}`}
-                                    className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
-                                    title="Edit Penjualan"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </Link> 
+                                  {canEditPenjualan(pj.tanggalTransaksi) && (
+                                    <Link
+                                      href={`/dashboard/kasir/penjualan?editId=${pj.id}`}
+                                      className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                      title="Edit Penjualan"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </Link>
+                                  )}
                                 </>
                               )}
                             </div>

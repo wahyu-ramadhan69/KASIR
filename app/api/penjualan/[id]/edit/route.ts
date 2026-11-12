@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { isAuthenticated, getAuthData } from "@/app/AuthGuard";
+import { isBeforeTodayWIB } from "@/app/lib/tanggal";
 
 const prisma = new PrismaClient();
 
@@ -212,6 +213,28 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    // Kasir hanya boleh mengedit transaksi hari ini (WIB)
+    if (authData?.role === "KASIR") {
+      if (isBeforeTodayWIB(penjualan.tanggalTransaksi)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Transaksi tanggal sebelumnya tidak bisa diedit",
+          },
+          { status: 403 }
+        );
+      }
+      if (body.tanggalTransaksi && isBeforeTodayWIB(body.tanggalTransaksi)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Tanggal transaksi tidak boleh diubah ke tanggal sebelumnya",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     if (body.karyawanId !== undefined && body.karyawanId !== null) {
