@@ -479,7 +479,7 @@ const DataCustomerPage = () => {
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="w-full px-6 pb-8">
+      <div className="w-full px-3 sm:px-6 pb-8">
         <Toaster
           position="top-right"
           toastOptions={{
@@ -491,17 +491,17 @@ const DataCustomerPage = () => {
         />
 
         {/* Enhanced Header Section */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-8 mb-8 shadow-2xl">
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
-                <Users className="w-10 h-10 text-white" />
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-5 sm:p-8 mb-6 sm:mb-8 shadow-2xl">
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 backdrop-blur-sm p-3 sm:p-4 rounded-xl">
+                <Users className="w-7 h-7 sm:w-10 sm:h-10 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
+                <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2 tracking-tight">
                   Data Customer
                 </h1>
-                <p className="text-blue-100 text-lg">
+                <p className="text-blue-100 text-sm sm:text-lg">
                   Kelola informasi pelanggan dan toko Anda
                 </p>
               </div>
@@ -509,7 +509,7 @@ const DataCustomerPage = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="group bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
+                className="group flex-1 sm:flex-none justify-center bg-white hover:bg-blue-50 text-blue-600 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 transform"
               >
                 <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
                 Tambah Customer
@@ -517,7 +517,7 @@ const DataCustomerPage = () => {
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg"
+                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg"
               >
                 <RefreshCw
                   className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
@@ -529,38 +529,38 @@ const DataCustomerPage = () => {
         </div>
 
         {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+        <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 sm:mb-8">
+          <div className="group bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                <p className="text-gray-500 text-xs sm:text-sm font-semibold uppercase tracking-wide mb-1">
                   Total Customer
                 </p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">
                   {pagination.totalCount}
                 </p>
                 <p className="text-xs text-gray-400 mt-2">
                   Pelanggan terdaftar
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 hidden sm:block p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
                 <Users className="w-8 h-8 text-white" />
               </div>
             </div>
           </div>
 
-          <div className="group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+          <div className="group bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-1">
+                <p className="text-gray-500 text-xs sm:text-sm font-semibold uppercase tracking-wide mb-1">
                   Total Toko
                 </p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">
                   {pagination.totalCount}
                 </p>
                 <p className="text-xs text-gray-400 mt-2">Toko aktif</p>
               </div>
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 hidden sm:block p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
                 <Store className="w-8 h-8 text-white" />
               </div>
             </div>
@@ -568,8 +568,8 @@ const DataCustomerPage = () => {
         </div>
 
         {/* Search and Filter Section */}
-        <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
-          <div className="flex flex-col lg:flex-row gap-4">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 shadow-lg border border-gray-100">
+          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -623,7 +623,7 @@ const DataCustomerPage = () => {
           )}
         </div>
 
-        {/* Customer Cards Grid - 4 columns */}
+        {/* Customer Table */}
         {loading ? (
           <div className="flex justify-center items-center py-32">
             <div className="text-center">
@@ -649,197 +649,183 @@ const DataCustomerPage = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {filteredCustomers.map((customer) => {
-                const status = getPiutangStatus(
-                  customer.piutang,
-                  customer.limit_piutang
-                );
-                return (
-                  <div
-                    key={customer.id}
-                    className="group bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
-                  >
-                    {/* Card Header */}
-                    <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-4">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-10 rounded-full -mr-12 -mt-12"></div>
-                      <div className="relative z-10">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-base font-bold text-white pr-2 line-clamp-1">
-                            {customer.nama}
-                          </h3>
-                          <div
-                            className={`px-2 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1 flex-shrink-0 ${
-                              status.color === "text-red-600"
-                                ? "bg-red-100 text-red-700"
-                                : status.color === "text-yellow-600"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-green-100 text-green-700"
-                            }`}
-                          >
-                            <span className="w-3 h-3">{status.icon}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-blue-100 text-xs">
-                          <Store className="w-3 h-3 flex-shrink-0" />
-                          <span className="truncate font-medium">
-                            {customer.namaToko}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+            {/* Customer Table - responsive */}
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+                    <tr>
+                      <th className="hidden sm:table-cell px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide w-12">
+                        No
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                        Customer
+                      </th>
+                      <th className="hidden lg:table-cell px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                        NIK
+                      </th>
+                      <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                        No HP
+                      </th>
+                      <th className="hidden xl:table-cell px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                        Alamat
+                      </th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide">
+                        Piutang / Limit
+                      </th>
+                      <th className="hidden sm:table-cell px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide">
+                        Status
+                      </th>
+                      <th className="px-2 sm:px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide">
+                        Aksi
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredCustomers.map((customer, index) => {
+                      const status = getPiutangStatus(
+                        customer.piutang,
+                        customer.limit_piutang
+                      );
+                      const percentage = getPiutangPercentage(
+                        customer.piutang,
+                        customer.limit_piutang
+                      );
+                      const statusBadge =
+                        status.color === "text-red-600"
+                          ? "bg-red-100 text-red-700"
+                          : status.color === "text-yellow-600"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-green-100 text-green-700";
 
-                    {/* Card Body */}
-                    <div className="p-4">
-                      {/* NIK */}
-                      <div className="mb-3 pb-3 border-b border-gray-200">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="bg-gray-100 p-1.5 rounded-lg">
-                            <CreditCard className="w-3 h-3 text-gray-600" />
-                          </div>
-                          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">
-                            NIK
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-900 font-mono font-semibold pl-7">
-                          {formatNIK(customer.nik)}
-                        </p>
-                      </div>
+                      return (
+                        <tr
+                          key={customer.id}
+                          className="hover:bg-blue-50/50 transition-colors align-top"
+                        >
+                          {/* No */}
+                          <td className="hidden sm:table-cell px-3 py-3 text-center text-gray-500 font-medium">
+                            {index + 1}
+                          </td>
 
-                      {/* Piutang Info */}
-                      <div className="mb-3 pb-3 border-b border-gray-200">
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-1.5">
-                              <div className="bg-red-100 p-1.5 rounded-lg">
-                                <Wallet className="w-3 h-3 text-red-600" />
-                              </div>
-                              <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                                Piutang
+                          {/* Customer (nama + toko, info tambahan di layar kecil) */}
+                          <td className="px-3 py-3 min-w-[140px]">
+                            <p className="font-semibold text-gray-900 leading-tight break-words">
+                              {customer.nama}
+                            </p>
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                              <Store className="w-3 h-3 flex-shrink-0" />
+                              <span className="break-words">
+                                {customer.namaToko}
                               </span>
                             </div>
-                            <span
-                              className="text-xs font-bold text-red-600 cursor-help"
+                            {/* No HP - tampil di HP/tablet kecil */}
+                            <div className="md:hidden flex items-center gap-1 text-xs text-gray-500 mt-1">
+                              <Phone className="w-3 h-3 flex-shrink-0" />
+                              <span>{formatPhoneNumber(customer.noHp)}</span>
+                            </div>
+                            {/* NIK - tampil di bawah lg */}
+                            <p className="lg:hidden text-[11px] text-gray-400 font-mono mt-1">
+                              {formatNIK(customer.nik)}
+                            </p>
+                          </td>
+
+                          {/* NIK */}
+                          <td className="hidden lg:table-cell px-3 py-3 font-mono text-xs text-gray-700 whitespace-nowrap">
+                            {formatNIK(customer.nik)}
+                          </td>
+
+                          {/* No HP */}
+                          <td className="hidden md:table-cell px-3 py-3 text-gray-700 whitespace-nowrap">
+                            {formatPhoneNumber(customer.noHp)}
+                          </td>
+
+                          {/* Alamat */}
+                          <td className="hidden xl:table-cell px-3 py-3 text-xs text-gray-600 max-w-[220px]">
+                            <p className="line-clamp-2" title={customer.alamat}>
+                              {customer.alamat}
+                            </p>
+                          </td>
+
+                          {/* Piutang / Limit */}
+                          <td className="px-3 py-3 text-right whitespace-nowrap">
+                            <p
+                              className="font-bold text-red-600 cursor-help"
                               title={formatRupiah(customer.piutang)}
                             >
                               {formatRupiahSimple(customer.piutang)}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-1.5">
-                              <div className="bg-green-100 p-1.5 rounded-lg">
-                                <TrendingUp className="w-3 h-3 text-green-600" />
-                              </div>
-                              <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                                Limit
-                              </span>
-                            </div>
-                            <span
-                              className="text-xs font-bold text-green-600 cursor-help"
+                            </p>
+                            <p
+                              className="text-xs text-gray-500 cursor-help"
                               title={formatRupiah(customer.limit_piutang)}
                             >
-                              {formatRupiahSimple(customer.limit_piutang)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="mt-2">
-                          <div className="flex justify-between text-[10px] text-gray-600 mb-1 font-semibold">
-                            <span>Penggunaan</span>
-                            <span className={status.color}>
-                              {getPiutangPercentage(
-                                customer.piutang,
-                                customer.limit_piutang
-                              ).toFixed(1)}
-                              %
-                            </span>
-                          </div>
-                          <div className="relative w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                            <div
-                              className={`h-2 rounded-full transition-all duration-500 ${getPiutangColor(
-                                customer.piutang,
-                                customer.limit_piutang
-                              )} relative overflow-hidden`}
-                              style={{
-                                width: `${getPiutangPercentage(
+                              / {formatRupiahSimple(customer.limit_piutang)}
+                            </p>
+                            <div className="mt-1.5 ml-auto w-20 sm:w-24 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className={`h-1.5 rounded-full ${getPiutangColor(
                                   customer.piutang,
                                   customer.limit_piutang
-                                )}%`,
-                              }}
-                            >
-                              <div className="absolute inset-0 bg-white opacity-20 animate-pulse"></div>
+                                )}`}
+                                style={{ width: `${percentage}%` }}
+                              />
                             </div>
-                          </div>
-                        </div>
-                      </div>
+                            <p
+                              className={`text-[11px] font-semibold mt-0.5 ${status.color}`}
+                            >
+                              {percentage.toFixed(1)}%
+                              {/* Label status di HP (kolom Status tersembunyi) */}
+                              <span className="sm:hidden"> · {status.label}</span>
+                            </p>
+                          </td>
 
-                      {/* Contact Info */}
-                      <div className="space-y-2 mb-3">
-                        <div className="flex items-start gap-2 group/item">
-                          <div className="bg-gray-100 p-1.5 rounded-lg group-hover/item:bg-blue-100 transition-colors flex-shrink-0">
-                            <MapPin className="w-3 h-3 text-gray-600 group-hover/item:text-blue-600 transition-colors" />
-                          </div>
-                          <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
-                            {customer.alamat}
-                          </p>
-                        </div>
+                          {/* Status */}
+                          <td className="hidden sm:table-cell px-3 py-3 text-center">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${statusBadge}`}
+                            >
+                              {status.icon}
+                              {status.label}
+                            </span>
+                          </td>
 
-                        <div className="flex items-center gap-2 group/item">
-                          <div className="bg-gray-100 p-1.5 rounded-lg group-hover/item:bg-blue-100 transition-colors flex-shrink-0">
-                            <Phone className="w-3 h-3 text-gray-600 group-hover/item:text-blue-600 transition-colors" />
-                          </div>
-                          <p className="text-xs text-gray-700 font-semibold">
-                            {formatPhoneNumber(customer.noHp)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Date Info */}
-                      <div className="mb-3 pt-3 border-t border-gray-200">
-                        <div className="flex items-center justify-between text-[10px]">
-                          <div className="flex items-center gap-1 text-gray-500">
-                            <Calendar className="w-3 h-3" />
-                            <span>Terdaftar</span>
-                          </div>
-                          <span className="font-semibold text-gray-700">
-                            {formatDate(customer.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => handleEdit(customer)}
-                          className="group/btn bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-2 py-2 rounded-lg transition-all font-semibold text-xs flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                        >
-                          <Edit className="w-3 h-3 group-hover/btn:rotate-12 transition-transform" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleDelete(customer.id, customer.nama)
-                          }
-                          className="group/btn bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-2 py-2 rounded-lg transition-all font-semibold text-xs flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                        >
-                          <Trash2 className="w-3 h-3 group-hover/btn:scale-110 transition-transform" />
-                          Hapus
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => setSelectedCustomer(customer)}
-                        className="w-full mt-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-3 py-2 rounded-lg transition-all font-semibold text-xs shadow-md hover:shadow-lg flex items-center justify-center gap-1"
-                      >
-                        <Eye className="w-3 h-3" />
-                        Lihat Detail
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                          {/* Aksi */}
+                          <td className="px-2 sm:px-3 py-3">
+                            <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => setSelectedCustomer(customer)}
+                                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                                title="Lihat Detail"
+                                aria-label={`Lihat detail ${customer.nama}`}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleEdit(customer)}
+                                className="p-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors"
+                                title="Edit"
+                                aria-label={`Edit ${customer.nama}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleDelete(customer.id, customer.nama)
+                                }
+                                className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                                title="Hapus"
+                                aria-label={`Hapus ${customer.nama}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Infinite Scroll Trigger */}
