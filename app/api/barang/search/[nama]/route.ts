@@ -5,32 +5,21 @@ import { isAuthenticated } from "@/app/AuthGuard";
 
 const prisma = new PrismaClient();
 
-// Helper function to convert BigInt to number safely
-function bigIntToNumber(value: bigint | number): number {
-  if (typeof value === "bigint") {
-    return Number(value);
+// Konversi semua BigInt (termasuk relasi) ke number agar bisa di-JSON-kan.
+// Sebelumnya field seperti `berat` & `limitStok` tidak dikonversi sehingga
+// JSON.stringify gagal dan endpoint selalu error 500.
+function serializeBigInt(value: any): any {
+  if (typeof value === "bigint") return Number(value);
+  if (value instanceof Date) return value;
+  if (Array.isArray(value)) return value.map(serializeBigInt);
+  if (value && typeof value === "object") {
+    const result: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = serializeBigInt(val);
+    }
+    return result;
   }
   return value;
-}
-
-// Helper to serialize barang data with BigInt conversion
-function serializeBarang(barang: any) {
-  return {
-    ...barang,
-    hargaBeli: bigIntToNumber(barang.hargaBeli),
-    hargaJual: bigIntToNumber(barang.hargaJual),
-    stok: bigIntToNumber(barang.stok),
-    jumlahPerKemasan: bigIntToNumber(barang.jumlahPerKemasan),
-    ukuran: bigIntToNumber(barang.ukuran),
-    limitPenjualan: bigIntToNumber(barang.limitPenjualan),
-    supplier: barang.supplier
-      ? {
-          ...barang.supplier,
-          limitHutang: bigIntToNumber(barang.supplier.limitHutang),
-          hutang: bigIntToNumber(barang.supplier.hutang),
-        }
-      : undefined,
-  };
 }
 
 export async function GET(
@@ -41,9 +30,10 @@ export async function GET(
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { nama } = await params;
+  const { nama: rawNama } = await params;
+  const nama = (rawNama || "").trim();
 
-  if (!nama || nama.trim() === "") {
+  if (!nama) {
     return NextResponse.json(
       { success: false, error: "Nama barang tidak boleh kosong" },
       { status: 400 }
@@ -68,7 +58,7 @@ export async function GET(
     });
 
     // Serialize all barang to convert BigInt to number
-    const serializedBarang = barang.map(serializeBarang);
+    const serializedBarang = barang.map(serializeBigInt);
 
     return NextResponse.json(
       {
