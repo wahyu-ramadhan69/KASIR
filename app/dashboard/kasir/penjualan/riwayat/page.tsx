@@ -25,6 +25,13 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
+import { useRiwayatMode } from "@/app/lib/useRiwayatMode";
+import {
+  BatalPermintaanButton,
+  getPermintaanEdit,
+  PermintaanEditBadge,
+  type PermintaanEditInfo,
+} from "@/app/components/PermintaanEditBadge";
 
 interface Customer {
   id: number;
@@ -91,6 +98,8 @@ interface PenjualanHeader {
   items: PenjualanItem[];
   createdAt: string;
   updatedAt: string;
+  // Permintaan edit terakhir (approval admin)
+  permintaanEdit?: PermintaanEditInfo[];
 }
 
 interface Pagination {
@@ -226,6 +235,17 @@ const RiwayatPenjualanPage = () => {
     };
   }, [searchTerm]);
 
+  // Akses riwayat diatur admin (Akses Riwayat Kasir): SEMUA / HARI_INI
+  const riwayatMode = useRiwayatMode("toko");
+  const isRiwayatHariIni = riwayatMode === "HARI_INI";
+
+  // Mode "hari ini": kunci filter tanggal ke hari ini
+  useEffect(() => {
+    if (!isRiwayatHariIni) return;
+    setStartDate(todayStr);
+    setEndDate(todayStr);
+  }, [isRiwayatHariIni, todayStr]);
+
   // Transaksi sebelum hari ini tidak bisa diedit oleh kasir
   const canEditPenjualan = (tanggalTransaksi: string) =>
     userRole === "ADMIN" ||
@@ -269,6 +289,7 @@ const RiwayatPenjualanPage = () => {
     params.append("page", page.toString());
     params.append("limit", "20");
     params.append("status", "SELESAI");
+    params.append("scope", "riwayat");
 
     if (debouncedSearch) {
       params.append("search", debouncedSearch);
@@ -318,6 +339,7 @@ const RiwayatPenjualanPage = () => {
       params.append("status", "SELESAI");
       params.append("limit", "1000");
       params.append("summary", "1");
+      params.append("scope", "riwayat");
       if (debouncedSearch) {
         params.append("search", debouncedSearch);
       }
@@ -362,8 +384,8 @@ const RiwayatPenjualanPage = () => {
   const handleClearFilters = () => {
     setSearchTerm("");
     setDebouncedSearch("");
-    setStartDate("");
-    setEndDate("");
+    setStartDate(isRiwayatHariIni ? todayStr : "");
+    setEndDate(isRiwayatHariIni ? todayStr : "");
   };
 
   const handleViewDetail = (penjualan: PenjualanHeader) => {
@@ -607,6 +629,15 @@ const RiwayatPenjualanPage = () => {
 
         {/* Filter & Search - Compact Single Row */}
         <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
+          {isRiwayatHariIni && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+              <Clock className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                Admin membatasi riwayat ini hanya untuk{" "}
+                <b>transaksi hari ini</b>.
+              </span>
+            </div>
+          )}
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
             <div className="flex-1 relative">
@@ -635,9 +666,10 @@ const RiwayatPenjualanPage = () => {
                 <input
                   type="date"
                   value={startDate}
+                  disabled={isRiwayatHariIni}
                   onChange={(e) => setStartDate(e.target.value)}
                   placeholder="Tanggal Mulai"
-                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
+                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -647,9 +679,10 @@ const RiwayatPenjualanPage = () => {
                   type="date"
                   value={endDate}
                   min={startDate || undefined}
+                  disabled={isRiwayatHariIni}
                   onChange={(e) => setEndDate(e.target.value)}
                   placeholder="Tanggal Akhir"
-                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
+                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -788,6 +821,9 @@ const RiwayatPenjualanPage = () => {
                                 ? "PIUTANG"
                                 : pj.statusPembayaran}
                             </span>
+                            <PermintaanEditBadge
+                              permintaan={getPermintaanEdit(pj)}
+                            />
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-center">
                             <div className="flex items-center justify-center gap-2">
@@ -807,7 +843,19 @@ const RiwayatPenjualanPage = () => {
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
-                                  {canEditPenjualan(pj.tanggalTransaksi) && (
+                                  {getPermintaanEdit(pj)?.status === "PENDING" ? (
+                                    <BatalPermintaanButton
+                                      permintaanId={getPermintaanEdit(pj)!.id}
+                                      onDone={(ok, message) => {
+                                        if (ok) {
+                                          toast.success(message);
+                                          fetchPenjualan(1, true);
+                                        } else {
+                                          toast.error(message);
+                                        }
+                                      }}
+                                    />
+                                  ) : canEditPenjualan(pj.tanggalTransaksi) && (
                                     <Link
                                       href={`/dashboard/kasir/penjualan?editId=${pj.id}`}
                                       className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"

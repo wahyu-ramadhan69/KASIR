@@ -24,6 +24,8 @@ model User {
   pembayaranGaji PembayaranGaji[]
   penjualanDibuat PenjualanHeader[] @relation("PenjualanDibuat")
   penjualanDisetujui PenjualanHeader[] @relation("PenjualanDisetujui")
+  permintaanEditDiajukan PermintaanEditPenjualan[] @relation("PermintaanEditDiajukan")
+  permintaanEditDiproses PermintaanEditPenjualan[] @relation("PermintaanEditDiproses")
 }
 
 model KategoriBarang {
@@ -201,9 +203,33 @@ model PenjualanHeader {
   items                 PenjualanItem[]
   perjalananSales       PerjalananSales? @relation(fields: [perjalananSalesId], references: [id])
   pembayaran            PembayaranPenjualan[]
+  permintaanEdit        PermintaanEditPenjualan[]
   perjalananSalesId     Int?
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
+}
+
+// Permintaan edit penjualan dari kasir yang harus di-approve admin.
+// Perubahan (stok, pembayaran, piutang) baru diterapkan saat status APPROVED.
+model PermintaanEditPenjualan {
+  id              Int             @id @default(autoincrement())
+  penjualanId     Int
+  penjualan       PenjualanHeader @relation(fields: [penjualanId], references: [id], onDelete: Cascade)
+  diajukanOlehId  Int
+  diajukanOleh    User            @relation("PermintaanEditDiajukan", fields: [diajukanOlehId], references: [id])
+  alasan          String
+  payload         Json            // data edit yang diusulkan (body endpoint edit)
+  snapshotSebelum Json            // kondisi transaksi saat diajukan
+  status          StatusApproval  @default(PENDING)
+  diprosesOlehId  Int?
+  diprosesOleh    User?           @relation("PermintaanEditDiproses", fields: [diprosesOlehId], references: [id])
+  diprosesAt      DateTime?
+  catatanAdmin    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([status])
+  @@index([penjualanId])
 }
 
 model PembayaranPenjualan {
@@ -484,6 +510,16 @@ model HutangLainPembayaran {
   createdAt    DateTime   @default(now())
 
   @@index([hutangLainId])
+}
+
+// Pengaturan aplikasi umum (key-value), diatur oleh admin.
+// Contoh key: "riwayat_kasir_toko", "riwayat_kasir_sales" -> "SEMUA" | "HARI_INI"
+model PengaturanAplikasi {
+  key         String   @id
+  value       String
+  updatedById Int?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
 }
 
 model KonfigurasiGaji {

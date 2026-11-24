@@ -217,7 +217,10 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
+  const needsEditApproval = !!editPenjualanId && !isAdmin;
   const [loadingEdit, setLoadingEdit] = useState<boolean>(false);
+  // Edit oleh kasir harus disetujui admin -> wajib isi alasan
+  const [alasanEdit, setAlasanEdit] = useState<string>("");
   const [originalQtyByBarangId, setOriginalQtyByBarangId] = useState<{
     [key: number]: number;
   }>({});
@@ -963,6 +966,42 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
           updatePayload.namaCustomer = manualCustomerName;
         }
 
+        // Kasir: kirim sebagai permintaan edit (menunggu approval admin)
+        if (needsEditApproval) {
+          if (alasanEdit.trim().length < 5) {
+            toast.error("Alasan edit wajib diisi (minimal 5 karakter)");
+            return;
+          }
+          const requestRes = await fetch(
+            `/api/penjualan/${editPenjualanId}/permintaan-edit`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...updatePayload,
+                alasan: alasanEdit.trim(),
+              }),
+            }
+          );
+          const requestResult = await requestRes.json();
+
+          if (requestResult.success) {
+            toast.success(
+              requestResult.message ||
+                "Permintaan edit terkirim, menunggu approval admin"
+            );
+            setShowCheckoutModal(false);
+            setAlasanEdit("");
+            setEditPenjualanId(null);
+            router.replace("/dashboard/kasir/penjualan/riwayat");
+          } else {
+            toast.error(
+              requestResult.error || "Gagal mengirim permintaan edit"
+            );
+          }
+          return;
+        }
+
         const updateRes = await fetch(
           `/api/penjualan/${editPenjualanId}/edit`,
           {
@@ -1074,6 +1113,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   };
 
   const handleReset = () => {
+    setAlasanEdit("");
     // Reset semua state tanpa konfirmasi
     setCartItems([]);
     setSelectedCustomer(null);
@@ -1226,6 +1266,7 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   <div className="mt-2">
                     <span className="inline-flex items-center gap-2 bg-yellow-400/90 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full">
                       Mode Edit • #{editPenjualanId}
+                      {needsEditApproval && " • Perlu approval admin"}
                       {loadingEdit && (
                         <span className="inline-block h-2 w-2 rounded-full bg-slate-900 animate-pulse" />
                       )}
@@ -2496,6 +2537,30 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   </div>
                 )}
 
+              {/* Alasan edit - kasir wajib isi, perlu approval admin */}
+              {needsEditApproval && (
+                <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                  <div className="flex items-start gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-800">
+                      Perubahan ini <b>tidak langsung tersimpan</b>. Admin harus
+                      menyetujui terlebih dahulu sebelum stok, pembayaran, dan
+                      piutang ikut berubah.
+                    </p>
+                  </div>
+                  <label className="block font-bold text-slate-900 uppercase text-xs tracking-wider mb-1">
+                    Alasan Edit <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={alasanEdit}
+                    onChange={(e) => setAlasanEdit(e.target.value)}
+                    rows={2}
+                    placeholder="Contoh: salah input jumlah barang, customer menambah pesanan..."
+                    className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none text-sm bg-white"
+                  />
+                </div>
+              )}
+
               {/* Buttons */}
               <div className="flex gap-3">
                 <button
@@ -2510,7 +2575,8 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                     loading ||
                     !hasPaymentInput ||
                     (!selectedCustomer && !manualCustomerName) ||
-                    (paymentStatus !== null && !paymentStatus.canCheckout)
+                    (paymentStatus !== null && !paymentStatus.canCheckout) ||
+                    (needsEditApproval && alasanEdit.trim().length < 5)
                   }
                   className="flex-1 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white px-4 py-3 rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
                 >
@@ -2519,7 +2585,9 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
                   ) : (
                     <>
                       <Check className="w-5 h-5" />
-                      {editPenjualanId
+                      {needsEditApproval
+                        ? "Ajukan Perubahan"
+                        : editPenjualanId
                         ? "Simpan Perubahan"
                         : "Selesaikan Pembayaran"}
                     </>

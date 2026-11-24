@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getAuthData, isAuthenticated } from "@/app/AuthGuard";
+import { getBarangSummary, readBarangIdParam } from "@/app/lib/barangSummary";
+import { applyRiwayatHariIni, getRiwayatMode } from "@/app/lib/pengaturan";
 
 const prisma = new PrismaClient();
 
@@ -134,6 +136,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("endDate");
     const summary = searchParams.get("summary") === "1";
     const excludeDeleted = searchParams.get("excludeDeleted") === "1";
+    const barangId = readBarangIdParam(searchParams);
 
     const baseWhere: any = {
       karyawanId: null, // hanya penjualan header tanpa karyawan
@@ -184,6 +187,18 @@ export async function GET(request: NextRequest) {
         end.setHours(23, 59, 59, 999);
         baseWhere.tanggalTransaksi.lte = end;
       }
+    }
+
+    // Kasir di halaman riwayat: batasi sesuai pengaturan admin
+    // (Pengaturan > Akses Riwayat Kasir)
+    if (authData?.role === "KASIR" && searchParams.get("scope") === "riwayat") {
+      const mode = await getRiwayatMode(prisma, "toko");
+      if (mode === "HARI_INI") applyRiwayatHariIni(baseWhere);
+    }
+
+    // Filter: hanya transaksi yang memuat barang tertentu
+    if (barangId !== null) {
+      baseWhere.items = { some: { barangId } };
     }
 
     const listWhere: any = { ...baseWhere };
@@ -240,6 +255,12 @@ export async function GET(request: NextRequest) {
       });
       const totalPemasukan = Number(totalPemasukanAgg._sum.nominal || 0);
 
+      // Ringkasan jumlah barang terjual jika filter barang aktif
+      const barangSummary =
+        barangId !== null
+          ? await getBarangSummary(prisma, barangId, summaryWhere)
+          : null;
+
       return NextResponse.json(
         deepSerialize({
           success: true,
@@ -253,6 +274,7 @@ export async function GET(request: NextRequest) {
             hutangJatuhTempo,
             totalPemasukan,
           },
+          barangSummary,
         })
       );
     }
@@ -295,6 +317,19 @@ export async function GET(request: NextRequest) {
               barang: true,
             },
             orderBy: { id: "asc" },
+          },
+          // Status permintaan edit terakhir (approval admin)
+          permintaanEdit: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              id: true,
+              status: true,
+              alasan: true,
+              catatanAdmin: true,
+              createdAt: true,
+              diprosesAt: true,
+            },
           },
         },
         orderBy,

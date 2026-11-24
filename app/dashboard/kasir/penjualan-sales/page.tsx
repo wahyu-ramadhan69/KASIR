@@ -182,6 +182,8 @@ const PenjualanPage = () => {
   const [loading, setLoading] = useState(false);
   const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
+  // Edit oleh kasir harus disetujui admin -> wajib isi alasan
+  const [alasanEdit, setAlasanEdit] = useState("");
   const [originalQtyByBarangId, setOriginalQtyByBarangId] = useState<{
     [key: number]: number;
   }>({});
@@ -1213,30 +1215,38 @@ const PenjualanPage = () => {
         updatePayload.totalCash = cash;
         updatePayload.totalTransfer = transfer;
 
-        const updateRes = await fetch(
-          `/api/penjualan/${editPenjualanId}/edit`,
+        // Kasir: kirim sebagai permintaan edit (menunggu approval admin)
+        if (alasanEdit.trim().length < 5) {
+          toast.error("Alasan edit wajib diisi (minimal 5 karakter)");
+          return;
+        }
+
+        const requestRes = await fetch(
+          `/api/penjualan/${editPenjualanId}/permintaan-edit`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updatePayload),
+            body: JSON.stringify({
+              ...updatePayload,
+              alasan: alasanEdit.trim(),
+            }),
           }
         );
-        const updateResult = await updateRes.json();
+        const requestResult = await requestRes.json();
 
-        if (updateResult.success) {
-          setReceiptData({
-            ...updateResult.data.receipt,
-            id: editPenjualanId,
-          });
+        if (requestResult.success) {
+          toast.success(
+            requestResult.message ||
+              "Permintaan edit terkirim, menunggu approval admin"
+          );
           setShowCheckoutModal(false);
-          setShowReceiptModal(true);
-          toast.success(updateResult.message || "Penjualan berhasil diupdate");
-          fetchMasterData();
-          fetchTopCustomers();
-          fetchTopKaryawan();
-          fetchTodaySales();
+          setAlasanEdit("");
+          setEditPenjualanId(null);
+          router.replace("/dashboard/kasir/penjualan-sales/riwayat");
         } else {
-          throw new Error(updateResult.error || "Gagal update penjualan");
+          throw new Error(
+            requestResult.error || "Gagal mengirim permintaan edit"
+          );
         }
 
         return;
@@ -1339,6 +1349,7 @@ const PenjualanPage = () => {
   };
 
   const handleReset = () => {
+    setAlasanEdit("");
     setCurrentPenjualan({
       items: [],
       subtotal: 0,
@@ -1482,7 +1493,7 @@ const PenjualanPage = () => {
                 {editPenjualanId && (
                   <div className="mt-2">
                     <span className="inline-flex items-center gap-2 bg-yellow-400/90 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full">
-                      Mode Edit • #{editPenjualanId}
+                      Mode Edit • #{editPenjualanId} • Perlu approval admin
                       {loadingEdit && (
                         <span className="inline-block h-2 w-2 rounded-full bg-slate-900 animate-pulse" />
                       )}
@@ -2494,7 +2505,7 @@ const PenjualanPage = () => {
                     className="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
                   >
                     <CreditCard className="w-5 h-5" />
-                    {editPenjualanId ? "Simpan Perubahan" : "Bayar Sekarang"}
+                    {editPenjualanId ? "Lanjut Ajukan Perubahan" : "Bayar Sekarang"}
                   </button>
                 </div>
               )}
@@ -2845,6 +2856,30 @@ const PenjualanPage = () => {
                 </div>
               )}
 
+              {/* Alasan edit - kasir wajib isi, perlu approval admin */}
+              {editPenjualanId && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3.5 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-800">
+                      Perubahan ini <b>tidak langsung tersimpan</b>. Admin harus
+                      menyetujui terlebih dahulu sebelum stok, pembayaran, dan
+                      piutang ikut berubah.
+                    </p>
+                  </div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide block">
+                    Alasan Edit <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={alasanEdit}
+                    onChange={(e) => setAlasanEdit(e.target.value)}
+                    rows={2}
+                    placeholder="Contoh: salah input jumlah barang, sales menambah pesanan..."
+                    className="w-full px-3.5 py-2.5 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none text-sm bg-white resize-none"
+                  />
+                </div>
+              )}
+
               {/* Keterangan */}
               <div className="space-y-2.5">
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-2">
@@ -2877,7 +2912,11 @@ const PenjualanPage = () => {
             <div className="p-5 bg-gray-50 border-t border-gray-200 rounded-b-2xl space-y-2.5">
               <button
                 onClick={handleCheckout}
-                disabled={loading || !paymentStatus?.canCheckout}
+                disabled={
+                  loading ||
+                  !paymentStatus?.canCheckout ||
+                  (!!editPenjualanId && alasanEdit.trim().length < 5)
+                }
                 className="w-full bg-slate-700 hover:bg-slate-800 disabled:bg-gray-300 text-white py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed"
               >
                 {loading ? (
@@ -2888,7 +2927,7 @@ const PenjualanPage = () => {
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    {editPenjualanId ? "Simpan Perubahan" : "Konfirmasi Pembayaran"}
+                    {editPenjualanId ? "Ajukan Perubahan" : "Konfirmasi Pembayaran"}
                   </>
                 )}
               </button>

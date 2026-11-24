@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getAuthData } from "@/app/AuthGuard";
+import { getBarangSummary, readBarangIdParam } from "@/app/lib/barangSummary";
+import { applyRiwayatHariIni, getRiwayatMode } from "@/app/lib/pengaturan";
 
 const prisma = new PrismaClient();
 
@@ -119,6 +121,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("endDate");
     const summary = searchParams.get("summary") === "1";
     const excludeDeleted = searchParams.get("excludeDeleted") === "1";
+    const barangId = readBarangIdParam(searchParams);
 
     const isPrivileged = authData.role === "ADMIN";
     const baseWhere: any = {
@@ -162,20 +165,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Kasir di halaman riwayat penjualan sales hanya boleh melihat data
-    // hari ini dan ke depan (WIB). Data sebelum hari ini tidak dikembalikan.
+    // Kasir di halaman riwayat: batasi sesuai pengaturan admin
+    // (Pengaturan > Akses Riwayat Kasir)
     const scope = searchParams.get("scope");
     if (authData.role === "KASIR" && scope === "riwayat") {
-      const todayWIB = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Jakarta",
-      }).format(new Date()); // YYYY-MM-DD
-      const startOfTodayWIB = new Date(`${todayWIB}T00:00:00+07:00`);
+      const mode = await getRiwayatMode(prisma, "sales");
+      if (mode === "HARI_INI") applyRiwayatHariIni(baseWhere);
+    }
 
-      if (!baseWhere.tanggalTransaksi) baseWhere.tanggalTransaksi = {};
-      const currentGte: Date | undefined = baseWhere.tanggalTransaksi.gte;
-      if (!currentGte || currentGte < startOfTodayWIB) {
-        baseWhere.tanggalTransaksi.gte = startOfTodayWIB;
-      }
+    // Filter: hanya transaksi yang memuat barang tertentu
+    if (barangId !== null) {
+      baseWhere.items = { some: { barangId } };
     }
 
     const isAdmin = authData.role === "ADMIN";
@@ -231,6 +231,12 @@ export async function GET(request: NextRequest) {
       });
       const totalPemasukan = Number(totalPemasukanAgg._sum.nominal || 0);
 
+      // Ringkasan jumlah barang terjual jika filter barang aktif
+      const barangSummary =
+        barangId !== null
+          ? await getBarangSummary(prisma, barangId, summaryWhere)
+          : null;
+
       return NextResponse.json(
         deepSerialize({
           success: true,
@@ -244,6 +250,7 @@ export async function GET(request: NextRequest) {
             hutangJatuhTempo,
             totalPemasukan,
           },
+          barangSummary,
         })
       );
     }
@@ -276,6 +283,19 @@ export async function GET(request: NextRequest) {
             barang: true,
           },
           orderBy: { id: "asc" },
+        },
+        // Status permintaan edit terakhir (approval admin)
+        permintaanEdit: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            alasan: true,
+            catatanAdmin: true,
+            createdAt: true,
+            diprosesAt: true,
+          },
         },
       },
       orderBy,

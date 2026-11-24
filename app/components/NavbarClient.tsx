@@ -1,15 +1,80 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Bell, Clock, Loader2 } from "lucide-react";
+import { useApprovalEditCount } from "@/app/lib/approvalEditEvents";
 
 type NavbarClientProps = {
   settingsPath: string;
+  isAdmin?: boolean;
 };
 
-const NavbarClient = ({ settingsPath }: NavbarClientProps) => {
+type PermintaanPreview = {
+  id: number;
+  alasan: string;
+  createdAt: string;
+  penjualan: { kodePenjualan: string };
+  diajukanOleh: { username: string };
+};
+
+const APPROVAL_PATH = "/dashboard/admin/approval-edit";
+
+const formatWaktuLalu = (iso: string) => {
+  const menit = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+  if (menit < 1) return "baru saja";
+  if (menit < 60) return `${menit} menit lalu`;
+  const jam = Math.floor(menit / 60);
+  if (jam < 24) return `${jam} jam lalu`;
+  return `${Math.floor(jam / 24)} hari lalu`;
+};
+
+const NavbarClient = ({ settingsPath, isAdmin = false }: NavbarClientProps) => {
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Lonceng approval edit (admin)
+  const approvalCount = useApprovalEditCount(isAdmin);
+  const [isBellOpen, setIsBellOpen] = useState(false);
+  const [bellLoading, setBellLoading] = useState(false);
+  const [bellItems, setBellItems] = useState<PermintaanPreview[]>([]);
+  const bellRef = useRef<HTMLDivElement>(null);
+
+  const toggleBell = async () => {
+    const next = !isBellOpen;
+    setIsBellOpen(next);
+    setIsDropdownOpen(false);
+    if (!next) return;
+    setBellLoading(true);
+    try {
+      const res = await fetch(
+        "/api/permintaan-edit-penjualan?status=PENDING&limit=5",
+        { cache: "no-store" },
+      );
+      const data = await res.json();
+      setBellItems(data.success ? data.data : []);
+    } catch {
+      setBellItems([]);
+    } finally {
+      setBellLoading(false);
+    }
+  };
+
+  // Tutup dropdown lonceng saat klik di luar
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        bellRef.current &&
+        event.target instanceof Node &&
+        !bellRef.current.contains(event.target)
+      ) {
+        setIsBellOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -71,9 +136,95 @@ const NavbarClient = ({ settingsPath }: NavbarClientProps) => {
             home
           </h6>
         </div>
+        <div className="flex items-center gap-1 self-end md:self-auto">
+        {/* Lonceng approval edit (khusus admin) */}
+        {isAdmin && (
+          <div className="relative" ref={bellRef}>
+            <button
+              onClick={toggleBell}
+              className={`relative w-10 h-10 rounded-lg grid place-items-center transition-all hover:bg-blue-gray-500/10 ${
+                approvalCount > 0 ? "text-amber-500" : "text-gray-500"
+              }`}
+              type="button"
+              title="Permintaan edit menunggu approval"
+              aria-label={`Notifikasi approval edit: ${approvalCount}`}
+            >
+              <Bell className="h-5 w-5" />
+              {approvalCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-white">
+                  {approvalCount > 99 ? "99+" : approvalCount}
+                </span>
+              )}
+            </button>
+
+            {isBellOpen && (
+              <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                  <p className="text-sm font-bold text-gray-900">
+                    Approval Edit Penjualan
+                  </p>
+                  {approvalCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[11px] font-bold">
+                      {approvalCount} menunggu
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-80 overflow-y-auto">
+                  {bellLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                    </div>
+                  ) : bellItems.length === 0 ? (
+                    <p className="px-4 py-6 text-sm text-center text-gray-500">
+                      Tidak ada permintaan yang menunggu
+                    </p>
+                  ) : (
+                    bellItems.map((item) => (
+                      <Link
+                        key={item.id}
+                        href={APPROVAL_PATH}
+                        onClick={() => setIsBellOpen(false)}
+                        className="block px-4 py-3 hover:bg-blue-50 border-b border-gray-50 last:border-0 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-gray-900 truncate">
+                            {item.penjualan.kodePenjualan}
+                          </span>
+                          <span className="text-[11px] text-gray-400 flex items-center gap-1 flex-shrink-0">
+                            <Clock className="w-3 h-3" />
+                            {formatWaktuLalu(item.createdAt)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          oleh <span className="font-medium">{item.diajukanOleh.username}</span>
+                        </p>
+                        <p className="text-xs text-gray-700 mt-1 line-clamp-2">
+                          {item.alasan}
+                        </p>
+                      </Link>
+                    ))
+                  )}
+                </div>
+
+                <Link
+                  href={APPROVAL_PATH}
+                  onClick={() => setIsBellOpen(false)}
+                  className="block px-4 py-2.5 text-center text-sm font-semibold text-blue-600 hover:bg-blue-50 border-t border-gray-100"
+                >
+                  Lihat semua
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center relative" ref={dropdownRef}>
           <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            onClick={() => {
+              setIsDropdownOpen(!isDropdownOpen);
+              setIsBellOpen(false);
+            }}
             className="middle cursor-pointer none font-sans font-bold center uppercase transition-all disabled:opacity-50 disabled:shadow-none disabled:pointer-events-none text-xs py-3 rounded-lg text-gray-500 hover:bg-blue-gray-500/10 active:bg-blue-gray-500/30 hidden items-center gap-1 px-4 xl:flex"
             type="button"
           >
@@ -155,6 +306,7 @@ const NavbarClient = ({ settingsPath }: NavbarClientProps) => {
               </button>
             </div>
           )}
+        </div>
         </div>
       </div>
     </nav>

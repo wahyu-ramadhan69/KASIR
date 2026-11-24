@@ -36,7 +36,9 @@ import {
   SquareArrowOutDownRight,
   ClipboardPen,
   FileCheckCorner,
+  Bell,
 } from "lucide-react";
+import { useApprovalEditCount } from "@/app/lib/approvalEditEvents";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +53,8 @@ interface NavLinkWithSub {
   href: string;
   icon: React.ReactElement;
   subMenu?: SubMenuItem[];
+  /** tampilkan badge angka (mis. jumlah permintaan yang perlu di-approve) */
+  badgeKey?: "approvalEdit";
 }
 
 // ─── Admin Menus ──────────────────────────────────────────────────────────────
@@ -60,6 +64,17 @@ const adminNavLinks: NavLinkWithSub[] = [
     label: "Dashboard",
     href: "/dashboard/admin",
     icon: <LayoutDashboard className="w-5 h-5" />,
+  },
+  {
+    label: "Approval Edit",
+    href: "/dashboard/admin/approval-edit",
+    icon: <Bell className="w-5 h-5" />,
+    badgeKey: "approvalEdit",
+  },
+  {
+    label: "Akses Riwayat Kasir",
+    href: "/dashboard/admin/akses-riwayat",
+    icon: <History className="w-5 h-5" />,
   },
 ];
 
@@ -533,6 +548,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
           ? salesTransactionLinks
           : [];
 
+  // Jumlah permintaan edit yang menunggu approval (badge lonceng admin)
+  const approvalEditCount = useApprovalEditCount(userRole === "admin");
+
+  const getBadgeCount = (link: NavLinkWithSub) =>
+    link.badgeKey === "approvalEdit" ? approvalEditCount : 0;
+
   // Auto-expand menu jika ada submenu yang aktif
   useEffect(() => {
     if (!isCollapsed) {
@@ -677,6 +698,9 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
       );
     }
 
+    const badgeCount = getBadgeCount(link);
+    const badgeText = badgeCount > 99 ? "99+" : String(badgeCount);
+
     return (
       <li key={link.href} className="relative group">
         <Link href={link.href} scroll={false}>
@@ -689,16 +713,23 @@ const Sidebar: React.FC<SidebarProps> = ({ role, username }) => {
             type="button"
           >
             <span
-              className={`flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`}
+              className={`relative flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"} ${badgeCount > 0 && !isActive ? "text-amber-300" : ""}`}
             >
               {link.icon}
+              {/* Titik angka di ikon (terlihat juga saat sidebar diciutkan) */}
+              {badgeCount > 0 && (
+                <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-gray-900">
+                  {badgeText}
+                </span>
+              )}
             </span>
-            {!isCollapsed && <span>{link.label}</span>}
+            {!isCollapsed && <span className="flex-1 text-left">{link.label}</span>}
           </button>
         </Link>
         {isCollapsed && (
           <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
             {link.label}
+            {badgeCount > 0 && ` (${badgeText})`}
           </div>
         )}
       </li>

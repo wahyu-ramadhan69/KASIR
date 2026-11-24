@@ -15,7 +15,9 @@ const Navbar = async () => {
             ? "/dashboard/kepala_gudang/settings"
             : "/dashboard";
 
-  return <NavbarClient settingsPath={settingsPath} />;
+  return (
+    <NavbarClient settingsPath={settingsPath} isAdmin={role === "ADMIN"} />
+  );
 };
 
 export default Navbar;

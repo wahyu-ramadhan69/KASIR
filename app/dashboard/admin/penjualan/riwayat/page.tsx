@@ -25,6 +25,14 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
+import {
+  BarangFilterBanner,
+  BarangFilterPicker,
+  formatQty,
+  getQtyBarang,
+  type BarangOption,
+  type BarangSummary,
+} from "@/app/components/BarangFilter";
 
 interface Customer {
   id: number;
@@ -173,6 +181,14 @@ const RiwayatPenjualanPage = () => {
   const [startDate, setStartDate] = useState<string>(todayDate);
   const [endDate, setEndDate] = useState<string>(todayDate);
 
+  // Filter barang
+  const [selectedBarang, setSelectedBarang] = useState<BarangOption | null>(
+    null,
+  );
+  const [barangSummary, setBarangSummary] = useState<BarangSummary | null>(
+    null,
+  );
+
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -241,11 +257,16 @@ const RiwayatPenjualanPage = () => {
     };
   }, [searchTerm]);
 
+  const handleChangeBarang = (barang: BarangOption | null) => {
+    setSelectedBarang(barang);
+    setBarangSummary(null);
+  };
+
   // Fetch data & stats when filters change
   useEffect(() => {
     fetchPenjualan(1, true);
     fetchStats();
-  }, [startDate, endDate, debouncedSearch]);
+  }, [startDate, endDate, debouncedSearch, selectedBarang?.id]);
 
   // Setup intersection observer for infinite scroll
   useEffect(() => {
@@ -290,6 +311,10 @@ const RiwayatPenjualanPage = () => {
 
     if (endDate) {
       params.append("endDate", endDate);
+    }
+
+    if (selectedBarang) {
+      params.append("barangId", selectedBarang.id.toString());
     }
 
     return params.toString();
@@ -337,6 +362,9 @@ const RiwayatPenjualanPage = () => {
       if (endDate) {
         params.append("endDate", endDate);
       }
+      if (selectedBarang) {
+        params.append("barangId", selectedBarang.id.toString());
+      }
       const selesaiRes = await fetch(`/api/penjualan?${params.toString()}`);
       const selesaiData = await selesaiRes.json();
 
@@ -353,6 +381,7 @@ const RiwayatPenjualanPage = () => {
             totalPemasukan: summary.totalPemasukan || 0,
           });
         }
+        setBarangSummary(selesaiData.barangSummary || null);
       }
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -373,6 +402,7 @@ const RiwayatPenjualanPage = () => {
   const handleClearFilters = () => {
     setSearchTerm("");
     setDebouncedSearch("");
+    handleChangeBarang(null);
     const resetDate = getTodayDate();
     setStartDate(resetDate);
     setEndDate(resetDate);
@@ -487,7 +517,8 @@ const RiwayatPenjualanPage = () => {
     return penjualan.namaSales || "-";
   };
 
-  const hasActiveFilters = startDate || endDate || debouncedSearch;
+  const hasActiveFilters =
+    startDate || endDate || debouncedSearch || selectedBarang;
 
   const isAdmin = userRole === "ADMIN";
 
@@ -685,6 +716,13 @@ const RiwayatPenjualanPage = () => {
 
             {/* Filters in one row */}
             <div className="flex gap-3 flex-wrap lg:flex-nowrap">
+              {/* Filter Barang */}
+              <BarangFilterPicker
+                value={selectedBarang}
+                onChange={handleChangeBarang}
+                className="w-full sm:w-64 lg:w-60 xl:w-72"
+              />
+
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
                 <input
@@ -721,6 +759,15 @@ const RiwayatPenjualanPage = () => {
           </div>
         </div>
 
+        {/* Ringkasan filter barang */}
+        {selectedBarang && (
+          <BarangFilterBanner
+            barang={selectedBarang}
+            summary={barangSummary}
+            totalTransaksi={stats.totalTransaksi}
+          />
+        )}
+
         {/* Table */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
           {loading && penjualanList.length === 0 ? (
@@ -749,6 +796,11 @@ const RiwayatPenjualanPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Tanggal
                     </th>
+                    {selectedBarang && (
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-amber-700 uppercase tracking-wider bg-amber-50">
+                        Qty Barang
+                      </th>
+                    )}
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Total
                     </th>
@@ -767,11 +819,15 @@ const RiwayatPenjualanPage = () => {
                   {penjualanList.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={selectedBarang ? 8 : 7}
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         <Receipt className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                        <p>Tidak ada data penjualan ditemukan</p>
+                        <p>
+                          {selectedBarang
+                            ? `Tidak ada transaksi yang membeli "${selectedBarang.namaBarang}"`
+                            : "Tidak ada data penjualan ditemukan"}
+                        </p>
                       </td>
                     </tr>
                   ) : (
@@ -830,6 +886,17 @@ const RiwayatPenjualanPage = () => {
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(pj.tanggalTransaksi)}
                           </td>
+                          {selectedBarang && (
+                            <td className="px-4 py-3 whitespace-nowrap bg-amber-50/60">
+                              <span className="inline-flex px-2 py-1 rounded-lg bg-amber-100 text-amber-800 text-sm font-bold">
+                                {formatQty(
+                                  getQtyBarang(pj.items, selectedBarang.id),
+                                  selectedBarang.jumlahPerKemasan,
+                                  selectedBarang.jenisKemasan || "dus",
+                                )}
+                              </span>
+                            </td>
+                          )}
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                             {formatRupiah(pj.totalHarga)}
                           </td>
@@ -1128,7 +1195,14 @@ const RiwayatPenjualanPage = () => {
                               : `${jumlahSisa} item`;
 
                         return (
-                          <tr key={item.id}>
+                          <tr
+                            key={item.id}
+                            className={
+                              selectedBarang?.id === item.barangId
+                                ? "bg-amber-50"
+                                : ""
+                            }
+                          >
                             <td className="px-3 py-2">
                               <p className="font-medium">
                                 {item.barang?.namaBarang}

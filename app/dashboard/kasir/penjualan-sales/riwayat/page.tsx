@@ -22,6 +22,13 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
+import { useRiwayatMode } from "@/app/lib/useRiwayatMode";
+import {
+  BatalPermintaanButton,
+  getPermintaanEdit,
+  PermintaanEditBadge,
+  type PermintaanEditInfo,
+} from "@/app/components/PermintaanEditBadge";
 
 interface Customer {
   id: number;
@@ -103,6 +110,8 @@ interface PenjualanHeader {
   items: PenjualanItem[];
   createdAt: string;
   updatedAt: string;
+  // Permintaan edit terakhir (approval admin)
+  permintaanEdit?: PermintaanEditInfo[];
 }
 
 interface Pagination {
@@ -166,9 +175,6 @@ const RiwayatPenjualanPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
 
-  // User role state
-  const [userRole, setUserRole] = useState<string>("");
-
   // Filter state
   // Tanggal hari ini (zona waktu lokal, format YYYY-MM-DD)
   const todayStr = new Date().toLocaleDateString("en-CA");
@@ -219,33 +225,16 @@ const RiwayatPenjualanPage = () => {
     };
   }, [searchTerm]);
 
-  // Check user role on mount
+  // Akses riwayat diatur admin (Akses Riwayat Kasir): SEMUA / HARI_INI
+  const riwayatMode = useRiwayatMode("sales");
+  const isRiwayatHariIni = riwayatMode === "HARI_INI";
+
+  // Mode "hari ini": kunci filter tanggal ke hari ini
   useEffect(() => {
-    const checkUserRole = async () => {
-      try {
-        const res = await fetch("/api/auth/me");
-        const data = await res.json();
-        if (data.success) setUserRole(data.data.role);
-      } catch (error) {
-        console.error("Error checking user role:", error);
-      }
-    };
-    checkUserRole();
-  }, []);
-
-  // Kasir hanya boleh melihat data hari ini dan ke depan
-  const isKasir = userRole === "KASIR";
-  const minDate = isKasir ? todayStr : undefined;
-
-  const clampDate = (value: string) =>
-    isKasir && value && value < todayStr ? todayStr : value;
-
-  // Pastikan filter tanggal kasir tidak kurang dari hari ini
-  useEffect(() => {
-    if (!isKasir) return;
-    if (!startDate || startDate < todayStr) setStartDate(todayStr);
-    if (endDate && endDate < todayStr) setEndDate(todayStr);
-  }, [isKasir, startDate, endDate, todayStr]);
+    if (!isRiwayatHariIni) return;
+    setStartDate(todayStr);
+    setEndDate(todayStr);
+  }, [isRiwayatHariIni, todayStr]);
 
   // Fetch data & stats when filters change
   useEffect(() => {
@@ -386,8 +375,8 @@ const RiwayatPenjualanPage = () => {
   const handleClearFilters = () => {
     setSearchTerm("");
     setDebouncedSearch("");
-    setStartDate(isKasir ? todayStr : "");
-    setEndDate(isKasir ? todayStr : "");
+    setStartDate(isRiwayatHariIni ? todayStr : "");
+    setEndDate(isRiwayatHariIni ? todayStr : "");
   };
 
   const handleViewDetail = (penjualan: PenjualanHeader) => {
@@ -629,6 +618,15 @@ const RiwayatPenjualanPage = () => {
 
         {/* Filter & Search - Only Date Filters */}
         <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
+          {isRiwayatHariIni && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+              <Clock className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                Admin membatasi riwayat ini hanya untuk{" "}
+                <b>transaksi hari ini</b>.
+              </span>
+            </div>
+          )}
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
             <div className="flex-1 relative">
@@ -657,10 +655,10 @@ const RiwayatPenjualanPage = () => {
                 <input
                   type="date"
                   value={startDate}
-                  min={minDate}
-                  onChange={(e) => setStartDate(clampDate(e.target.value))}
+                  disabled={isRiwayatHariIni}
+                  onChange={(e) => setStartDate(e.target.value)}
                   placeholder="Tanggal Mulai"
-                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
+                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -669,10 +667,11 @@ const RiwayatPenjualanPage = () => {
                 <input
                   type="date"
                   value={endDate}
-                  min={startDate || minDate}
-                  onChange={(e) => setEndDate(clampDate(e.target.value))}
+                  min={startDate || undefined}
+                  disabled={isRiwayatHariIni}
+                  onChange={(e) => setEndDate(e.target.value)}
                   placeholder="Tanggal Akhir"
-                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white"
+                  className="pl-9 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -812,6 +811,9 @@ const RiwayatPenjualanPage = () => {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                             {formatRupiah(pj.totalHarga)}
+                            <PermintaanEditBadge
+                              permintaan={getPermintaanEdit(pj)}
+                            />
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span
@@ -843,13 +845,29 @@ const RiwayatPenjualanPage = () => {
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
-                                   <Link
-                                    href={`/dashboard/kasir/penjualan-sales?editId=${pj.id}`}
-                                    className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
-                                    title="Edit Penjualan"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </Link> 
+                                  {getPermintaanEdit(pj)?.status === "PENDING" ? (
+                                    <BatalPermintaanButton
+                                      permintaanId={getPermintaanEdit(pj)!.id}
+                                      onDone={(ok, message) => {
+                                        if (ok) {
+                                          toast.success(message);
+                                          fetchPenjualan(1, true);
+                                        } else {
+                                          toast.error(message);
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    !pj.perjalananSalesId && (
+                                      <Link
+                                        href={`/dashboard/kasir/penjualan-sales?editId=${pj.id}`}
+                                        className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
+                                        title="Edit Penjualan (perlu approval admin)"
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </Link>
+                                    )
+                                  )}
                                 </>
                               )}
                             </div>
