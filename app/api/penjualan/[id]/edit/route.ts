@@ -9,6 +9,7 @@ import {
   editPenjualan,
   EditPenjualanError,
 } from "@/app/lib/penjualanEdit";
+import { kasirEditButuhApproval } from "@/app/lib/permintaanEdit";
 
 const prisma = new PrismaClient();
 
@@ -34,12 +35,18 @@ export async function POST(
 
     const result = await editPenjualan(prisma, penjualanId, body, {
       actorUserId: authUserId,
-      assertPenjualan: () => {
-        // Edit penjualan (toko & sales) oleh kasir wajib lewat
-        // permintaan edit yang disetujui admin
-        if (isKasir) {
+      assertPenjualan: (penjualan) => {
+        // Kasir: transaksi tanggal sebelumnya wajib lewat permintaan edit
+        // (approval admin). Transaksi hari ini boleh langsung.
+        if (
+          isKasir &&
+          kasirEditButuhApproval(
+            penjualan.tanggalTransaksi,
+            body.tanggalTransaksi
+          )
+        ) {
           throw new EditPenjualanError(
-            "Edit penjualan oleh kasir harus melalui permintaan edit dan disetujui admin",
+            "Edit transaksi tanggal sebelumnya harus melalui permintaan edit dan disetujui admin",
             403
           );
         }

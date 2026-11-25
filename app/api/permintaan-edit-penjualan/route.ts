@@ -3,7 +3,10 @@
 // GET daftar permintaan edit penjualan
 //   ADMIN : semua permintaan
 //   KASIR : hanya permintaan miliknya
-// Query: status=PENDING|APPROVED|REJECTED|all, page, limit
+// Query: status=PENDING|APPROVED|REJECTED|all, page, limit,
+//        tipe=TOKO|SALES, startDate & endDate (YYYY-MM-DD, WIB)
+//        Tanggal memfilter: PENDING -> createdAt (diajukan),
+//                           APPROVED/REJECTED -> diprosesAt (diproses admin)
 // =====================================================
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient, Prisma } from "@prisma/client";
@@ -38,11 +41,40 @@ export async function GET(request: NextRequest) {
       where.diajukanOlehId = parseInt(authData.userId, 10);
     }
 
+    // Filter tipe penjualan: toko (tanpa sales) / sales
+    const tipe = searchParams.get("tipe");
+    if (tipe === "TOKO") {
+      where.penjualan = { karyawanId: null };
+    } else if (tipe === "SALES") {
+      where.penjualan = { karyawanId: { not: null } };
+    }
+
+    // Filter tanggal (WIB)
+    const isYmd = (v: string | null): v is string =>
+      !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    if (isYmd(startDate) || isYmd(endDate)) {
+      const range: Prisma.DateTimeFilter = {};
+      if (isYmd(startDate)) range.gte = new Date(`${startDate}T00:00:00+07:00`);
+      if (isYmd(endDate)) range.lte = new Date(`${endDate}T23:59:59.999+07:00`);
+      if (status === "APPROVED" || status === "REJECTED") {
+        where.diprosesAt = range;
+      } else {
+        where.createdAt = range;
+      }
+    }
+
     const [list, totalCount, pendingCount] = await Promise.all([
       prisma.permintaanEditPenjualan.findMany({
         where,
-        // PENDING: paling lama dulu (antrian); lainnya: terbaru dulu
-        orderBy: { createdAt: status === "PENDING" ? "asc" : "desc" },
+        // PENDING: paling lama dulu (antrian); lainnya: terbaru diproses dulu
+        orderBy:
+          status === "PENDING"
+            ? [{ createdAt: "asc" }, { id: "asc" }]
+            : status === "APPROVED" || status === "REJECTED"
+              ? [{ diprosesAt: "desc" }, { id: "desc" }]
+              : [{ createdAt: "desc" }, { id: "desc" }],
         skip,
         take: limit,
         include: {

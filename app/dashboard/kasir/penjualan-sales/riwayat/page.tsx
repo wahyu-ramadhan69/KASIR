@@ -862,7 +862,12 @@ const RiwayatPenjualanPage = () => {
                                       <Link
                                         href={`/dashboard/kasir/penjualan-sales?editId=${pj.id}`}
                                         className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
-                                        title="Edit Penjualan (perlu approval admin)"
+                                        title={
+                                          new Date(pj.tanggalTransaksi).toLocaleDateString("en-CA") <
+                                          todayStr
+                                            ? "Edit Penjualan (perlu approval admin)"
+                                            : "Edit Penjualan"
+                                        }
                                       >
                                         <Pencil className="w-4 h-4" />
                                       </Link>

@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bell,
   Check,
@@ -13,6 +13,7 @@ import {
   ArrowRight,
   AlertTriangle,
   MessageSquare,
+  Calendar,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { notifyApprovalEditChanged as notifySidebar } from "@/app/lib/approvalEditEvents";
@@ -203,14 +204,34 @@ function CompareRow({
   );
 }
 
+const PAGE_SIZE = 10;
+
+/** Tanggal kemarin (lokal) format YYYY-MM-DD */
+const getYesterday = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toLocaleDateString("en-CA");
+};
+
+const getToday = () => new Date().toLocaleDateString("en-CA");
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 const ApprovalEditPage = () => {
   const [status, setStatus] = useState<Status>("PENDING");
   const [list, setList] = useState<Permintaan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [tipeFilter, setTipeFilter] = useState<TipeFilter>("all");
+
+  // Filter tanggal diproses (tab Disetujui / Ditolak). Default: kemarin.
+  const [startDate, setStartDate] = useState<string>(getYesterday);
+  const [endDate, setEndDate] = useState<string>(getYesterday);
+  const isProcessedTab = status !== "PENDING";
 
   // Modal aksi
   const [action, setAction] = useState<{
@@ -220,40 +241,90 @@ const ApprovalEditPage = () => {
   const [catatan, setCatatan] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchList = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/permintaan-edit-penjualan?status=${status}&limit=50`,
-      );
-      const data = await res.json();
-      if (data.success) {
-        setList(data.data);
-        setPendingCount(data.pendingCount || 0);
-        // Buka otomatis permintaan pertama di tab Menunggu
-        if (status === "PENDING" && data.data.length > 0) {
-          setExpanded((prev) => prev ?? data.data[0].id);
-        }
-      } else {
-        toast.error(data.error || "Gagal mengambil data");
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal mengambil data permintaan edit");
-    } finally {
-      setLoading(false);
-    }
-  }, [status]);
+  // Cegah respons lama (filter sebelumnya) menimpa data terbaru
+  const requestIdRef = useRef(0);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
+  const fetchPage = useCallback(
+    async (pageNum: number, reset: boolean) => {
+      const requestId = ++requestIdRef.current;
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
+
+      try {
+        const params = new URLSearchParams({
+          status,
+          page: String(pageNum),
+          limit: String(PAGE_SIZE),
+        });
+        if (tipeFilter !== "all") params.append("tipe", tipeFilter);
+        if (isProcessedTab) {
+          if (startDate) params.append("startDate", startDate);
+          if (endDate) params.append("endDate", endDate);
+        }
+
+        const res = await fetch(`/api/permintaan-edit-penjualan?${params}`);
+        const data = await res.json();
+        if (requestId !== requestIdRef.current) return; // sudah usang
+
+        if (data.success) {
+          setList((prev) => (reset ? data.data : [...prev, ...data.data]));
+          setPendingCount(data.pendingCount || 0);
+          setTotalCount(data.pagination?.totalCount || 0);
+          setHasMore(!!data.pagination?.hasMore);
+          setPage(pageNum);
+          // Buka otomatis permintaan pertama di tab Menunggu
+          if (reset && status === "PENDING" && data.data.length > 0) {
+            setExpanded((prev) => prev ?? data.data[0].id);
+          }
+        } else {
+          toast.error(data.error || "Gagal mengambil data");
+          setHasMore(false);
+        }
+      } catch (error) {
+        console.error(error);
+        if (requestId === requestIdRef.current) {
+          toast.error("Gagal mengambil data permintaan edit");
+          setHasMore(false);
+        }
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [status, tipeFilter, isProcessedTab, startDate, endDate],
+  );
+
+  const fetchList = useCallback(() => fetchPage(1, true), [fetchPage]);
+
+  // Muat ulang dari halaman 1 saat tab / filter berubah
   useEffect(() => {
     setExpanded(null);
     fetchList();
   }, [fetchList]);
 
-  const visibleList =
-    tipeFilter === "all"
-      ? list
-      : list.filter((p) => (p.snapshotSebelum?.tipe ?? "TOKO") === tipeFilter);
+  // Infinite scroll
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !loadingMore) {
+          fetchPage(page + 1, false);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, page, fetchPage]);
+
+  const resetTanggal = () => {
+    setStartDate(getYesterday());
+    setEndDate(getYesterday());
+  };
 
   const openAction = (type: "setujui" | "tolak", item: Permintaan) => {
     setCatatan("");
@@ -375,23 +446,73 @@ const ApprovalEditPage = () => {
         </select>
         </div>
 
+        {/* Filter tanggal diproses (Disetujui / Ditolak) */}
+        {isProcessedTab && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              Tanggal diproses
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                max={endDate || getToday()}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                aria-label="Tanggal mulai"
+              />
+              <span className="text-gray-400">-</span>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                max={getToday()}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                aria-label="Tanggal akhir"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setStartDate(getToday());
+                  setEndDate(getToday());
+                }}
+                className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium"
+              >
+                Hari ini
+              </button>
+              <button
+                onClick={resetTanggal}
+                className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium"
+              >
+                Kemarin
+              </button>
+            </div>
+            <span className="sm:ml-auto text-sm text-gray-500">
+              {loading ? "Memuat..." : `${totalCount} permintaan`}
+            </span>
+          </div>
+        )}
+
         {/* List */}
         {loading ? (
           <div className="flex justify-center py-24">
             <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
           </div>
-        ) : visibleList.length === 0 ? (
+        ) : list.length === 0 ? (
           <div className="bg-white rounded-2xl shadow border border-gray-100 p-14 text-center">
             <Check className="w-12 h-12 mx-auto mb-3 text-green-400" />
             <p className="text-gray-500 font-medium">
               {status === "PENDING"
                 ? "Tidak ada permintaan edit yang menunggu approval"
-                : "Belum ada data"}
+                : "Tidak ada permintaan yang diproses pada tanggal ini"}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {visibleList.map((p) => {
+            {list.map((p) => {
               const before = p.snapshotSebelum;
               const after = p.payload?.sesudah;
               const isOpen = expanded === p.id;
@@ -692,6 +813,21 @@ const ApprovalEditPage = () => {
                 </div>
               );
             })}
+
+            {/* Infinite scroll */}
+            <div ref={loadMoreRef} className="py-4 flex justify-center">
+              {loadingMore && (
+                <span className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Memuat lebih banyak...
+                </span>
+              )}
+              {!hasMore && list.length > 0 && (
+                <span className="text-xs text-gray-400">
+                  Menampilkan semua {list.length} permintaan
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

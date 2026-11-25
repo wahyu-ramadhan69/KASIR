@@ -1,12 +1,12 @@
 // =====================================================
 // PATH: app/api/penjualan/[id]/permintaan-edit/route.ts
-// KASIR  : ajukan permintaan edit (menunggu approval admin)
 // ADMIN  : edit langsung diterapkan (tanpa approval)
+// KASIR  : transaksi hari ini -> edit langsung
+//          transaksi tanggal sebelumnya -> permintaan edit (approval admin)
 // =====================================================
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getAuthData } from "@/app/AuthGuard";
-import { isBeforeTodayWIB } from "@/app/lib/tanggal";
 import {
   deepSerialize,
   editPenjualan,
@@ -15,6 +15,7 @@ import {
 import {
   buildRingkasanUsulan,
   buildSnapshotSebelum,
+  kasirEditButuhApproval,
   PermintaanPayload,
 } from "@/app/lib/permintaanEdit";
 
@@ -62,11 +63,18 @@ export async function POST(
       );
     }
 
-    // KASIR: buat permintaan edit
-    const alasanTrim = typeof alasan === "string" ? alasan.trim() : "";
-    if (alasanTrim.length < 5) {
+    // ===== KASIR =====
+    const penjualanInfo = await prisma.penjualanHeader.findUnique({
+      where: { id: penjualanId },
+      select: { tanggalTransaksi: true, perjalananSalesId: true },
+    });
+    if (!penjualanInfo) {
+      throw new EditPenjualanError("Penjualan tidak ditemukan", 404);
+    }
+    // Penjualan luar kota (perjalanan sales) punya alur edit sendiri
+    if (penjualanInfo.perjalananSalesId) {
       throw new EditPenjualanError(
-        "Alasan edit wajib diisi (minimal 5 karakter)",
+        "Penjualan luar kota tidak bisa diedit dari sini",
         400,
       );
     }
@@ -82,34 +90,39 @@ export async function POST(
       );
     }
 
+    const butuhApproval = kasirEditButuhApproval(
+      penjualanInfo.tanggalTransaksi,
+      editBody.tanggalTransaksi,
+    );
+
+    // Transaksi hari ini: edit langsung tanpa approval
+    if (!butuhApproval) {
+      const result = await editPenjualan(prisma, penjualanId, editBody, {
+        actorUserId: userId,
+      });
+      return NextResponse.json(
+        deepSerialize({
+          success: true,
+          applied: true,
+          message: "Penjualan berhasil diupdate",
+          data: { penjualan: result?.updated, receipt: result?.receipt },
+        }),
+      );
+    }
+
+    // Transaksi tanggal sebelumnya: buat permintaan edit (approval admin)
+    const alasanTrim = typeof alasan === "string" ? alasan.trim() : "";
+    if (alasanTrim.length < 5) {
+      throw new EditPenjualanError(
+        "Edit transaksi tanggal sebelumnya perlu approval admin. Alasan edit wajib diisi (minimal 5 karakter)",
+        400,
+      );
+    }
+
     // Validasi penuh tanpa menyimpan (stok, limit piutang, dll.)
     await editPenjualan(prisma, penjualanId, editBody, {
       dryRun: true,
       actorUserId: userId,
-      assertPenjualan: (penjualan) => {
-        // Penjualan luar kota (perjalanan sales) punya alur edit sendiri
-        if (penjualan.perjalananSalesId) {
-          throw new EditPenjualanError(
-            "Penjualan luar kota tidak bisa diedit dari sini",
-            400,
-          );
-        }
-        if (isBeforeTodayWIB(penjualan.tanggalTransaksi)) {
-          throw new EditPenjualanError(
-            "Transaksi tanggal sebelumnya tidak bisa diedit",
-            403,
-          );
-        }
-        if (
-          editBody.tanggalTransaksi &&
-          isBeforeTodayWIB(editBody.tanggalTransaksi)
-        ) {
-          throw new EditPenjualanError(
-            "Tanggal transaksi tidak boleh diubah ke tanggal sebelumnya",
-            403,
-          );
-        }
-      },
     });
 
     const [snapshotSebelum, sesudah] = await Promise.all([

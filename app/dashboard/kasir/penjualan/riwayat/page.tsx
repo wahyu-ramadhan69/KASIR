@@ -246,10 +246,10 @@ const RiwayatPenjualanPage = () => {
     setEndDate(todayStr);
   }, [isRiwayatHariIni, todayStr]);
 
-  // Transaksi sebelum hari ini tidak bisa diedit oleh kasir
-  const canEditPenjualan = (tanggalTransaksi: string) =>
-    userRole === "ADMIN" ||
-    new Date(tanggalTransaksi).toLocaleDateString("en-CA") >= todayStr;
+  // Kasir: edit transaksi tanggal sebelumnya perlu approval admin
+  const editButuhApproval = (tanggalTransaksi: string) =>
+    userRole !== "ADMIN" &&
+    new Date(tanggalTransaksi).toLocaleDateString("en-CA") < todayStr;
 
   // Fetch data & stats when filters change
   useEffect(() => {
@@ -855,11 +855,19 @@ const RiwayatPenjualanPage = () => {
                                         }
                                       }}
                                     />
-                                  ) : canEditPenjualan(pj.tanggalTransaksi) && (
+                                  ) : (
                                     <Link
                                       href={`/dashboard/kasir/penjualan?editId=${pj.id}`}
-                                      className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all"
-                                      title="Edit Penjualan"
+                                      className={`p-2 text-white rounded-lg transition-all ${
+                                        editButuhApproval(pj.tanggalTransaksi)
+                                          ? "bg-orange-400 hover:bg-orange-500"
+                                          : "bg-amber-500 hover:bg-amber-600"
+                                      }`}
+                                      title={
+                                        editButuhApproval(pj.tanggalTransaksi)
+                                          ? "Edit Penjualan (perlu approval admin)"
+                                          : "Edit Penjualan"
+                                      }
                                     >
                                       <Pencil className="w-4 h-4" />
                                     </Link>

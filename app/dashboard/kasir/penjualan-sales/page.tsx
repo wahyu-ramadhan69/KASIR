@@ -184,12 +184,20 @@ const PenjualanPage = () => {
   const [loadingEdit, setLoadingEdit] = useState(false);
   // Edit oleh kasir harus disetujui admin -> wajib isi alasan
   const [alasanEdit, setAlasanEdit] = useState("");
+  // Tanggal asli transaksi yang sedang diedit (YYYY-MM-DD lokal)
+  const [tanggalAsliEdit, setTanggalAsliEdit] = useState("");
   const [originalQtyByBarangId, setOriginalQtyByBarangId] = useState<{
     [key: number]: number;
   }>({});
   const [tanggalPenjualan, setTanggalPenjualan] = useState(
     new Date().toISOString().split("T")[0]
   );
+  // Kasir: edit transaksi hari ini langsung; tanggal sebelumnya perlu approval
+  const todayLocalStr = new Date().toLocaleDateString("en-CA");
+  const needsEditApproval =
+    !!editPenjualanId &&
+    ((!!tanggalAsliEdit && tanggalAsliEdit < todayLocalStr) ||
+      (!!tanggalPenjualan && tanggalPenjualan < todayLocalStr));
   const [tanggalJatuhTempo, setTanggalJatuhTempo] = useState("");
   const [keterangan, setKeterangan] = useState("");
   const [rutePengiriman, setRutePengiriman] = useState("");
@@ -460,11 +468,12 @@ const PenjualanPage = () => {
         setJumlahCash("");
         setJumlahTransfer("");
       }
-      setTanggalPenjualan(
-        penjualan.tanggalTransaksi
-          ? new Date(penjualan.tanggalTransaksi).toISOString().split("T")[0]
-          : new Date().toISOString().split("T")[0]
-      );
+      // Pakai tanggal lokal (WIB), bukan UTC, agar tidak mundur sehari
+      const tanggalAsli = penjualan.tanggalTransaksi
+        ? new Date(penjualan.tanggalTransaksi).toLocaleDateString("en-CA")
+        : new Date().toLocaleDateString("en-CA");
+      setTanggalPenjualan(tanggalAsli);
+      setTanggalAsliEdit(tanggalAsli);
       setTanggalJatuhTempo(
         penjualan.tanggalJatuhTempo
           ? new Date(penjualan.tanggalJatuhTempo).toISOString().split("T")[0]
@@ -1215,8 +1224,9 @@ const PenjualanPage = () => {
         updatePayload.totalCash = cash;
         updatePayload.totalTransfer = transfer;
 
-        // Kasir: kirim sebagai permintaan edit (menunggu approval admin)
-        if (alasanEdit.trim().length < 5) {
+        // Tanggal sebelumnya: permintaan edit (approval admin), wajib alasan.
+        // Hari ini: backend langsung menerapkan edit.
+        if (needsEditApproval && alasanEdit.trim().length < 5) {
           toast.error("Alasan edit wajib diisi (minimal 5 karakter)");
           return;
         }
@@ -1228,13 +1238,27 @@ const PenjualanPage = () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ...updatePayload,
-              alasan: alasanEdit.trim(),
+              alasan: needsEditApproval ? alasanEdit.trim() : undefined,
             }),
           }
         );
         const requestResult = await requestRes.json();
 
-        if (requestResult.success) {
+        if (requestResult.success && requestResult.applied) {
+          // Edit langsung diterapkan (transaksi hari ini)
+          setReceiptData({
+            ...requestResult.data.receipt,
+            id: editPenjualanId,
+          });
+          setShowCheckoutModal(false);
+          setShowReceiptModal(true);
+          setAlasanEdit("");
+          toast.success(requestResult.message || "Penjualan berhasil diupdate");
+          fetchMasterData();
+          fetchTopCustomers();
+          fetchTopKaryawan();
+          fetchTodaySales();
+        } else if (requestResult.success) {
           toast.success(
             requestResult.message ||
               "Permintaan edit terkirim, menunggu approval admin"
@@ -1350,6 +1374,7 @@ const PenjualanPage = () => {
 
   const handleReset = () => {
     setAlasanEdit("");
+    setTanggalAsliEdit("");
     setCurrentPenjualan({
       items: [],
       subtotal: 0,
@@ -1493,7 +1518,8 @@ const PenjualanPage = () => {
                 {editPenjualanId && (
                   <div className="mt-2">
                     <span className="inline-flex items-center gap-2 bg-yellow-400/90 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full">
-                      Mode Edit • #{editPenjualanId} • Perlu approval admin
+                      Mode Edit • #{editPenjualanId}
+                      {needsEditApproval && " • Perlu approval admin"}
                       {loadingEdit && (
                         <span className="inline-block h-2 w-2 rounded-full bg-slate-900 animate-pulse" />
                       )}
@@ -2505,7 +2531,11 @@ const PenjualanPage = () => {
                     className="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
                   >
                     <CreditCard className="w-5 h-5" />
-                    {editPenjualanId ? "Lanjut Ajukan Perubahan" : "Bayar Sekarang"}
+                    {needsEditApproval
+                      ? "Lanjut Ajukan Perubahan"
+                      : editPenjualanId
+                      ? "Simpan Perubahan"
+                      : "Bayar Sekarang"}
                   </button>
                 </div>
               )}
@@ -2856,8 +2886,8 @@ const PenjualanPage = () => {
                 </div>
               )}
 
-              {/* Alasan edit - kasir wajib isi, perlu approval admin */}
-              {editPenjualanId && (
+              {/* Alasan edit - transaksi tanggal sebelumnya perlu approval admin */}
+              {needsEditApproval && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3.5 space-y-2">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -2915,7 +2945,7 @@ const PenjualanPage = () => {
                 disabled={
                   loading ||
                   !paymentStatus?.canCheckout ||
-                  (!!editPenjualanId && alasanEdit.trim().length < 5)
+                  (needsEditApproval && alasanEdit.trim().length < 5)
                 }
                 className="w-full bg-slate-700 hover:bg-slate-800 disabled:bg-gray-300 text-white py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed"
               >
@@ -2927,7 +2957,11 @@ const PenjualanPage = () => {
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    {editPenjualanId ? "Ajukan Perubahan" : "Konfirmasi Pembayaran"}
+                    {needsEditApproval
+                      ? "Ajukan Perubahan"
+                      : editPenjualanId
+                      ? "Simpan Perubahan"
+                      : "Konfirmasi Pembayaran"}
                   </>
                 )}
               </button>

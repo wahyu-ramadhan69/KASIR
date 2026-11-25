@@ -217,7 +217,15 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [editPenjualanId, setEditPenjualanId] = useState<number | null>(null);
-  const needsEditApproval = !!editPenjualanId && !isAdmin;
+  // Tanggal asli transaksi yang sedang diedit (YYYY-MM-DD lokal)
+  const [tanggalAsliEdit, setTanggalAsliEdit] = useState<string>("");
+  // Kasir: edit transaksi hari ini langsung; tanggal sebelumnya perlu approval
+  const todayLocalStr = new Date().toLocaleDateString("en-CA");
+  const needsEditApproval =
+    !!editPenjualanId &&
+    !isAdmin &&
+    ((!!tanggalAsliEdit && tanggalAsliEdit < todayLocalStr) ||
+      (!!tanggalTransaksi && tanggalTransaksi < todayLocalStr));
   const [loadingEdit, setLoadingEdit] = useState<boolean>(false);
   // Edit oleh kasir harus disetujui admin -> wajib isi alasan
   const [alasanEdit, setAlasanEdit] = useState<string>("");
@@ -308,18 +316,6 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         return;
       }
 
-      // Transaksi tanggal sebelumnya tidak bisa diedit dari halaman kasir
-      const todayLocal = new Date().toLocaleDateString("en-CA");
-      const tanggalPenjualan = new Date(
-        penjualan.tanggalTransaksi
-      ).toLocaleDateString("en-CA");
-      if (tanggalPenjualan < todayLocal) {
-        toast.error("Transaksi tanggal sebelumnya tidak bisa diedit");
-        setEditPenjualanId(null);
-        router.replace("/dashboard/kasir/penjualan/riwayat");
-        return;
-      }
-
       const originalQtyMap: { [key: number]: number } = {};
       const newCartItems: CartItem[] = penjualan.items.map((item) => {
         const jumlahPerKemasan = Number(item.barang?.jumlahPerKemasan || 1);
@@ -405,10 +401,12 @@ const PenjualanPage = ({ isAdmin = false, userId }: Props) => {
         setJumlahTransfer("");
       }
 
+      // Pakai tanggal lokal (WIB), bukan UTC, agar tidak mundur sehari
       const transaksiDate = penjualan.tanggalTransaksi
-        ? new Date(penjualan.tanggalTransaksi).toISOString().split("T")[0]
+        ? new Date(penjualan.tanggalTransaksi).toLocaleDateString("en-CA")
         : "";
       setTanggalTransaksi(transaksiDate);
+      setTanggalAsliEdit(transaksiDate);
 
       const jatuhTempoDate = penjualan.tanggalJatuhTempo
         ? new Date(penjualan.tanggalJatuhTempo).toISOString().split("T")[0]

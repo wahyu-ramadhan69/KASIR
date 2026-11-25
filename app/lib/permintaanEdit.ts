@@ -8,6 +8,23 @@ import {
   getTotalItemPcs,
   toNumber,
 } from "@/app/lib/penjualanEdit";
+import { isBeforeTodayWIB } from "@/app/lib/tanggal";
+
+/**
+ * Aturan edit kasir:
+ * - transaksi HARI INI            -> boleh edit langsung
+ * - transaksi TANGGAL SEBELUMNYA  -> wajib permintaan edit (approval admin)
+ * - mengubah tanggal ke hari sebelumnya juga wajib approval
+ */
+export function kasirEditButuhApproval(
+  tanggalTransaksiLama: Date,
+  tanggalTransaksiBaru?: string | null,
+): boolean {
+  return (
+    isBeforeTodayWIB(tanggalTransaksiLama) ||
+    (!!tanggalTransaksiBaru && isBeforeTodayWIB(tanggalTransaksiBaru))
+  );
+}
 
 /** Ringkasan transaksi untuk ditampilkan (sebelum / sesudah) */
 export type RingkasanPenjualan = {
