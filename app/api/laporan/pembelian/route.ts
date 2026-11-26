@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { isAuthenticated } from "@/app/AuthGuard";
+import { parseSupplierIds, supplierWhere } from "./supplierFilter";
 
 const prisma = new PrismaClient();
 
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("endDate");
     const search = searchParams.get("search");
     const statusPembayaran = searchParams.get("statusPembayaran");
-    const supplierId = searchParams.get("supplierId");
+    const supplierIds = parseSupplierIds(searchParams);
 
     // Build where clause
     const where: any = {
@@ -74,8 +75,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter supplier
-    if (supplierId) {
-      where.supplierId = parseInt(supplierId);
+    if (supplierIds.length > 0) {
+      where.supplierId = supplierWhere(supplierIds);
     }
 
     // Search

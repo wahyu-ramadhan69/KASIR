@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import ExcelJS from "exceljs";
 import { isAuthenticated } from "@/app/AuthGuard";
+import { parseSupplierIds, supplierWhere } from "../supplierFilter";
 
 const prisma = new PrismaClient();
 
@@ -23,7 +24,8 @@ async function fetchPembelian(
   startDate: string | null,
   endDate: string | null,
   search: string | null,
-  supplierId: string | null
+  supplierIds: number[],
+  statusPembayaran: string | null
 ): Promise<any[]> {
   const where: any = {
     statusTransaksi: "SELESAI",
@@ -47,8 +49,13 @@ async function fetchPembelian(
   }
 
   // SUPPLIER FILTER
-  if (supplierId) {
-    where.supplierId = parseInt(supplierId);
+  if (supplierIds.length > 0) {
+    where.supplierId = supplierWhere(supplierIds);
+  }
+
+  // STATUS PEMBAYARAN FILTER
+  if (statusPembayaran === "LUNAS" || statusPembayaran === "HUTANG") {
+    where.statusPembayaran = statusPembayaran;
   }
 
   // SEARCH
@@ -84,6 +91,29 @@ function addBorder(cell: any) {
   };
 }
 
+/** Teks filter supplier & status untuk header Excel */
+async function getFilterLabel(
+  supplierIds: number[],
+  statusPembayaran: string | null
+): Promise<string> {
+  let supplierLabel = "Semua Supplier";
+  if (supplierIds.length > 0) {
+    const suppliers = await prisma.supplier.findMany({
+      where: { id: { in: supplierIds } },
+      select: { namaSupplier: true },
+      orderBy: { namaSupplier: "asc" },
+    });
+    supplierLabel = suppliers.map((sp) => sp.namaSupplier).join(", ") || "-";
+  }
+  const statusLabel =
+    statusPembayaran === "LUNAS"
+      ? "Lunas"
+      : statusPembayaran === "HUTANG"
+        ? "Hutang"
+        : "Semua Status";
+  return `Supplier: ${supplierLabel} | Status: ${statusLabel}`;
+}
+
 function formatDateRange(
   startDate: string | null,
   endDate: string | null
@@ -117,14 +147,17 @@ async function exportSummary(
   startDate: string | null,
   endDate: string | null,
   search: string | null,
-  supplierId: string | null
+  supplierIds: number[],
+  statusPembayaran: string | null
 ): Promise<NextResponse> {
   const pembelianList = await fetchPembelian(
     startDate,
     endDate,
     search,
-    supplierId
+    supplierIds,
+    statusPembayaran
   );
+  const filterLabel = await getFilterLabel(supplierIds, statusPembayaran);
 
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Laporan Pembelian");
@@ -158,7 +191,7 @@ async function exportSummary(
   // DATE RANGE ROW
   worksheet.mergeCells("A2:K2");
   const periodCell = worksheet.getCell("A2");
-  periodCell.value = `Periode: ${formatDateRange(startDate, endDate)}`;
+  periodCell.value = `Periode: ${formatDateRange(startDate, endDate)} | ${filterLabel}`;
   periodCell.alignment = { horizontal: "center" };
   periodCell.font = { italic: true, size: 11 };
 
@@ -311,14 +344,17 @@ async function exportDetail(
   startDate: string | null,
   endDate: string | null,
   search: string | null,
-  supplierId: string | null
+  supplierIds: number[],
+  statusPembayaran: string | null
 ): Promise<NextResponse> {
   const pembelianList = await fetchPembelian(
     startDate,
     endDate,
     search,
-    supplierId
+    supplierIds,
+    statusPembayaran
   );
+  const filterLabel = await getFilterLabel(supplierIds, statusPembayaran);
 
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Laporan Detail Pembelian");
@@ -354,7 +390,7 @@ async function exportDetail(
   // DATE RANGE ROW
   worksheet.mergeCells("A2:M2");
   const periodCell = worksheet.getCell("A2");
-  periodCell.value = `Periode: ${formatDateRange(startDate, endDate)}`;
+  periodCell.value = `Periode: ${formatDateRange(startDate, endDate)} | ${filterLabel}`;
   periodCell.alignment = { horizontal: "center" };
   periodCell.font = { italic: true, size: 11 };
 
@@ -562,7 +598,14 @@ async function exportDetail(
 // =====================================================
 // EXPORT YEARLY
 // =====================================================
-async function exportYearly(year: number): Promise<NextResponse> {
+async function exportYearly(
+  year: number,
+  supplierIds: number[]
+): Promise<NextResponse> {
+  const filterLabel =
+    supplierIds.length > 0
+      ? (await getFilterLabel(supplierIds, null)).split(" | ")[0]
+      : null;
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet(`Laporan ${year}`);
 
@@ -579,7 +622,9 @@ async function exportYearly(year: number): Promise<NextResponse> {
   // Title
   worksheet.mergeCells("A1:G1");
   const titleCell = worksheet.getCell("A1");
-  titleCell.value = `LAPORAN PEMBELIAN TAHUNAN ${year}`;
+  titleCell.value = `LAPORAN PEMBELIAN TAHUNAN ${year}${
+    filterLabel ? ` - ${filterLabel.replace("Supplier: ", "")}` : ""
+  }`;
   titleCell.font = { size: 16, bold: true, color: { argb: "FFFFFFFF" } };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   titleCell.fill = {
@@ -643,6 +688,9 @@ async function exportYearly(year: number): Promise<NextResponse> {
       where: {
         statusTransaksi: "SELESAI",
         createdAt: { gte: startDate, lte: endDate },
+        ...(supplierIds.length > 0
+          ? { supplierId: supplierWhere(supplierIds) }
+          : {}),
       },
       include: {
         items: { include: { barang: true } },
@@ -745,20 +793,33 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const search = searchParams.get("search");
-    const supplierId = searchParams.get("supplierId");
+    const supplierIds = parseSupplierIds(searchParams);
+    const statusPembayaran = searchParams.get("statusPembayaran");
 
     // YEARLY REPORT
     if (period === "yearly" && year) {
-      return await exportYearly(parseInt(year));
+      return await exportYearly(parseInt(year), supplierIds);
     }
 
     // DETAIL REPORT (with date range)
     if (detail) {
-      return await exportDetail(startDate, endDate, search, supplierId);
+      return await exportDetail(
+        startDate,
+        endDate,
+        search,
+        supplierIds,
+        statusPembayaran
+      );
     }
 
     // SUMMARY REPORT (with date range)
-    return await exportSummary(startDate, endDate, search, supplierId);
+    return await exportSummary(
+      startDate,
+      endDate,
+      search,
+      supplierIds,
+      statusPembayaran
+    );
   } catch (error) {
     console.error("Error exporting:", error);
     return NextResponse.json(

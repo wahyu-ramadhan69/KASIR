@@ -13,6 +13,7 @@ import {
   Building2,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import MultiSelectChecklist from "@/app/components/MultiSelectChecklist";
 
 interface Barang {
   id: number;
@@ -61,6 +62,23 @@ interface Stats {
   totalDus: number;
 }
 
+// Default filter tanggal: 1 bulan terakhir (sampai hari ini)
+const getDefaultRange = () => {
+  const end = new Date();
+  const start = new Date();
+  start.setMonth(start.getMonth() - 1);
+  return {
+    start: start.toLocaleDateString("en-CA"),
+    end: end.toLocaleDateString("en-CA"),
+  };
+};
+
+interface SupplierOption {
+  id: number;
+  namaSupplier: string;
+  isActive: boolean;
+}
+
 const LaporanPembelianPage = () => {
   const [pembelianList, setPembelianList] = useState<PembelianHeader[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -78,8 +96,15 @@ const LaporanPembelianPage = () => {
   const [hasMore, setHasMore] = useState<boolean>(true);
 
   // Filter state
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>(
+    () => getDefaultRange().start
+  );
+  const [endDate, setEndDate] = useState<string>(() => getDefaultRange().end);
+  // Filter supplier, bisa lebih dari satu (diproses di backend)
+  const [supplierIds, setSupplierIds] = useState<number[]>([]);
+  // urutan pilihan tidak penting -> key stabil untuk dependency effect
+  const supplierIdsKey = [...supplierIds].sort((a, b) => a - b).join(",");
+  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -96,12 +121,44 @@ const LaporanPembelianPage = () => {
   // Ref untuk infinite scroll
   const observerTarget = useRef<HTMLDivElement>(null);
 
+  // Daftar supplier untuk filter
+  useEffect(() => {
+    fetch("/api/laporan/pembelian/suppliers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setSupplierOptions(data.data);
+      })
+      .catch((error) => console.error("Error fetching supplier:", error));
+  }, []);
+
   useEffect(() => {
     setPembelianList([]);
     setPage(1);
     setHasMore(true);
     fetchData(1, true);
-  }, [startDate, endDate, searchTerm, statusFilter]);
+  }, [startDate, endDate, searchTerm, statusFilter, supplierIdsKey]);
+
+  /** Parameter filter yang sama untuk tabel & export */
+  const buildFilterParams = () => {
+    const params = new URLSearchParams();
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+    if (searchTerm) params.append("search", searchTerm);
+    if (statusFilter !== "all") params.append("statusPembayaran", statusFilter);
+    if (supplierIdsKey) params.append("supplierIds", supplierIdsKey);
+    return params;
+  };
+
+  const selectedSupplierNames = supplierOptions
+    .filter((sp) => supplierIds.includes(sp.id))
+    .map((sp) => sp.namaSupplier);
+  // Label ringkas untuk banner & nama file
+  const selectedSupplierLabel =
+    selectedSupplierNames.length === 0
+      ? ""
+      : selectedSupplierNames.length <= 2
+        ? selectedSupplierNames.join(", ")
+        : `${selectedSupplierNames.length} supplier`;
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -136,12 +193,10 @@ const LaporanPembelianPage = () => {
     }
 
     try {
-      let url = `/api/laporan/pembelian?page=${pageNum}&limit=20`;
-
-      if (startDate) url += `&startDate=${startDate}`;
-      if (endDate) url += `&endDate=${endDate}`;
-      if (searchTerm) url += `&search=${searchTerm}`;
-      if (statusFilter !== "all") url += `&statusPembayaran=${statusFilter}`;
+      const params = buildFilterParams();
+      params.append("page", String(pageNum));
+      params.append("limit", "20");
+      const url = `/api/laporan/pembelian?${params.toString()}`;
 
       const res = await fetch(url);
 
@@ -194,11 +249,21 @@ const LaporanPembelianPage = () => {
     setShowDetailModal(true);
   };
 
+  const defaultRange = getDefaultRange();
+  const isDefaultFilter =
+    startDate === defaultRange.start &&
+    endDate === defaultRange.end &&
+    !searchTerm &&
+    statusFilter === "all" &&
+    supplierIds.length === 0;
+
   const handleClearFilters = () => {
-    setStartDate("");
-    setEndDate("");
+    const range = getDefaultRange();
+    setStartDate(range.start);
+    setEndDate(range.end);
     setSearchTerm("");
     setStatusFilter("all");
+    setSupplierIds([]);
   };
 
   const handleExport = async (exportType: "summary" | "detail" = "detail") => {
@@ -209,19 +274,16 @@ const LaporanPembelianPage = () => {
     }
 
     try {
-      let url = `/api/laporan/pembelian/export?format=excel`;
-
-      if (exportType === "summary") {
-        url += `&detail=false`;
-      } else {
-        url += `&detail=true`;
-      }
-
-      if (startDate) url += `&startDate=${startDate}`;
-      if (endDate) url += `&endDate=${endDate}`;
-      if (searchTerm) url += `&search=${searchTerm}`;
+      // Export memakai filter yang sama dengan tabel
+      const params = buildFilterParams();
+      params.append("format", "excel");
+      params.append("detail", exportType === "summary" ? "false" : "true");
+      const url = `/api/laporan/pembelian/export?${params.toString()}`;
 
       const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const blob = await res.blob();
 
       const downloadUrl = window.URL.createObjectURL(blob);
@@ -233,6 +295,9 @@ const LaporanPembelianPage = () => {
         filename += "-Summary";
       } else {
         filename += "-Detail";
+      }
+      if (selectedSupplierLabel) {
+        filename += `-${selectedSupplierLabel.replace(/[^a-zA-Z0-9]+/g, "-")}`;
       }
 
       if (startDate && endDate) {
@@ -265,15 +330,27 @@ const LaporanPembelianPage = () => {
 
     try {
       const year = new Date().getFullYear();
-      const url = `/api/laporan/pembelian/export?period=yearly&year=${year}`;
+      const params = new URLSearchParams({
+        period: "yearly",
+        year: String(year),
+      });
+      if (supplierIdsKey) params.append("supplierIds", supplierIdsKey);
+      const url = `/api/laporan/pembelian/export?${params.toString()}`;
 
       const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const blob = await res.blob();
 
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `Laporan-Pembelian-Tahunan-${year}.xlsx`;
+      link.download = `Laporan-Pembelian-Tahunan-${year}${
+        selectedSupplierLabel
+          ? `-${selectedSupplierLabel.replace(/[^a-zA-Z0-9]+/g, "-")}`
+          : ""
+      }.xlsx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -382,18 +459,27 @@ const LaporanPembelianPage = () => {
           </div>
         </div>
 
-        {(startDate || endDate) && (
-          <div className="mt-4 bg-blue-700/50 rounded-lg px-4 py-2">
-            <p className="text-sm text-blue-100">
-              📅 Export akan menggunakan filter:{" "}
-              <span className="font-semibold text-white">
-                {startDate && `Dari ${formatDate(startDate)}`}
-                {startDate && endDate && " "}
-                {endDate && `Sampai ${formatDate(endDate)}`}
-              </span>
-            </p>
-          </div>
-        )}
+        <div className="mt-4 bg-blue-700/50 rounded-lg px-4 py-2">
+          <p className="text-sm text-blue-100">
+            📅 Export akan menggunakan filter:{" "}
+            <span className="font-semibold text-white">
+              {startDate || endDate ? (
+                <>
+                  {startDate && `Dari ${formatDate(startDate)}`}
+                  {startDate && endDate && " "}
+                  {endDate && `Sampai ${formatDate(endDate)}`}
+                </>
+              ) : (
+                "Semua periode"
+              )}
+              {" · "}
+              {selectedSupplierLabel || "Semua supplier"}
+              {statusFilter !== "all" &&
+                ` · ${statusFilter === "LUNAS" ? "Lunas" : "Hutang"}`}
+              {searchTerm && ` · Cari "${searchTerm}"`}
+            </span>
+          </p>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -479,6 +565,20 @@ const LaporanPembelianPage = () => {
             </div>
           </div>
 
+          <MultiSelectChecklist
+            className="md:w-56"
+            options={supplierOptions.map((sp) => ({
+              value: sp.id,
+              label: sp.namaSupplier,
+              hint: sp.isActive ? undefined : "nonaktif",
+            }))}
+            selected={supplierIds}
+            onChange={setSupplierIds}
+            allLabel="Semua Supplier"
+            unitLabel="supplier"
+            searchPlaceholder="Cari supplier..."
+          />
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -489,7 +589,7 @@ const LaporanPembelianPage = () => {
             <option value="HUTANG">Hutang</option>
           </select>
 
-          {(startDate || endDate || searchTerm || statusFilter !== "all") && (
+          {!isDefaultFilter && (
             <button
               onClick={handleClearFilters}
               className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-all flex items-center gap-2"
